@@ -1,0 +1,11 @@
+# Сборки
+/bin/
+/spike/*/s1
+/spike/*/out/
+*.test
+*.syso
+
+# Редакторы
+.vscode/
+.idea/
+*.swp
