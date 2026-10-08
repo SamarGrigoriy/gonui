@@ -31,3 +31,57 @@ func BoxPack(h, child H, expand bool) {
 func SpacerNew(id uint32) H {
 	return adopt(C.gtk_box_new(C.NUI_GTK_ORIENTATION_HORIZONTAL, 0), id, true)
 }
+
+// GridNew — GtkGrid с промежутками 6 по колонкам и строкам (layout.md, §2).
+func GridNew(id uint32) H {
+	w := C.gtk_grid_new()
+	C.gtk_grid_set_column_spacing((*C.GtkGrid)(w), 6)
+	C.gtk_grid_set_row_spacing((*C.GtkGrid)(w), 6)
+	return adopt(w, id, true)
+}
+
+func GridAttach(h, child H, col, row, cols, rows int) {
+	C.gtk_grid_attach((*C.GtkGrid)(h), widget(child), C.gint(col), C.gint(row), C.gint(cols), C.gint(rows))
+}
+
+func GridSetSpacing(h H, colGap, rowGap int) {
+	if colGap < 0 {
+		colGap = 0
+	}
+	if rowGap < 0 {
+		rowGap = 0
+	}
+	C.gtk_grid_set_column_spacing((*C.GtkGrid)(h), C.guint(colGap))
+	C.gtk_grid_set_row_spacing((*C.GtkGrid)(h), C.guint(rowGap))
+}
+
+// SeparatorNew: горизонтальная линия для VBox, вертикальная — для HBox.
+func SeparatorNew(id uint32, vertical bool) H {
+	o := C.GtkOrientation(C.NUI_GTK_ORIENTATION_HORIZONTAL)
+	if vertical {
+		o = C.NUI_GTK_ORIENTATION_VERTICAL
+	}
+	return adopt(C.gtk_separator_new(o), id, true)
+}
+
+// FrameNew — рамка с заголовком; "" — без заголовка.
+func FrameNew(id uint32, title string) H {
+	h := adopt(C.gtk_frame_new(nil), id, true)
+	FrameSetTitle(h, title)
+	return h
+}
+
+func FrameSetTitle(h H, s string) {
+	if s == "" {
+		C.gtk_frame_set_label((*C.GtkFrame)(h), nil)
+		return
+	}
+	C.gtk_frame_set_label((*C.GtkFrame)(h), cstr(s))
+}
+
+// ScrollNew — полосы прокрутки появляются, только если ребёнок не помещается.
+func ScrollNew(id uint32) H {
+	w := C.gtk_scrolled_window_new(nil, nil)
+	C.gtk_scrolled_window_set_policy((*C.GtkScrolledWindow)(w), C.NUI_GTK_POLICY_AUTOMATIC, C.NUI_GTK_POLICY_AUTOMATIC)
+	return adopt(w, id, true)
+}

@@ -9,7 +9,7 @@ GO           ?= go
 TINYGO       ?= tinygo
 TINYGO_SCHED ?= none
 ARCH         ?= amd64
-EXAMPLES     := hello
+EXAMPLES     := hello form
 GTK_DEBUG_ENV := NO_AT_BRIDGE=1 G_DEBUG=fatal-criticals
 XVFB         ?= xvfb-run -a
 
@@ -85,13 +85,25 @@ docker-ci:                                   ## ci-container в чистом Deb
 
 ci: check docker-ci
 
-SHOTS := docs/reports/phase-1
-shots: release-gc small                      ## фотоотчёт: окна под Xvfb с openbox (в контейнере)
+# Фотоотчёт: окна примеров (обоими тулчейнами) и окна тестов раскладки под Xvfb с openbox.
+# Запускать в контейнере: tools/docker-run.sh make shots SHOTS=docs/reports/phase-N
+SHOTS       ?= docs/reports/phase-2
+SHOTS_TESTS ?= TestBoxLayout|TestGridLayout|TestLabelEllipsisWidth
+shots: release-gc small
 	@mkdir -p $(SHOTS)
-	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) $(XVFB) -s "-screen 0 640x360x24" sh -c '\
+	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) $(XVFB) -s "-screen 0 800x600x24" sh -c '\
 		openbox >/dev/null 2>&1 & sleep 1; \
-		for t in gc small; do ./bin/$$t/hello & pid=$$!; sleep 1.5; rootshot | pnmtopng > $(SHOTS)/hello-$$t.png; kill $$pid; sleep 0.5; done; \
-		NUI_SHOTS=$(SHOTS) $(GO) test -count=1 -tags gui -run TestBoxLayout .'
+		for e in $(EXAMPLES); do for t in gc small; do \
+			./bin/$$t/$$e & pid=$$!; sleep 1.5; rootshot | pnmtopng > $(SHOTS)/$$e-$$t.png; kill $$pid; sleep 0.5; \
+		done; done; \
+		NUI_SHOTS=$(SHOTS) $(GO) test -count=1 -tags gui -run "$(SHOTS_TESTS)" .'
+	@# Часть ручного чек-листа (testing.md, §7) — автоматически: тёмная тема и масштаб 2×.
+	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) GTK_THEME=Adwaita:dark $(XVFB) -s "-screen 0 800x600x24" sh -c '\
+		openbox >/dev/null 2>&1 & sleep 1; ./bin/small/form & pid=$$!; sleep 1.5; \
+		rootshot | pnmtopng > $(SHOTS)/form-dark.png; kill $$pid'
+	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) GDK_SCALE=2 $(XVFB) -s "-screen 0 1100x1100x24" sh -c '\
+		openbox >/dev/null 2>&1 & sleep 1; ./bin/small/form & pid=$$!; sleep 1.5; \
+		rootshot | pnmtopng > $(SHOTS)/form-scale2.png; kill $$pid'
 
 clean:
 	rm -rf bin

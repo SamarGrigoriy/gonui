@@ -40,3 +40,47 @@ func WindowShow(h H) {
 	C.gtk_widget_show(widget(h))
 	C.gtk_window_present((*C.GtkWindow)(h))
 }
+
+// WindowSetSize (api.md, §5): растягиваемое окно — начальный размер (до показа —
+// default size, после — resize), пользователь может его менять; нерастягиваемое —
+// фиксированный размер через size request: окно = max(запрос, размер содержимого).
+// Последний SetSize хранится в default size самого окна — у nui.Window нет лишних полей.
+func WindowSetSize(h H, w, ht int) {
+	win := (*C.GtkWindow)(h)
+	C.gtk_window_set_default_size(win, C.gint(w), C.gint(ht))
+	if C.gtk_window_get_resizable(win) == 0 {
+		C.gtk_widget_set_size_request(widget(h), C.gint(w), C.gint(ht))
+		return
+	}
+	C.gtk_widget_set_size_request(widget(h), -1, -1)
+	if C.gtk_widget_get_visible(widget(h)) != 0 {
+		C.gtk_window_resize(win, C.gint(w), C.gint(ht))
+	}
+}
+
+// WindowSetResizable меняет растягиваемость и заново применяет последний SetSize:
+// его смысл от неё зависит (начальный размер или фиксированный).
+func WindowSetResizable(h H, on bool) {
+	win := (*C.GtkWindow)(h)
+	C.gtk_window_set_resizable(win, b2i(on))
+	var w, ht C.gint
+	C.gtk_window_get_default_size(win, &w, &ht)
+	if w > 0 || ht > 0 {
+		WindowSetSize(h, int(w), int(ht))
+	}
+}
+
+// WindowSetDefault делает кнопку кнопкой по умолчанию: её нажимает Enter в поле ввода
+// с activates_default. btn == Nil — убрать.
+func WindowSetDefault(h, btn H) {
+	if btn != Nil {
+		C.gtk_widget_set_can_default(widget(btn), 1)
+	}
+	C.gtk_window_set_default((*C.GtkWindow)(h), widget(btn))
+}
+
+func WindowSetIconName(h H, name string) { C.gtk_window_set_icon_name((*C.GtkWindow)(h), cstr(name)) }
+
+// ContainerSetChild — Frame, Scroll: удалить старого ребёнка (он уничтожится), добавить нового.
+// Прокрутка сама оборачивает ребёнка без собственной прокрутки в GtkViewport.
+func ContainerSetChild(h, child H) { WindowSetChild(h, child) }

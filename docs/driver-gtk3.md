@@ -67,7 +67,8 @@ func LabelSetEllipsis(h H, e uint8)
 func LabelSetWrap(h H, on bool)
 func LabelSetSelectable(h H, on bool)
 func LabelSetTextAlign(h H, a uint8)
-func LabelSetStyle(h H, bold bool, color uint32) // color == 1<<24 — без цвета
+func LabelSetBold(h H, on bool)         // жирность и цвет хранятся в самой метке (g_object_set_data),
+func LabelSetColor(h H, color uint32)   // поэтому каждый вызов меняет только своё; 1<<24 — без цвета
 
 // Button, Check
 func ButtonNew(id uint32, text string) H
@@ -423,7 +424,7 @@ void g_variant_unref(GVariant*)                                                 
 | nui | Создание | Сигналы → Kind | Особенности |
 |---|---|---|---|
 | Window | `gtk_window_new(TOPLEVEL)`, `set_title`, `set_position(CENTER)`, `border_width 12` | `delete-event` → EvClose (через `nui_connect_ret`), `destroy` → EvDestroy | Окно не показывается при создании. `WindowSetSize`: у растягиваемого окна до показа — `set_default_size`, после — `gtk_window_resize`; у нерастягиваемого — `gtk_widget_set_size_request` (окно = max(запрос, естественный размер)). `SetDefault`: `gtk_widget_set_can_default(btn, TRUE)` + `gtk_window_set_default` |
-| Label | `gtk_label_new`, `gtk_label_set_xalign(0.0)` | — | `SetTextAlign` → `gtk_label_set_xalign` (0 / 0.5 / 1) **и** `gtk_label_set_justify` (LEFT / CENTER / RIGHT): `xalign` двигает блок текста целиком, а `justify` выравнивает строки внутри многострочного текста. `SetStyle` → `nui_label_style` (атрибуты Pango: вес 700/400, цвет `r*257, g*257, b*257`). Многоточие: `gtk_label_set_ellipsize`; с `EllipsisNone` минимальная ширина = ширина текста |
+| Label | `gtk_label_new`, `gtk_label_set_xalign(0.0)` | — | Жирность и цвет: `nui_label_style` хранит упакованное состояние в самой метке (`g_object_set_data`, число, не указатель Go) — у `nui.Label` нет лишних полей, и `hello` от них не растёт. `SetTextAlign` → `gtk_label_set_xalign` (0 / 0.5 / 1) **и** `gtk_label_set_justify` (LEFT / CENTER / RIGHT): `xalign` двигает блок текста целиком, а `justify` выравнивает строки внутри многострочного текста. `SetStyle` → `nui_label_style` (атрибуты Pango: вес 700/400, цвет `r*257, g*257, b*257`). Многоточие: `gtk_label_set_ellipsize`; с `EllipsisNone` минимальная ширина = ширина текста |
 | Button | `gtk_button_new_with_label` | `clicked` → EvClick | Подчёркивания в тексте не превращаются в мнемоники — это нормально |
 | Entry | `gtk_entry_new`, `set_activates_default(TRUE)` | `changed` → EvChange, `activate` → EvEnter | `SetReadOnly` → `gtk_editable_set_editable(!on)`. nui выключает `activates_default`, когда задан `OnEnter` |
 | Check | `gtk_check_button_new_with_label` | `toggled` → EvChange | — |

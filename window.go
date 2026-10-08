@@ -94,6 +94,49 @@ func (w *Window) Close() {
 	}
 }
 
+// SetSize: растягиваемое окно — начальный размер, пользователь может его менять;
+// нерастягиваемое — фиксированный размер, но не меньше естественного размера содержимого.
+func (w *Window) SetSize(width, height int) {
+	if !w.dead() {
+		drv.WindowSetSize(w.h, width, height)
+	}
+}
+
+// SetResizable — можно ли менять размер окна мышью (по умолчанию можно).
+func (w *Window) SetResizable(on bool) {
+	if !w.dead() {
+		drv.WindowSetResizable(w.h, on) // заново применит последний SetSize: его смысл от этого зависит
+	}
+}
+
+// SetPadding — отступ между краем окна и содержимым, по умолчанию 12.
+func (w *Window) SetPadding(px int) {
+	if !w.dead() {
+		drv.SetPadding(w.h, px)
+	}
+}
+
+// SetDefault — кнопка по умолчанию: её нажимает Enter в Entry без OnEnter и в поле
+// ComboEntry. nil — убрать.
+func (w *Window) SetDefault(b *Button) {
+	if w.dead() {
+		return
+	}
+	btn := drv.Nil
+	if b != nil && b.id != 0 {
+		btn = b.h
+	}
+	drv.WindowSetDefault(w.h, btn)
+}
+
+// SetIconName — иконка из темы иконок по имени, например "utilities-terminal"
+// или имя из вашего .desktop-файла.
+func (w *Window) SetIconName(name string) {
+	if !w.dead() {
+		drv.WindowSetIconName(w.h, name)
+	}
+}
+
 // OnClose: пользователь закрывает окно (крестик, Alt+F4). fn возвращает false —
 // окно остаётся. Без обработчика окно закрывается. nil снимает обработчик.
 func (w *Window) OnClose(fn func() bool) { w.onClose = fn }

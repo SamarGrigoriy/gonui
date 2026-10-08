@@ -84,7 +84,7 @@ func expectPanic(t *testing.T, want string, fn func()) {
 	defer func() {
 		r := recover()
 		if s, _ := r.(string); s != want {
-			t.Fatalf("паника %v, ожидалась %q", r, want)
+			t.Errorf("паника %v, ожидалась %q", r, want)
 		}
 	}()
 	fn()
@@ -122,22 +122,22 @@ func TestButtonClick(t *testing.T) {
 		defer w.Close()
 		b.SetText("Новая надпись") // программное изменение обработчик не вызывает (ADR-8)
 		if n != 0 || b.Text() != "Новая надпись" {
-			t.Fatalf("SetText: n = %d, текст %q", n, b.Text())
+			t.Errorf("SetText: n = %d, текст %q", n, b.Text())
 		}
 		drv.SimClick(b.h)
 		if n != 1 {
-			t.Fatalf("SimClick: OnClick вызван %d раз, ожидался 1", n)
+			t.Errorf("SimClick: OnClick вызван %d раз, ожидался 1", n)
 		}
 		m := 0
 		b.OnClick(func() { m++ }) // новый обработчик заменяет старый
 		drv.SimClick(b.h)
 		if n != 1 || m != 1 {
-			t.Fatalf("после замены: старый %d, новый %d", n, m)
+			t.Errorf("после замены: старый %d, новый %d", n, m)
 		}
 		b.OnClick(nil)
 		drv.SimClick(b.h)
 		if m != 1 {
-			t.Fatal("OnClick(nil) не снял обработчик")
+			t.Error("OnClick(nil) не снял обработчик")
 		}
 	})
 }
@@ -171,7 +171,7 @@ func TestDestroyedWidgetsAreInert(t *testing.T) {
 		w.Focus()
 		w.Close()
 		if l.Text() != "" || b.Text() != "" || w.Title() != "" || b.Enabled() || b.Visible() {
-			t.Fatal("геттеры уничтоженных объектов должны возвращать нулевые значения")
+			t.Error("геттеры уничтоженных объектов должны возвращать нулевые значения")
 		}
 	})
 }
@@ -183,11 +183,11 @@ func TestSetChildDestroysOld(t *testing.T) {
 		defer w.Close()
 		w.SetChild(nw)
 		if old.Alive() || !nw.Alive() {
-			t.Fatalf("после SetChild: старый жив = %v, новый жив = %v", old.Alive(), nw.Alive())
+			t.Errorf("после SetChild: старый жив = %v, новый жив = %v", old.Alive(), nw.Alive())
 		}
 		w.SetChild(nil)
 		if nw.Alive() {
-			t.Fatal("SetChild(nil) не уничтожил ребёнка")
+			t.Error("SetChild(nil) не уничтожил ребёнка")
 		}
 	})
 }
@@ -204,7 +204,7 @@ func TestOnClose(t *testing.T) {
 	waitUntil(t, 1000, func() bool { return asked == 1 })
 	ui(func() {
 		if !w.Alive() {
-			t.Fatal("OnClose вернул false, а окно уничтожено")
+			t.Error("OnClose вернул false, а окно уничтожено")
 		}
 		drv.SimClose(w.h)
 	})
@@ -241,7 +241,7 @@ func TestTimers(t *testing.T) {
 	time.Sleep(250 * time.Millisecond)
 	ui(func() {
 		if after != 1 || every != 3 {
-			t.Fatalf("After сработал %d раз (ожидался 1), Every — %d (ожидалось 3)", after, every)
+			t.Errorf("After сработал %d раз (ожидался 1), Every — %d (ожидалось 3)", after, every)
 		}
 		once.Stop() // Stop после срабатывания After ничего не делает
 		ev.Stop()
@@ -283,7 +283,7 @@ func TestWatchPipe(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	ui(func() {
 		if len(got) != n {
-			t.Fatal("после Stop наблюдатель продолжает срабатывать")
+			t.Error("после Stop наблюдатель продолжает срабатывать")
 		}
 		w.Stop()
 	})
@@ -294,7 +294,7 @@ func TestDoIsAsyncAndOrdered(t *testing.T) {
 	ui(func() {
 		Do(func() { ran = true })
 		if ran {
-			t.Fatal("Do выполнил функцию синхронно")
+			t.Error("Do выполнил функцию синхронно")
 		}
 	})
 	waitUntil(t, 1000, func() bool { return ran })
@@ -333,7 +333,7 @@ func TestDoIsAsyncAndOrdered(t *testing.T) {
 	})
 	ui(func() {
 		if bad != 0 {
-			t.Fatalf("порядок нарушен %d раз", bad)
+			t.Errorf("порядок нарушен %d раз", bad)
 		}
 	})
 }
