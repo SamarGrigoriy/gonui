@@ -87,8 +87,8 @@ ci: check docker-ci
 
 # Фотоотчёт: окна примеров (обоими тулчейнами) и окна тестов раскладки под Xvfb с openbox.
 # Запускать в контейнере: tools/docker-run.sh make shots SHOTS=docs/reports/phase-N
-SHOTS       ?= docs/reports/phase-2
-SHOTS_TESTS ?= TestBoxLayout|TestGridLayout|TestLabelEllipsisWidth
+SHOTS       ?= docs/reports/phase-3
+SHOTS_TESTS ?= TestBoxLayout|TestGridLayout|TestLabelEllipsisWidth|TestMessageDialogs|TestFileDialogs
 shots: release-gc small
 	@mkdir -p $(SHOTS)
 	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) $(XVFB) -s "-screen 0 800x600x24" sh -c '\

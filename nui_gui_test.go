@@ -421,6 +421,13 @@ func TestNoDisplay(t *testing.T) {
 
 func runHelper(t *testing.T, name string, want int, unset []string) {
 	t.Helper()
+	runHelperEnv(t, name, want, nil, unset)
+}
+
+// runHelperEnv запускает сценарий в дочернем процессе с добавленными (env) и убранными
+// (unset) переменными окружения.
+func runHelperEnv(t *testing.T, name string, want int, env, unset []string) {
+	t.Helper()
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
 	for _, kv := range os.Environ() {
 		skip := false
@@ -433,6 +440,7 @@ func runHelper(t *testing.T, name string, want int, unset []string) {
 			cmd.Env = append(cmd.Env, kv)
 		}
 	}
+	cmd.Env = append(cmd.Env, env...)
 	cmd.Env = append(cmd.Env, "NUI_HELPER="+name)
 	start := time.Now()
 	out, err := cmd.CombinedOutput()
@@ -477,6 +485,24 @@ func helper(name string) int {
 			code = 0
 		case "nodisplay":
 			code = 4 // setup не должен вызываться
+		case "openuri", "showinfolder": // подставная программа пишет в $NUI_REC, что открыли
+			ok := false
+			if name == "openuri" {
+				ok = OpenURI("https://example.org/nui?a=1")
+			} else {
+				ok = ShowInFolder(os.Getenv("NUI_FILE"))
+			}
+			if !ok {
+				code = 5
+				Quit()
+				break
+			}
+			Every(50, func() {
+				if b, _ := os.ReadFile(os.Getenv("NUI_REC")); len(b) > 0 {
+					code = 0
+					Quit()
+				}
+			})
 		}
 		After(4000, func() { code = 11; Quit() }) // страховка: Run не завершился
 	})

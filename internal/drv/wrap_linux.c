@@ -94,6 +94,51 @@ void nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, in
 	}
 }
 
+/* Модальное сообщение: title — крупный заголовок, text — пояснение под ним.
+   Внутри gtk_dialog_run крутится вложенный цикл: таймеры, Watch и Do продолжают работать.
+   Своя ссылка на диалог: если родитель уничтожится, пока диалог открыт (DESTROY_WITH_PARENT),
+   gtk_dialog_run вернётся, а объект ещё будет жив — destroy и unref безопасны. */
+int nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text) {
+	GtkWidget *d = gtk_message_dialog_new(parent, NUI_GTK_DIALOG_MODAL | NUI_GTK_DIALOG_DESTROY_WITH_PARENT,
+	                                      type, buttons, "%s", title);
+	if (text && *text)
+		gtk_message_dialog_format_secondary_text((GtkMessageDialog *)d, "%s", text);
+	g_object_ref(d);
+	int r = gtk_dialog_run((GtkDialog *)d);
+	gtk_widget_destroy(d);
+	g_object_unref(d);
+	return r;
+}
+
+/* Ответ файлового менеджера на ShowItems: при ошибке (службы нет и т. п.) — открыть папку. */
+static void nui_show_items_done(GObject *src, GAsyncResult *res, gpointer dir_uri) {
+	GError *err = 0;
+	GVariant *v = g_dbus_connection_call_finish((GDBusConnection *)src, res, &err);
+	if (v) {
+		g_variant_unref(v);
+	} else {
+		g_error_free(err);
+		gtk_show_uri_on_window(0, (const char *)dir_uri, 0, 0);
+	}
+	g_free(dir_uri);
+	g_object_unref(src);
+}
+
+/* Выделить файл в файловом менеджере: D-Bus org.freedesktop.FileManager1.ShowItems, асинхронно —
+   интерфейс не ждёт. Таймаут D-Bus по умолчанию: при коротком файловый менеджер, запускавшийся
+   дольше, всё равно выполнил бы ShowItems, и вместе с запасным путём открылись бы два окна.
+   Нет сессии D-Bus — сразу открыть папку. 1 — запрос отправлен или папка открыта. */
+int nui_show_items(const gchar *uri, const gchar *dir_uri) {
+	GDBusConnection *c = g_bus_get_sync(NUI_G_BUS_TYPE_SESSION, 0, 0);
+	if (!c)
+		return gtk_show_uri_on_window(0, dir_uri, 0, 0);
+	const gchar *uris[2] = {uri, 0};
+	g_dbus_connection_call(c, "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+	                       "org.freedesktop.FileManager1", "ShowItems", g_variant_new("(^ass)", uris, ""),
+	                       0, NUI_G_DBUS_CALL_FLAGS_NONE, -1, 0, nui_show_items_done, g_strdup(dir_uri));
+	return 1;
+}
+
 #ifdef NUI_GUI_TEST
 /* Тестовый помощник: GtkAllocation живёт на стеке C, Go к нему не прикасается. */
 void nui_allocation(GtkWidget *w, int out[4]) {
@@ -103,5 +148,41 @@ void nui_allocation(GtkWidget *w, int out[4]) {
 	out[1] = a.y;
 	out[2] = a.width;
 	out[3] = a.height;
+}
+
+/* Видимый диалог среди окон верхнего уровня: chooser — файловый (GtkFileChooserNative
+   без портала показывает GtkFileChooserDialog), иначе — любой другой GtkDialog. */
+static GtkWidget *nui_find_dialog(int chooser) {
+	GList *all = gtk_window_list_toplevels(), *it;
+	GtkWidget *found = 0;
+	for (it = all; it; it = it->next) {
+		GtkWidget *w = it->data;
+		if (!gtk_widget_get_visible(w) || !g_type_check_instance_is_a((GTypeInstance *)w, gtk_dialog_get_type()))
+			continue;
+		if (!!g_type_check_instance_is_a((GTypeInstance *)w, gtk_file_chooser_get_type()) == !!chooser)
+			found = w;
+	}
+	g_list_free(all);
+	return found;
+}
+
+/* Открыт ли сейчас диалог (ничего в нём не нажимая). */
+int nui_dialog_open(int chooser) { return nui_find_dialog(chooser) != 0; }
+
+/* Ответить в открытом диалоге, как будто нажали кнопку. 0 — диалога нет. */
+int nui_sim_dialog_response(int chooser, int response) {
+	GtkWidget *d = nui_find_dialog(chooser);
+	if (!d)
+		return 0;
+	gtk_dialog_response((GtkDialog *)d, response);
+	return 1;
+}
+
+/* Выбрать путь в открытом файловом диалоге (каталог загружается асинхронно — дайте ему время). */
+int nui_sim_file_chooser_set(const gchar *path) {
+	GtkWidget *d = nui_find_dialog(1);
+	if (!d)
+		return 0;
+	return gtk_file_chooser_set_filename((GtkFileChooser *)d, path);
 }
 #endif

@@ -122,8 +122,8 @@ func ContainerSetChild(h, child H)      // Frame, Scroll: удалить ста�
 
 // Диалоги и оболочка
 type Filter struct{ Name string; Patterns []string }
-func MessageBox(parent H, kind uint8, title, text string) bool // kind: Info, Alert, Ask; true = OK/Да
-func FileDialog(parent H, mode uint8, title, name string, f []Filter) (string, bool) // Open/Save/Folder
+func MessageBox(parent H, kind uint8, title, text string) bool // kind: MsgInfo, MsgAlert, MsgAsk; true = OK/Да
+func FileDialog(parent H, mode uint8, title, name string, f []Filter) (string, bool) // FileOpen, FileSave, FileFolder
 func OpenURI(parent H, uri string) bool
 func ShowInFolder(path string) bool     // асинхронно, см. §7
 ```
@@ -195,7 +195,9 @@ typedef struct { void *p[16]; } NuiTextIter;
 /* ---------- 3. Прототипы ---------- */
 /* NUI_FN(ret, имя, (параметры)) → объявление;
    в режиме проверки → _Static_assert(__builtin_types_compatible_p(
-                           __typeof__(&имя), ret (*)(параметры)), "имя"). */
+                           __typeof__(&имя), ret (*)(параметры)), "имя").
+   NUI_FN_CONST(ret, имя) — для функций без аргументов с G_GNUC_CONST (*_get_type):
+   атрибут const у GCC — часть типа функции, поэтому сверяется тип результата. */
 NUI_FN(GtkWidget *, gtk_label_new, (const gchar *str))
 ...
 

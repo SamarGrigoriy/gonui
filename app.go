@@ -52,6 +52,7 @@ func Run(setup func()) error {
 		return ErrNoDisplay
 	}
 	core.MarkUIThread(drv.IsMainThread)
+	core.SetWaker(drv.Wake)
 	state = stSetup
 	setup()
 	if !quitAsked {

@@ -12,12 +12,18 @@ GOSHARE=$(dirname "$(readlink -f "$GOROOT_HOST/src")")
 TINYGOROOT=${TINYGOROOT:-$HOME/.cache/nui/tinygo-0.42.0/x/tinygo}
 CACHE=${NUI_DOCKER_CACHE:-$HOME/.cache/nui/docker}
 mkdir -p "$CACHE/home" "$CACHE/go" "$CACHE/xdg"
+# Текущий uid должен быть в /etc/passwd контейнера: иначе dbus-daemon (тесты ShowInFolder)
+# падает с «Memory allocation failure in message bus».
+uid=$(id -u) gid=$(id -g)
+printf 'root:x:0:0:root:/root:/bin/sh\nnui:x:%s:%s:nui:/cache/home:/bin/sh\n' "$uid" "$gid" >"$CACHE/passwd"
+printf 'root:x:0:\nnui:x:%s:\n' "$gid" >"$CACHE/group"
 docker build -q -t nui-bookworm -f "$root/tools/bookworm.Dockerfile" "$root/tools" >/dev/null
 
 set -- --rm --user "$(id -u):$(id -g)" \
 	-v "$root":/src -w /src \
 	-v "$GOROOT_HOST":"$GOROOT_HOST":ro -v "$GOSHARE":"$GOSHARE":ro \
 	-v "$CACHE":/cache \
+	-v "$CACHE/passwd":/etc/passwd:ro -v "$CACHE/group":/etc/group:ro \
 	-e HOME=/cache/home -e GOCACHE=/cache/go -e XDG_CACHE_HOME=/cache/xdg \
 	-e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false \
 	-e PATH="/opt/tinygo/bin:$GOROOT_HOST/bin:/usr/local/bin:/usr/bin:/bin" \

@@ -8,7 +8,7 @@ package drv
 // (docs/driver-gtk3.md, §9). Здесь — только библиотеки, по soname: -dev не нужен.
 
 /*
-#cgo LDFLAGS: -l:libgtk-3.so.0 -l:libgobject-2.0.so.0 -l:libglib-2.0.so.0 -l:libpango-1.0.so.0
+#cgo LDFLAGS: -l:libgtk-3.so.0 -l:libgobject-2.0.so.0 -l:libglib-2.0.so.0 -l:libpango-1.0.so.0 -l:libgio-2.0.so.0
 #include "gtk3_linux.h"
 */
 import "C"

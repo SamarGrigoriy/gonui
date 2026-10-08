@@ -9,6 +9,7 @@ import (
 func reset() {
 	objs = []Receiver{nil}
 	free = nil
+	waker = nil
 	mu.Lock()
 	queue, pending, closed = nil, false, false
 	mu.Unlock()
@@ -116,14 +117,25 @@ func TestPostWakesOncePerBatch(t *testing.T) {
 	if !got[0] || got[1] || got[2] {
 		t.Fatalf("Post ×3 = %v, ожидалось true, false, false", got)
 	}
+	// Drain пачки из трёх заранее будит цикл (в очереди оставались функции): idle уже
+	// запланирован, и Post будить не должен. Когда этот idle отработает — снова должен.
+	wakes := 0
+	SetWaker(func() { wakes++ })
+	Drain()
+	if wakes != 1 || Post(func() {}) {
+		t.Fatalf("после Drain пачки: разбужено %d раз, Post будит повторно", wakes)
+	}
+	Drain() // разбуженный idle
 	Drain()
 	if !Post(func() {}) {
-		t.Fatal("после Drain первый Post снова должен будить цикл")
+		t.Fatal("когда idle отработал и очередь пуста, первый Post снова должен будить цикл")
 	}
 }
 
 func TestPostInsideDrainRunsInNextBatch(t *testing.T) {
 	reset()
+	wakes := 0
+	SetWaker(func() { wakes++ })
 	var order []int
 	var woke bool
 	Post(func() {
@@ -135,12 +147,42 @@ func TestPostInsideDrainRunsInNextBatch(t *testing.T) {
 	if len(order) != 2 || order[0] != 1 || order[1] != 2 {
 		t.Fatalf("первая пачка: %v", order)
 	}
-	if !woke {
-		t.Fatal("Post внутри Drain должен будить цикл")
+	// Цикл должен быть разбужен для следующей пачки — либо самим Post, либо заранее Drain.
+	if !woke && wakes == 0 {
+		t.Fatal("после Post внутри Drain цикл никто не разбудил")
 	}
 	Drain()
 	if len(order) != 3 || order[2] != 3 {
 		t.Fatalf("вторая пачка: %v", order)
+	}
+}
+
+// Функция из очереди открыла «модальный диалог» (вложенный цикл): остальные функции
+// той же пачки выполняет вложенный Drain, не дожидаясь возврата. Порядок сохраняется.
+func TestDrainNestedLoop(t *testing.T) {
+	reset()
+	nested := 0
+	SetWaker(func() { nested++ })
+	var order []int
+	Post(func() {
+		order = append(order, 1)
+		if nested != 1 {
+			t.Fatal("перед функцией, которая может заблокироваться, цикл должен быть разбужен")
+		}
+		Drain() // вложенный цикл: разбуженный idle выполняет остаток очереди
+		order = append(order, 99)
+	})
+	Post(func() { order = append(order, 2) })
+	Post(func() { order = append(order, 3) })
+	Drain()
+	want := []int{1, 2, 3, 99}
+	if len(order) != len(want) {
+		t.Fatalf("порядок %v, ожидался %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("порядок %v, ожидался %v", order, want)
+		}
 	}
 }
 

@@ -53,3 +53,34 @@ func SimEdit(view H, s string) { C.gtk_text_buffer_set_text(textBuffer(view), cs
 
 // ComboEntryForTest — поле ввода ComboEntry (чтобы имитировать Enter в нём).
 func ComboEntryForTest(h H) H { return comboEntry(h) }
+
+// SimAnswer — ответ в открытом сообщении: OK/«Да» (true) или Esc/«Нет» (false). false — диалога нет.
+func SimAnswer(yes bool) bool {
+	r := C.int(C.NUI_GTK_RESPONSE_NO)
+	if yes {
+		// у Message/Alert кнопка OK, у Ask — «Да»: на «Да» GTK отвечает YES, на OK — OK.
+		r = C.NUI_GTK_RESPONSE_YES
+	}
+	return C.nui_sim_dialog_response(0, r) != 0
+}
+
+// SimOK — нажать OK в открытом сообщении.
+func SimOK() bool { return C.nui_sim_dialog_response(0, C.NUI_GTK_RESPONSE_OK) != 0 }
+
+// SimEsc — закрыть открытое сообщение, как Esc.
+func SimEsc() bool { return C.nui_sim_dialog_response(0, C.NUI_GTK_RESPONSE_DELETE_EVENT) != 0 }
+
+// SimChooserSet выбирает путь в открытом файловом диалоге; false — диалога нет.
+func SimChooserSet(path string) bool { return C.nui_sim_file_chooser_set(cpath(path)) != 0 }
+
+// SimChooserDone — «Открыть/Сохранить» (accept) или «Отмена» в открытом файловом диалоге.
+func SimChooserDone(accept bool) bool {
+	r := C.int(C.NUI_GTK_RESPONSE_CANCEL)
+	if accept {
+		r = C.NUI_GTK_RESPONSE_ACCEPT
+	}
+	return C.nui_sim_dialog_response(1, r) != 0
+}
+
+// DialogOpen — открыт ли сейчас диалог: файловый (chooser) или сообщение.
+func DialogOpen(chooser bool) bool { return C.nui_dialog_open(C.int(b2i(chooser))) != 0 }

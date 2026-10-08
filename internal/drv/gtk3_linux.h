@@ -16,7 +16,10 @@ typedef float gfloat;
 typedef void *gpointer;
 /* Перечисления: в ABI это int. В режиме проверки — настоящие enum. */
 typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnectFlags, GIOCondition,
-            GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight;
+            GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight,
+            GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags;
+typedef unsigned int guint32;
+typedef unsigned long GType;
 typedef unsigned short guint16;
 typedef double gdouble;
 typedef void (*GCallback)(void);
@@ -38,7 +41,17 @@ typedef struct _GtkScrolledWindow GtkScrolledWindow; typedef struct _GtkAdjustme
 typedef struct _GtkTextView GtkTextView;   typedef struct _GtkTextBuffer GtkTextBuffer;
 typedef struct _GtkTextIter GtkTextIter;   typedef struct _GtkTextMark GtkTextMark;
 typedef struct _PangoAttrList PangoAttrList; typedef struct _PangoAttribute PangoAttribute;
-typedef struct _GObject GObject;
+typedef struct _GObject GObject;           typedef struct _GTypeInstance GTypeInstance;
+typedef struct _GtkDialog GtkDialog;       typedef struct _GtkMessageDialog GtkMessageDialog;
+typedef struct _GtkFileChooser GtkFileChooser; typedef struct _GtkFileFilter GtkFileFilter;
+typedef struct _GtkNativeDialog GtkNativeDialog;
+typedef struct _GtkFileChooserNative GtkFileChooserNative;
+typedef struct _GError GError;             typedef struct _GVariant GVariant;
+typedef struct _GVariantType GVariantType; typedef struct _GDBusConnection GDBusConnection;
+typedef struct _GCancellable GCancellable; typedef struct _GAsyncResult GAsyncResult;
+typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
+typedef struct _GList GList;
+struct _GList { gpointer data; GList *next; GList *prev; };
 /* GtkAllocation (= GdkRectangle) — только для тестового помощника nui_allocation */
 typedef struct { int x, y, width, height; } GtkAllocation;
 #endif
@@ -53,9 +66,14 @@ typedef struct { void *p[16]; } NuiTextIter;
 	_Static_assert(__builtin_types_compatible_p(__typeof__(&name), ret (*) params), #name);
 #define NUI_CONST(name, val) \
 	_Static_assert((val) == (name), #name); enum { NUI_##name = (val) };
+/* Функции без аргументов с G_GNUC_CONST (*_get_type): атрибут const у GCC — часть типа
+   функции, поэтому сверяется тип результата. */
+#define NUI_FN_CONST(ret, name) \
+	_Static_assert(__builtin_types_compatible_p(__typeof__(name()), ret), #name);
 #else
 #define NUI_FN(ret, name, params) ret name params;
 #define NUI_CONST(name, val) enum { NUI_##name = (val) };
+#define NUI_FN_CONST(ret, name) ret name(void) __attribute__((const));
 #endif
 
 /* ---------- 3. Константы ---------- */
@@ -87,8 +105,27 @@ NUI_CONST(PANGO_ELLIPSIZE_MIDDLE, 2)
 NUI_CONST(PANGO_ELLIPSIZE_END, 3)
 NUI_CONST(PANGO_WEIGHT_NORMAL, 400)
 NUI_CONST(PANGO_WEIGHT_BOLD, 700)
+NUI_CONST(GTK_DIALOG_MODAL, 1)
+NUI_CONST(GTK_DIALOG_DESTROY_WITH_PARENT, 2)
+NUI_CONST(GTK_MESSAGE_INFO, 0)
+NUI_CONST(GTK_MESSAGE_QUESTION, 2)
+NUI_CONST(GTK_MESSAGE_ERROR, 3)
+NUI_CONST(GTK_BUTTONS_OK, 1)
+NUI_CONST(GTK_BUTTONS_YES_NO, 4)
+NUI_CONST(GTK_RESPONSE_ACCEPT, -3)
+NUI_CONST(GTK_RESPONSE_DELETE_EVENT, -4)
+NUI_CONST(GTK_RESPONSE_OK, -5)
+NUI_CONST(GTK_RESPONSE_CANCEL, -6)
+NUI_CONST(GTK_RESPONSE_YES, -8)
+NUI_CONST(GTK_RESPONSE_NO, -9)
+NUI_CONST(GTK_FILE_CHOOSER_ACTION_OPEN, 0)
+NUI_CONST(GTK_FILE_CHOOSER_ACTION_SAVE, 1)
+NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
+NUI_CONST(G_BUS_TYPE_SESSION, 2)
+NUI_CONST(G_DBUS_CALL_FLAGS_NONE, 0)
 #ifdef NUI_CHECK
 _Static_assert(sizeof(NuiTextIter) >= sizeof(GtkTextIter), "NuiTextIter меньше GtkTextIter");
+_Static_assert(sizeof(GType) == sizeof(unsigned long), "GType");
 #endif
 
 /* ---------- 4. Прототипы ---------- */
@@ -108,6 +145,13 @@ NUI_FN(gboolean, g_source_remove, (guint tag))
 NUI_FN(void, g_free, (gpointer mem))
 NUI_FN(void, g_object_set_data, (GObject *object, const gchar *key, gpointer data))   /* (w) */
 NUI_FN(gpointer, g_object_get_data, (GObject *object, const gchar *key))              /* (w) */
+NUI_FN(gpointer, g_object_ref, (gpointer object))                                      /* (w) */
+NUI_FN(void, g_object_unref, (gpointer object))
+NUI_FN(gchar *, g_strdup, (const gchar *str))                                          /* (w) */
+NUI_FN(void, g_error_free, (GError *error))
+NUI_FN(gchar *, g_filename_to_uri, (const gchar *filename, const gchar *hostname, GError **error)) /* g_free */
+NUI_FN(gboolean, g_type_check_instance_is_a, (GTypeInstance *instance, GType iface_type))  /* тесты */
+NUI_FN(void, g_list_free, (GList *list))                                                   /* тесты */
 NUI_FN(size_t, strlen, (const char *s))
 NUI_FN(int, gettid, (void)) /* pid_t; glibc ≥ 2.30 — ниже фактического минимума 2.34 */
 NUI_FN(int, getpid, (void))
@@ -242,6 +286,38 @@ NUI_FN(GtkWidget *, gtk_separator_new, (GtkOrientation orientation))
 NUI_FN(GtkWidget *, gtk_frame_new, (const gchar *label))
 NUI_FN(void, gtk_frame_set_label, (GtkFrame *frame, const gchar *label))
 
+/* Диалоги и оболочка */
+NUI_FN(GtkWidget *, gtk_message_dialog_new, (GtkWindow *parent, GtkDialogFlags flags, GtkMessageType type,
+       GtkButtonsType buttons, const gchar *message_format, ...))                                        /* (w) */
+NUI_FN(void, gtk_message_dialog_format_secondary_text, (GtkMessageDialog *message_dialog,
+       const gchar *message_format, ...))                                                                /* (w) */
+NUI_FN(gint, gtk_dialog_run, (GtkDialog *dialog))                                                         /* (w) */
+NUI_FN(void, gtk_dialog_response, (GtkDialog *dialog, gint response_id))                                  /* тесты */
+NUI_FN_CONST(GType, gtk_dialog_get_type)                                                                  /* тесты */
+NUI_FN_CONST(GType, gtk_file_chooser_get_type)                                                            /* тесты */
+NUI_FN(GList *, gtk_window_list_toplevels, (void))                                                        /* тесты */
+NUI_FN(GtkFileChooserNative *, gtk_file_chooser_native_new, (const gchar *title, GtkWindow *parent,
+       GtkFileChooserAction action, const gchar *accept_label, const gchar *cancel_label))
+NUI_FN(gint, gtk_native_dialog_run, (GtkNativeDialog *self))
+NUI_FN(void, gtk_native_dialog_set_modal, (GtkNativeDialog *self, gboolean modal))
+NUI_FN(gchar *, gtk_file_chooser_get_filename, (GtkFileChooser *chooser)) /* g_free */
+NUI_FN(gboolean, gtk_file_chooser_set_filename, (GtkFileChooser *chooser, const char *filename))          /* тесты */
+NUI_FN(void, gtk_file_chooser_set_current_name, (GtkFileChooser *chooser, const gchar *name))
+NUI_FN(void, gtk_file_chooser_set_do_overwrite_confirmation, (GtkFileChooser *chooser, gboolean do_overwrite_confirmation))
+NUI_FN(GtkFileFilter *, gtk_file_filter_new, (void))
+NUI_FN(void, gtk_file_filter_set_name, (GtkFileFilter *filter, const gchar *name))
+NUI_FN(void, gtk_file_filter_add_pattern, (GtkFileFilter *filter, const gchar *pattern))
+NUI_FN(void, gtk_file_chooser_add_filter, (GtkFileChooser *chooser, GtkFileFilter *filter))
+NUI_FN(gboolean, gtk_show_uri_on_window, (GtkWindow *parent, const char *uri, guint32 timestamp, GError **error))
+NUI_FN(GDBusConnection *, g_bus_get_sync, (GBusType bus_type, GCancellable *cancellable, GError **error))  /* (w) */
+NUI_FN(GVariant *, g_variant_new, (const gchar *format_string, ...))                                       /* (w) */
+NUI_FN(void, g_dbus_connection_call, (GDBusConnection *connection, const gchar *bus_name,
+       const gchar *object_path, const gchar *interface_name, const gchar *method_name,
+       GVariant *parameters, const GVariantType *reply_type, GDBusCallFlags flags, gint timeout_msec,
+       GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data))                      /* (w) */
+NUI_FN(GVariant *, g_dbus_connection_call_finish, (GDBusConnection *connection, GAsyncResult *res, GError **error)) /* (w) */
+NUI_FN(void, g_variant_unref, (GVariant *value))                                                           /* (w) */
+
 /* ---------- 5. Наши обёртки (wrap_linux.c) и трамплины (export_linux.go) ----------
    Объявляются в ОБОИХ режимах: в режиме проверки wrap_linux.c компилируется против
    настоящих заголовков (tools/check-protos.sh, шаг 2), и без этих объявлений трамплины
@@ -254,7 +330,12 @@ guint  nui_watch(int fd, unsigned cond, uintptr_t ud);
 void   nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigned color);
 char  *nui_text_get(GtkTextBuffer *b);
 void   nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, int max_lines);
+int    nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text);
+int    nui_show_items(const gchar *uri, const gchar *dir_uri);
 void   nui_allocation(GtkWidget *w, int out[4]); /* только с NUI_GUI_TEST */
+int    nui_sim_dialog_response(int chooser, int response); /* только с NUI_GUI_TEST */
+int    nui_sim_file_chooser_set(const gchar *path);         /* только с NUI_GUI_TEST */
+int    nui_dialog_open(int chooser);                        /* только с NUI_GUI_TEST */
 
 void nuiSignal(void *obj, uintptr_t ud);
 int  nuiSignalRet(void *obj, void *arg, uintptr_t ud);
