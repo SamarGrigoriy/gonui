@@ -8,7 +8,7 @@ set -eu
 cd "$(dirname "$0")"
 TINYGOROOT=${TINYGOROOT:-$HOME/.cache/nui/tinygo-0.42.0/x/tinygo}
 STRESS=${STRESS:-60}
-docker build -q -t nui-bookworm -f ../bookworm.Dockerfile .. >/dev/null
+docker build -q -t nui-bookworm -f ../../tools/bookworm.Dockerfile ../../tools >/dev/null
 mkdir -p out shots
 GOROOT_HOST=$(go env GOROOT)
 GOSHARE=$(dirname "$(readlink -f "$GOROOT_HOST/src")")

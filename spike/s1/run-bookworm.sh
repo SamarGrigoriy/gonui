@@ -1,12 +1,12 @@
 #!/bin/sh
 # Критерии S1 в чистом Debian 12: только runtime-пакет GTK, без libgtk-3-dev.
-# Образ nui-bookworm (spike/bookworm.Dockerfile) собирается один раз; Go монтируется с хоста
+# Образ nui-bookworm (tools/bookworm.Dockerfile) собирается один раз; Go монтируется с хоста
 # (он собран статически). В Debian-пакете Go каталоги src, lib и др. — симлинки
 # в /usr/share/go-*, поэтому монтируется и он, по тем же путям.
 # Результаты: out/ — бинарники, журналы и report.txt; shots/ — снимки для фотоотчёта.
 set -eu
 cd "$(dirname "$0")"
-docker build -q -t nui-bookworm -f ../bookworm.Dockerfile .. >/dev/null
+docker build -q -t nui-bookworm -f ../../tools/bookworm.Dockerfile ../../tools >/dev/null
 mkdir -p out
 GOROOT_HOST=$(go env GOROOT)
 GOSHARE=$(dirname "$(readlink -f "$GOROOT_HOST/src")")
