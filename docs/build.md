@@ -6,7 +6,7 @@
 |---|---|---|---|
 | Запуск приложений | GTK3 (обычно уже стоит с десктопом) | `libgtk-3-0` | `libgtk-3-0t64` |
 | Сборка gc | Go ≥ 1.22, gcc, make, git | `build-essential git` + Go с go.dev | `build-essential git golang` (1.24) или go.dev |
-| Малая сборка | TinyGo с поддержкой `-libc=glibc` (§3) | — | — |
+| Малая сборка | выпущенный TinyGo (проверено 0.42.0) + target-файл nui (§3) | — | — |
 | Тесты GUI | Xvfb | `xvfb xauth` | то же |
 | Проверка прототипов (CI) | заголовки GTK | `libgtk-3-dev pkg-config` | то же |
 | Кросс-сборка под Windows (фаза 5) | mingw | `gcc-mingw-w64-x86-64` | то же |
@@ -35,7 +35,22 @@ make test           # юнит-тесты + интеграционные под 
 
 ## 3. TinyGo с glibc
 
-Состояние на 07.10.2026: поддержку системной glibc добавляет [TinyGo PR #5838](https://github.com/tinygo-org/tinygo/pull/5838) (флаг `-libc=glibc`). PR **открыт**. Без него TinyGo на Linux линкуется только со своей статической musl, а с ней системный GTK загрузить нельзя ([decisions.md](decisions.md), ADR-4).
+Штатный TinyGo на Linux линкуется со своей статической musl, а с ней системный GTK загрузить нельзя ([decisions.md](decisions.md), ADR-4).
+
+**Основной путь (ADR-17, спайк S3 пройден): выпущенный TinyGo + target-файл nui.** Всё, что делает [PR #5838](https://github.com/tinygo-org/tinygo/pull/5838) (флаг `-libc=glibc`, на 08.10.2026 не влит), задаёт файл `targets/linux-glibc-amd64.json`. Образец — [spike/s3/linux-glibc-amd64.json](../spike/s3/linux-glibc-amd64.json).
+
+```sh
+wget https://github.com/tinygo-org/tinygo/releases/download/v0.42.0/tinygo0.42.0.linux-amd64.tar.gz
+# сверить sha256 с digest выпуска: GitHub API, поле assets[].digest
+mkdir -p ~/.local && tar -xzf tinygo0.42.0.linux-amd64.tar.gz -C ~/.local   # → ~/.local/tinygo
+export PATH=$PATH:$HOME/.local/tinygo/bin
+tinygo version          # проверить: поддерживает ли он установленную версию Go
+tinygo build -target=targets/linux-glibc-amd64.json -o bin/small/hello ./examples/hello
+```
+
+Нужен `libc6-dev`: C-файлам рантайма TinyGo нужны заголовки glibc. Он входит в `build-essential`.
+
+Варианты А и Б ниже — запасные: на случай, если target-файл перестанет работать с новой версией TinyGo.
 
 **Вариант А — PR уже влит и вошёл в релиз.** Ставим .deb из релизов TinyGo:
 
@@ -58,7 +73,7 @@ go install -tags=llvmNN                                        # или make, к
 tinygo version
 ```
 
-**Вариант В — свой target-файл без патча** (спайк S3 в [roadmap.md](roadmap.md)). Это гипотеза; описание и критерии — в roadmap.
+**Вариант В** — основной путь выше (спайк S3).
 
 TinyGo использует установленный Go (его стандартную библиотеку). Версия Go должна входить в диапазон, который печатает `tinygo version`.
 
@@ -89,7 +104,7 @@ TinyGo использует установленный Go (его стандар
 | `CGO_CFLAGS` | `-Os -ffunction-sections -fdata-sections` | флаги размера C-части; в `#cgo` их писать нельзя ([driver-gtk3.md](driver-gtk3.md), §9) |
 | `CGO_LDFLAGS` | `-Wl,--gc-sections -Wl,--as-needed` | то же для линковщика |
 | `TINYGO_SCHED` | `none` | `threads` для приложений с горутинами |
-| `NUI_LIBDIR` | пусто | `-L/usr/lib/$(gcc -print-multiarch)`, если линковщик TinyGo не находит `.so` |
+| `ARCH` | `amd64` | какой target-файл TinyGo брать: `targets/linux-glibc-$(ARCH).json` |
 | `GTK_DEBUG_ENV` | `NO_AT_BRIDGE=1 G_DEBUG=fatal-criticals` | окружение для тестов |
 
 Скелет `examples` в Makefile:
@@ -100,10 +115,12 @@ EXAMPLES := hello form logger
 export CGO_CFLAGS  := -Os -ffunction-sections -fdata-sections
 export CGO_LDFLAGS := -Wl,--gc-sections -Wl,--as-needed
 GOFLAGS_REL := -trimpath -ldflags="-s -w -buildid="
-TINYFLAGS := -libc=glibc -opt=z -no-debug -panic=trap -gc=conservative -scheduler=$(TINYGO_SCHED)
+ARCH ?= amd64
+TINYFLAGS := -target=targets/linux-glibc-$(ARCH).json -opt=z -no-debug -panic=trap -gc=conservative -scheduler=$(TINYGO_SCHED)
 
 bin/small/%: FORCE
 	$(TINYGO) build $(TINYFLAGS) -o $@ ./examples/$*
+	strip --strip-all $@   # -no-debug оставляет таблицу символов: −20 КБ на спайке S3
 ```
 
 ## 5. arm64 (Raspberry Pi OS 64-bit и т. п.)

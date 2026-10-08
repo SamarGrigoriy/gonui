@@ -508,7 +508,7 @@ export CGO_LDFLAGS := -Wl,--gc-sections -Wl,--as-needed
 - `-l:имя.so.N` линкует по точному имени файла. Поэтому хватает runtime-пакетов: `libgtk-3-0` (в Debian 13 — `libgtk-3-0t64`), `libglib2.0-0`, `libpango-1.0-0`. Символьные ссылки `libgtk-3.so` из `-dev` не нужны.
 - `--gc-sections` и `-ffunction-sections` выбрасывают неиспользуемые обёртки, а `--as-needed` — неиспользуемые библиотеки. Например, без `ShowInFolder` не нужна libgio.
 - gc при cgo в стороннем пакете линкует внешним линковщиком (gcc), поэтому флаги работают.
-- TinyGo с `-libc=glibc`: какой линковщик и с какими путями поиска будет вызван, выясняется в спайке S2. Там же выясняется, учитывает ли TinyGo `CGO_CFLAGS`/`CGO_LDFLAGS`: C-файлы пакета он пропускает через LLVM вместе с Go-кодом, и флаги могут понадобиться в другом месте. Если `-l:` не находит библиотеки, добавьте `-L/usr/lib/$(gcc -print-multiarch)` (на amd64 это `x86_64-linux-gnu`, на arm64 — `aarch64-linux-gnu`) через переменную `NUI_LIBDIR` в Makefile.
+- TinyGo (ADR-17) линкует встроенным `ld.lld`. Путь `-L/usr/lib/<multiarch>`, `crt*.o`, `-lc` и `--dynamic-linker` задаёт target-файл nui, поэтому `-l:имя.so.N` из `#cgo LDFLAGS` находятся без дополнительных переменных. `CGO_CFLAGS`/`CGO_LDFLAGS` TinyGo не нужны: релизная сборка спайка S3 весит 35 952 байта без них.
 
 Проверка после сборки: `ldd bin/hello` показывает `libgtk-3.so.0` и её зависимости. `readelf -d bin/hello | grep NEEDED` показывает только то, что мы указали явно (плюс libc).
 

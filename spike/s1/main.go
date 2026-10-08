@@ -9,7 +9,6 @@ import (
 	"os"
 	"runtime"
 	"syscall"
-	"time"
 )
 
 // init выполняется в главном потоке: главная горутина остаётся на нём (runtime.md, §1).
@@ -18,7 +17,7 @@ func init() { runtime.LockOSThread() }
 // Проверки сценария S1 (docs/roadmap.md).
 const (
 	chkClick    = iota // 1. клик меняет текст метки
-	chkDo              // 2. Do из горутины
+	chkDo              // 2. Do из горутины (без планировщика — из таймера)
 	chkAfter           // 3. After меняет заголовок окна
 	chkWatch           // 4. Watch на pipe
 	chkCloseNo         // 5а. крестик → «Нет» → окно осталось
@@ -41,6 +40,11 @@ var names = [nChecks]string{
 
 var passed [nChecks]bool
 
+var (
+	shotDir   string // -shots DIR: каталог снимков; сами снимки — только со сборкой -tags shots
+	stressSec int    // -stress SEC: проверка сборщика мусора вместо автопилота
+)
+
 func main() {
 	auto := false
 	for i := 1; i < len(os.Args); i++ {
@@ -51,6 +55,11 @@ func main() {
 			if i+1 < len(os.Args) {
 				i++
 				shotDir = os.Args[i]
+			}
+		case "-stress": // roadmap.md, S2, п. 6
+			if i+1 < len(os.Args) {
+				i++
+				stressSec = atoi(os.Args[i])
 			}
 		}
 	}
@@ -88,14 +97,13 @@ func main() {
 		return yes
 	}
 
-	// 2. Do из горутины.
-	go func() {
-		time.Sleep(500 * time.Millisecond)
+	// 2. Do из горутины (в сборке без планировщика — из таймера).
+	background(500, func() {
 		Do(func() {
 			doLabel.SetText("Do: выполнено в UI-потоке")
 			passed[chkDo] = isMainThread()
 		})
-	}()
+	})
 
 	// 3. After меняет заголовок окна.
 	const title = "nui · спайк S1 · After сработал"
@@ -104,7 +112,7 @@ func main() {
 		passed[chkAfter] = win.Title() == title
 	})
 
-	// 4. Watch на pipe: горутина пишет, обработчик в UI-потоке читает.
+	// 4. Watch на pipe: «фон» пишет, обработчик в UI-потоке читает.
 	var p [2]int
 	if err := syscall.Pipe2(p[:], syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
 		panic(err)
@@ -121,18 +129,24 @@ func main() {
 		watcher.Stop() // до close(fd) — по контракту
 		syscall.Close(p[0])
 	})
-	go func() {
-		time.Sleep(600 * time.Millisecond)
+	background(600, func() {
 		syscall.Write(p[1], []byte(msg))
 		syscall.Close(p[1])
-	}()
+	})
 
 	win.Show()
-	if auto {
+	switch {
+	case stressSec > 0:
+		stress(win, button, status)
+	case auto:
 		autopilot(win, button)
 	}
 	C.gtk_main()
 
+	if stressSec > 0 {
+		stressReport()
+		return
+	}
 	passed[chkCloseYes] = closedByUser && win.id == 0
 	report()
 }
@@ -158,7 +172,62 @@ func autopilot(win *Window, button *Button) {
 	})
 }
 
-var shotDir string // -shots DIR: каталог снимков; сами снимки — только со сборкой -tags shots
+// Проверка сборщика мусора (roadmap.md, S2, п. 6): каждые 10 мс — 64 КБ мусора,
+// смена текста метки и одноразовый таймер (реестр выдаёт и освобождает id).
+// В конце клик должен дойти до своего обработчика: Go-объекты из реестра живы.
+var stressSteps, stressRSS0, stressRSS1 int
+var stressClickOK bool
+
+func stress(win *Window, button *Button, status *Label) {
+	stressRSS0 = rssKB()
+	var keep [][]byte
+	t := Every(10, func() {
+		stressSteps++
+		b := make([]byte, 64*1024)
+		b[0], b[len(b)-1] = byte(stressSteps), byte(stressSteps>>8)
+		if len(keep) == 16 {
+			keep = keep[:0] // часть мусора живёт дольше одного шага
+		}
+		keep = append(keep, b)
+		status.SetText("Стресс: шаг " + itoa(stressSteps))
+		After(0, func() {})
+	})
+	After(stressSec*1000, func() {
+		t.Stop()
+		passed[chkClick] = false
+		C.gtk_button_clicked((*C.GtkButton)(button.h))
+		stressClickOK = passed[chkClick] && passed[chkUTF8]
+		stressRSS1 = rssKB()
+		shot("stress-end")
+		win.onClose = nil
+		C.gtk_window_close((*C.GtkWindow)(win.h))
+	})
+}
+
+func stressReport() {
+	mark := "✓"
+	if !stressClickOK {
+		mark = "✗"
+	}
+	println(mark, "сборщик мусора:", stressSteps, "шагов по 64 КБ за", stressSec, "с; после — клик работает:", stressClickOK)
+	println("  RSS: в начале", stressRSS0, "КБ, в конце", stressRSS1, "КБ")
+	if !stressClickOK {
+		os.Exit(1)
+	}
+}
+
+// rssKB — резидентная память процесса из /proc/self/statm (страницы по 4 КБ).
+func rssKB() int {
+	b, err := os.ReadFile("/proc/self/statm")
+	if err != nil {
+		return -1
+	}
+	i := 0
+	for i < len(b) && b[i] != ' ' {
+		i++
+	}
+	return atoi(string(b[i+1:])) * 4
+}
 
 func report() {
 	ok := true
@@ -187,4 +256,13 @@ func itoa(n int) string {
 		b[i] = byte('0' + n%10)
 	}
 	return string(b[i:])
+}
+
+// atoi читает число до первого нецифрового символа.
+func atoi(s string) int {
+	n := 0
+	for i := 0; i < len(s) && s[i] >= '0' && s[i] <= '9'; i++ {
+		n = n*10 + int(s[i]-'0')
+	}
+	return n
 }

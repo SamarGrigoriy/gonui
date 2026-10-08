@@ -6,7 +6,7 @@
 
 | Бинарник | TinyGo (релиз) | gc |
 |---|---|---|
-| `examples/hello` | ≤ 64 КБ | замер S1 + 10 % (оценка: 1,3–1,8 МБ) |
+| `examples/hello` | ≤ 64 КБ (спайк S3 — 35 952 байта) | замер S1 + 10 % ≈ 1 625 000 байт (S1 — 1 477 448) |
 | `examples/form` (все виджеты MVP) | ≤ 160 КБ (оценка) | hello (gc) + 200 КБ |
 | `examples/logger` | **≤ 250 КБ** | hello (gc) + 300 КБ |
 
@@ -62,13 +62,14 @@
 **TinyGo, релиз:**
 
 ```sh
-tinygo build -libc=glibc -opt=z -no-debug -panic=trap -gc=conservative \
+tinygo build -target=targets/linux-glibc-amd64.json -opt=z -no-debug -panic=trap -gc=conservative \
              -scheduler=none -o bin/small/hello ./examples/hello
+strip --strip-all bin/small/hello
 ```
 
 | Флаг | Зачем |
 |---|---|
-| `-libc=glibc` | динамическая линковка с системной glibc — без этого GTK не загрузить (ADR-4) |
+| `-target=targets/linux-glibc-amd64.json` | цель nui: системная glibc вместо musl из TinyGo — без этого GTK не загрузить (ADR-4, ADR-17) |
 | `-opt=z` | оптимизация по размеру (по умолчанию тоже `z`; пишем явно) |
 | `-no-debug` | без DWARF |
 | `-panic=trap` | паника = инструкция-ловушка, без строк сообщений и кода печати. Для отладки — `-panic=print` |
@@ -83,7 +84,7 @@ go build -trimpath -ldflags="-s -w -buildid=" -o bin/hello ./examples/hello
 
 **C-часть:** `-Os -ffunction-sections -fdata-sections` и `-Wl,--gc-sections -Wl,--as-needed`. Они передаются через переменные `CGO_CFLAGS` и `CGO_LDFLAGS` в Makefile, а не через `#cgo`: там gc их не пропускает ([driver-gtk3.md](driver-gtk3.md), §9). На mingw без `-fdata-sections` ([driver-win32.md](driver-win32.md), §1).
 
-**Дополнительно:** `strip --strip-all` после TinyGo, если `-no-debug` оставил таблицу символов. Проверка: `file bin/small/hello` не должен показывать `not stripped`.
+**Обязательно:** `strip --strip-all` после TinyGo: `-no-debug` убирает DWARF, но оставляет таблицу символов (спайк S3: 56 640 → 35 952 байт). Проверка: `file bin/small/hello` не должен показывать `not stripped`.
 
 ## 5. UPX
 
@@ -100,7 +101,7 @@ go build -trimpath -ldflags="-s -w -buildid=" -o bin/hello ./examples/hello
 ```sh
 stat -c %s bin/small/logger                          # главное число
 
-tinygo build -size full -libc=glibc -opt=z … ./examples/logger
+tinygo build -size full -target=targets/linux-glibc-amd64.json -opt=z … ./examples/logger
                                                      # размер по пакетам: code / rodata / data / bss
 
 go build -trimpath -o /tmp/hello-dbg ./examples/hello  # gc: без -s -w, чтобы были символы

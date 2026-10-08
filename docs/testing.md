@@ -153,7 +153,7 @@ Selftest логгера, кроме того, создаёт псевдотер�
 | Задача | Шаги | Падение задачи |
 |---|---|---|
 | `gc` | vet, юнит, юнит `-race`, `gui` под Xvfb, selftest gc | блокирует |
-| `tinygo` | `make small`, selftest TinyGo, `make size` | блокирует, если S2/S3 прошли; иначе «можно падать» |
+| `tinygo` | `make small`, selftest TinyGo, `make size` | блокирует (S3 пройден, ADR-17) |
 | `static` | `check-protos` (с `libgtk-3-dev`), `deps`, `abi` | блокирует |
 | `windows` (с фазы 5) | кросс-сборка gc через mingw, `check-protos` для Win32 | блокирует |
 

@@ -2,7 +2,12 @@
 
 package main
 
-import "os/exec"
+/*
+int system(const char *command);
+*/
+import "C"
+
+import "unsafe"
 
 var shotN int
 
@@ -10,7 +15,8 @@ var shotN int
 // Выполняется синхронно в UI-потоке: окно уже нарисовано, X-сервер хранит его содержимое.
 // Снимок — через rootshot (spike/tools/rootshot.c), а не xwd -root: xwd теряет окна
 // с не-умолчательным визуалом, и модальный диалог выходил чёрным.
-// Под тегом shots, чтобы os/exec не попадал в бинарник, по которому меряют размер.
+// Команда запускается через system() из libc, а не os/exec: так снимки работают и в TinyGo.
+// Под тегом shots, чтобы этот код не попадал в бинарник, по которому меряют размер.
 func shot(name string) {
 	if shotDir == "" {
 		return
@@ -21,7 +27,7 @@ func shot(name string) {
 		n = "0" + n
 	}
 	path := shotDir + "/" + n + "-" + name + ".png"
-	if err := exec.Command("sh", "-c", "rootshot | pnmtopng > "+path).Run(); err != nil {
-		println("s1: снимок не удался:", path, err.Error())
+	if C.system((*C.char)(unsafe.Pointer(cstr("rootshot | pnmtopng > "+path)))) != 0 {
+		println("s1: снимок не удался:", path)
 	}
 }
