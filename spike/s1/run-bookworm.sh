@@ -1,11 +1,12 @@
 #!/bin/sh
 # Критерии S1 в чистом Debian 12: только runtime-пакет GTK, без libgtk-3-dev.
-# Go берётся с хоста (он собран статически), каталог спайка монтируется в /src.
-# В Debian-пакете Go каталоги src, lib и др. — симлинки в /usr/share/go-*,
-# поэтому монтируется и он, по тем же путям.
+# Образ nui-bookworm (spike/bookworm.Dockerfile) собирается один раз; Go монтируется с хоста
+# (он собран статически). В Debian-пакете Go каталоги src, lib и др. — симлинки
+# в /usr/share/go-*, поэтому монтируется и он, по тем же путям.
 # Результаты: out/ — бинарники, журналы и report.txt; shots/ — снимки для фотоотчёта.
 set -eu
 cd "$(dirname "$0")"
+docker build -q -t nui-bookworm -f ../bookworm.Dockerfile .. >/dev/null
 mkdir -p out
 GOROOT_HOST=$(go env GOROOT)
 GOSHARE=$(dirname "$(readlink -f "$GOROOT_HOST/src")")
@@ -13,15 +14,9 @@ docker run --rm \
 	-v "$PWD":/src -w /src \
 	-v "$GOROOT_HOST":"$GOROOT_HOST":ro -v "$GOSHARE":"$GOSHARE":ro \
 	-e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e GOROOT_HOST="$GOROOT_HOST" \
-	debian:bookworm sh -c '
+	nui-bookworm sh -c '
 set -eu
-export DEBIAN_FRONTEND=noninteractive PATH=$GOROOT_HOST/bin:$PATH GOTOOLCHAIN=local GOFLAGS=-buildvcs=false
-apt-get update -qq
-# Сборка и запуск: gcc, runtime GTK, Xvfb. Фотоотчёт: openbox (рамка с заголовком),
-# xwd + netpbm (снимки), шрифты с кириллицей и эмодзи, русская локаль (кнопки «Да/Нет»).
-apt-get install -y -qq --no-install-recommends gcc libc6-dev libgtk-3-0 xvfb xauth binutils \
-	openbox x11-apps netpbm fonts-dejavu-core fonts-noto-color-emoji adwaita-icon-theme locales >/dev/null 2>&1
-sed -i "s/^# *ru_RU.UTF-8/ru_RU.UTF-8/" /etc/locale.gen && locale-gen >/dev/null
+export PATH=$GOROOT_HOST/bin:$PATH GOTOOLCHAIN=local GOFLAGS=-buildvcs=false
 
 fail=0
 {
@@ -48,7 +43,7 @@ cat out/auto.log
 [ "$rc" -eq 0 ] || { echo "ОШИБКА: сценарий завершился с кодом $rc"; exit 1; }
 
 echo "== Фотоотчёт: тот же сценарий с оконным менеджером, LANG=ru_RU.UTF-8"
-rm -rf shots && mkdir -p shots
+mkdir -p shots
 rc=0
 LANG=ru_RU.UTF-8 NO_AT_BRIDGE=1 G_DEBUG=fatal-criticals timeout 30 \
 	xvfb-run -a -s "-screen 0 640x360x24" sh -c "openbox >/dev/null 2>&1 & sleep 1; ./out/s1-shots -auto -shots shots" \
