@@ -80,8 +80,13 @@ func FrameSetTitle(h H, s string) {
 }
 
 // ScrollNew — полосы прокрутки появляются, только если ребёнок не помещается.
+// Естественный размер — как у ребёнка (layout.md, §5): без SetSize окно покажет его
+// целиком, если хватит экрана; минимальный — маленький, по полосам прокрутки.
 func ScrollNew(id uint32) H {
 	w := C.gtk_scrolled_window_new(nil, nil)
-	C.gtk_scrolled_window_set_policy((*C.GtkScrolledWindow)(w), C.NUI_GTK_POLICY_AUTOMATIC, C.NUI_GTK_POLICY_AUTOMATIC)
+	sw := (*C.GtkScrolledWindow)(w)
+	C.gtk_scrolled_window_set_policy(sw, C.NUI_GTK_POLICY_AUTOMATIC, C.NUI_GTK_POLICY_AUTOMATIC)
+	C.gtk_scrolled_window_set_propagate_natural_width(sw, 1)
+	C.gtk_scrolled_window_set_propagate_natural_height(sw, 1)
 	return adopt(w, id, true)
 }

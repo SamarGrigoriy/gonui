@@ -21,7 +21,7 @@ GOFLAGS_REL := -trimpath -ldflags="-s -w -buildid="
 # Выпущенный TinyGo + target-файл nui: системная glibc вместо musl (ADR-17).
 TINYFLAGS   := -target=targets/linux-glibc-$(ARCH).json -opt=z -no-debug -panic=trap -gc=conservative -scheduler=$(TINYGO_SCHED)
 
-.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots clean FORCE
+.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots golden clean FORCE
 
 all: dev
 
@@ -39,8 +39,8 @@ bin/small/%: FORCE
 	$(TINYGO) build $(TINYFLAGS) -o $@ ./examples/$*
 	strip --strip-all $@
 
-test:                                        ## юнит-тесты ядра + интеграционные на GTK (обычная и отладочная сборка)
-	$(GO) test -count=1 -cover ./internal/core/...
+test:                                        ## юнит-тесты ядра и раскладки + интеграционные на GTK (обычная и отладочная сборка)
+	$(GO) test -count=1 -cover ./internal/core/... ./internal/layout
 	$(GTK_DEBUG_ENV) $(XVFB) $(GO) test -count=1 -tags gui .
 	$(GTK_DEBUG_ENV) $(XVFB) $(GO) test -count=1 -tags 'gui nuidebug' .
 
@@ -85,10 +85,19 @@ docker-ci:                                   ## ci-container в чистом Deb
 
 ci: check docker-ci
 
-# Фотоотчёт: окна примеров (обоими тулчейнами) и окна тестов раскладки под Xvfb с openbox.
+# Golden-снимки раскладки (layout.md, §8): GTK раскладывает случаи из
+# internal/layout/testdata/cases, снимки ложатся в testdata/golden. Только в контейнере —
+# снимки не должны зависеть от шрифтов и версии GTK машины: tools/docker-run.sh make golden
+golden:
+	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) $(XVFB) -s "-screen 0 1024x768x24" sh -c '\
+		openbox >/dev/null 2>&1 & sleep 1; \
+		NUI_GOLDEN=write $(GO) test -count=1 -tags gui -run TestLayoutGTK .'
+	$(GO) test -count=1 ./internal/layout
+
+# Фотоотчёт: окна примеров (обоими тулчейнами) и окна тестов под Xvfb с openbox.
 # Запускать в контейнере: tools/docker-run.sh make shots SHOTS=docs/reports/phase-N
-SHOTS       ?= docs/reports/phase-3
-SHOTS_TESTS ?= TestBoxLayout|TestGridLayout|TestLabelEllipsisWidth|TestMessageDialogs|TestFileDialogs
+SHOTS       ?= docs/reports/phase-5
+SHOTS_TESTS ?= TestLayoutGTK
 shots: release-gc small
 	@mkdir -p $(SHOTS)
 	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) $(XVFB) -s "-screen 0 800x600x24" sh -c '\

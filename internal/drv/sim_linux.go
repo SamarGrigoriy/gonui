@@ -5,10 +5,11 @@ package drv
 // Помощники интеграционных тестов: имитируют действия пользователя — вызывают GTK
 // напрямую, мимо счётчика quiet, поэтому обработчики On* срабатывают.
 // #cgo CFLAGS действует на все C-файлы пакета: тестовые C-помощники в wrap_linux.c
-// попадают только в сборку с тегом gui.
+// попадают только в сборку с тегом gui. libgdk-3 (gdk_window_get_origin) — тоже только ей.
 
 /*
 #cgo CFLAGS: -DNUI_GUI_TEST
+#cgo LDFLAGS: -l:libgdk-3.so.0
 #include "gtk3_linux.h"
 */
 import "C"
@@ -23,6 +24,20 @@ func SimClose(h H) { C.gtk_window_close((*C.GtkWindow)(h)) }
 func Allocation(h H) (x, y, w, ht int) {
 	var a [4]C.int
 	C.nui_allocation(widget(h), &a[0])
+	return int(a[0]), int(a[1]), int(a[2]), int(a[3])
+}
+
+// Preferred — минимальный и естественный размер виджета, как его видит GTK.
+func Preferred(h H) (minW, natW, minH, natH int) {
+	var a [4]C.int
+	C.nui_preferred(widget(h), &a[0])
+	return int(a[0]), int(a[1]), int(a[2]), int(a[3])
+}
+
+// WindowPos — положение виджета в окне (сквозь прокрутку) и начало окна на экране.
+func WindowPos(h H) (x, y, screenX, screenY int) {
+	var a [4]C.int
+	C.nui_window_pos(widget(h), &a[0])
 	return int(a[0]), int(a[1]), int(a[2]), int(a[3])
 }
 

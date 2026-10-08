@@ -150,6 +150,23 @@ void nui_allocation(GtkWidget *w, int out[4]) {
 	out[3] = a.height;
 }
 
+/* Минимальный и естественный размер: ширина (out[0], out[1]), высота (out[2], out[3]). */
+void nui_preferred(GtkWidget *w, int out[4]) {
+	gtk_widget_get_preferred_width(w, &out[0], &out[1]);
+	gtk_widget_get_preferred_height(w, &out[2], &out[3]);
+}
+
+/* Положение виджета в его окне верхнего уровня — сквозь GtkViewport, где allocation
+   отсчитывается от собственного GdkWindow, — и начало этого окна на экране. */
+void nui_window_pos(GtkWidget *w, int out[4]) {
+	GtkWidget *top = gtk_widget_get_toplevel(w);
+	GdkWindow *win = gtk_widget_get_window(top);
+	out[0] = out[1] = out[2] = out[3] = 0;
+	gtk_widget_translate_coordinates(w, top, 0, 0, &out[0], &out[1]);
+	if (win)
+		gdk_window_get_origin(win, &out[2], &out[3]);
+}
+
 /* Видимый диалог среди окон верхнего уровня: chooser — файловый (GtkFileChooserNative
    без портала показывает GtkFileChooserDialog), иначе — любой другой GtkDialog. */
 static GtkWidget *nui_find_dialog(int chooser) {

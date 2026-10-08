@@ -49,6 +49,7 @@ typedef struct _GtkFileChooserNative GtkFileChooserNative;
 typedef struct _GError GError;             typedef struct _GVariant GVariant;
 typedef struct _GVariantType GVariantType; typedef struct _GDBusConnection GDBusConnection;
 typedef struct _GCancellable GCancellable; typedef struct _GAsyncResult GAsyncResult;
+typedef struct _GdkWindow GdkWindow;
 typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
 typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
@@ -172,6 +173,13 @@ NUI_FN(void, gtk_widget_set_vexpand, (GtkWidget *widget, gboolean expand))
 NUI_FN(void, gtk_widget_set_size_request, (GtkWidget *widget, gint width, gint height))
 NUI_FN(void, gtk_widget_grab_focus, (GtkWidget *widget))
 NUI_FN(void, gtk_widget_get_allocation, (GtkWidget *widget, GtkAllocation *allocation)) /* (w), тесты */
+NUI_FN(void, gtk_widget_get_preferred_width, (GtkWidget *widget, gint *minimum_width, gint *natural_width))     /* тесты */
+NUI_FN(void, gtk_widget_get_preferred_height, (GtkWidget *widget, gint *minimum_height, gint *natural_height))  /* тесты */
+NUI_FN(gboolean, gtk_widget_translate_coordinates, (GtkWidget *src_widget, GtkWidget *dest_widget,
+       gint src_x, gint src_y, gint *dest_x, gint *dest_y))                                                     /* тесты */
+NUI_FN(GtkWidget *, gtk_widget_get_toplevel, (GtkWidget *widget))                                              /* тесты */
+NUI_FN(GdkWindow *, gtk_widget_get_window, (GtkWidget *widget))                                                /* тесты */
+NUI_FN(gint, gdk_window_get_origin, (GdkWindow *window, gint *x, gint *y))                                     /* тесты */
 NUI_FN(void, gtk_container_add, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_remove, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_set_border_width, (GtkContainer *container, guint border_width))
@@ -252,6 +260,8 @@ NUI_FN(void, gtk_progress_bar_set_show_text, (GtkProgressBar *pbar, gboolean sho
 NUI_FN(GtkWidget *, gtk_scrolled_window_new, (GtkAdjustment *hadjustment, GtkAdjustment *vadjustment))
 NUI_FN(void, gtk_scrolled_window_set_policy, (GtkScrolledWindow *scrolled_window,
        GtkPolicyType hscrollbar_policy, GtkPolicyType vscrollbar_policy))
+NUI_FN(void, gtk_scrolled_window_set_propagate_natural_width, (GtkScrolledWindow *scrolled_window, gboolean propagate))
+NUI_FN(void, gtk_scrolled_window_set_propagate_natural_height, (GtkScrolledWindow *scrolled_window, gboolean propagate))
 NUI_FN(GtkWidget *, gtk_text_view_new, (void))
 NUI_FN(GtkTextBuffer *, gtk_text_view_get_buffer, (GtkTextView *text_view))
 NUI_FN(void, gtk_text_buffer_set_text, (GtkTextBuffer *buffer, const gchar *text, gint len))
@@ -333,6 +343,8 @@ void   nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, 
 int    nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text);
 int    nui_show_items(const gchar *uri, const gchar *dir_uri);
 void   nui_allocation(GtkWidget *w, int out[4]); /* только с NUI_GUI_TEST */
+void   nui_preferred(GtkWidget *w, int out[4]);  /* только с NUI_GUI_TEST */
+void   nui_window_pos(GtkWidget *w, int out[4]); /* только с NUI_GUI_TEST */
 int    nui_sim_dialog_response(int chooser, int response); /* только с NUI_GUI_TEST */
 int    nui_sim_file_chooser_set(const gchar *path);         /* только с NUI_GUI_TEST */
 int    nui_dialog_open(int chooser);                        /* только с NUI_GUI_TEST */
