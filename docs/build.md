@@ -94,7 +94,11 @@ TinyGo использует установленный Go (его стандар
 | `make abi` | максимальная версия `GLIBC_` в релизных бинарниках не выше 2.36 (Debian 12) |
 | `make windows` | кросс-сборка gc под Windows через mingw (фаза 5) |
 | `make small-upx` | gc + UPX, вне бюджета ([size.md](size.md), §5) |
-| `make ci` | `deps check-protos test selftest size abi` |
+| `make check` | `vet deps check-protos` — статические проверки на хосте (нужен `libgtk-3-dev`) |
+| `make ci-container` | `deps test race selftest size abi` — всё, что не требует `libgtk-3-dev` |
+| `make docker-ci` | `ci-container` в чистом Debian 12: `tools/docker-run.sh make ci-container` |
+| `make ci` | `check docker-ci` |
+| `make shots` | фотоотчёт: окна под Xvfb с openbox → `docs/reports/phase-N/` (запускать в контейнере) |
 
 Переменные:
 

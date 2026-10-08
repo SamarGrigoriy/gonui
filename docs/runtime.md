@@ -25,7 +25,7 @@ var wins []*Window // живые окна (для автовыхода, ADR-15)
 func Run(setup func()) error {
 	if state != stIdle || !drv.IsMainThread() { panic("nui: Run вызывается один раз и из main") }
 	if !drv.Init(appID) { state = stDone; return ErrNoDisplay } // gtk_init_check
-	core.MarkUIThread()                                        // для проверок nuidebug
+	core.MarkUIThread(drv.IsMainThread)                        // для проверок nuidebug: ядро без cgo
 	state = stSetup
 	setup()
 	if !quitAsked {

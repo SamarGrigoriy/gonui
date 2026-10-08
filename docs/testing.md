@@ -45,7 +45,10 @@ NO_AT_BRIDGE=1 G_DEBUG=fatal-criticals xvfb-run -a go test -tags gui ./...
 func TestMain(m *testing.M) {
 	code := 0
 	err := Run(func() {
-		go func() { code = m.Run(); Do(Quit) }() // окон нет — цикл крутится до Quit
+		// Якорь: видимое окно на всё время тестов. Без него первое же закрытое тестом
+		// окно завершило бы Run по ADR-15, и следующие тесты повисли бы.
+		NewWindow("nui: интеграционные тесты", NewLabel("якорь")).Show()
+		go func() { code = m.Run(); Do(Quit) }()
 	})
 	if err != nil { panic(err) }
 	os.Exit(code)
@@ -74,6 +77,8 @@ func waitUntil(cond func() bool, ms int) bool {
 ```
 
 - `t.Parallel()` в GUI-тестах запрещён: у тестов один UI-поток и одно состояние GTK.
+- Сценарии, которые должны завершить `Run` (автовыход, `Quit` в setup, нет дисплея), идут в дочернем процессе: тест запускает свой бинарник с переменной `NUI_HELPER=<сценарий>`, и `TestMain` выполняет сценарий вместо `m.Run()`.
+- Если задан `NUI_SHOTS=<каталог>`, тесты раскладки снимают свои окна для фотоотчёта (`make shots`).
 - Горутины и `time` в тестах разрешены: ADR-7 и ADR-11 касаются только не-тестового кода.
 - Результат асинхронных действий (таймеры, `Watch`, `SimClose`) проверяется через `waitUntil`, а не однократным `ui`.
 

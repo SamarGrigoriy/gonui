@@ -84,6 +84,7 @@ nui/
 │   ├── link_linux.go        #cgo LDFLAGS (только библиотеки), тип H, Nil, cstr/cpath/gostr
 │   ├── export_linux.go      4 трамплина //export → core.Dispatch
 │   ├── app_linux.go         Init, Main, Quit, Wake, TimerAdd, WatchAdd, SourceRemove
+│   ├── window_linux.go      WindowNew, WindowSetChild, WindowShow …
 │   ├── widget_linux.go      общие функции: Show, Destroy, SetEnabled, SetAlign …
 │   ├── controls_linux.go    Label*, Button*, Entry*, Check*, Combo*, Slider*, Progress*, Text*
 │   ├── layout_linux.go      Box*, Grid*, Frame*, Scroll*, Separator*
@@ -98,7 +99,16 @@ nui/
 │   ├── form/                все виджеты MVP, Grid, диалоги
 │   └── logger/              приёмочное приложение (acceptance.md)
 │
+├── targets/
+│   └── linux-glibc-amd64.json   цель TinyGo: системная glibc вместо musl (ADR-17)
+│
+├── docs/reports/            отчёты фаз с фотоотчётами (снимки — make shots)
+│
 └── tools/
+    ├── docker-run.sh        команда в чистом Debian 12 (образ nui-bookworm)
+    ├── bookworm.Dockerfile  образ: runtime GTK, Xvfb, openbox, rootshot, make
+    ├── rootshot.c           снимок экрана одним XGetImage(root) — не xwd (spike/s1)
+    ├── abicheck.sh          glibc не новее Debian 12
     ├── depcheck.sh          белый список импортов
     ├── sizecheck.sh         сверка с size-budget.txt
     └── check-protos.sh      сверка прототипов с <gtk/gtk.h>
@@ -127,10 +137,17 @@ type Button struct {
 	onClick func()
 }
 
-func (b *Button) Event(k core.Kind, _ uintptr) uintptr { … } // реализует core.Receiver
+// Обработчик — на неэкспортируемом типе с тем же устройством: метод Event
+// не попадает в публичный API, а преобразование указателя ничего не стоит.
+type buttonEv Button
+
+func (b *buttonEv) Event(k core.Kind, _ uintptr) uintptr { … } // реализует core.Receiver
+
+// в конструкторе: b.id = core.Register((*buttonEv)(b))
 ```
 
-- Каждый тип виджета реализует `core.Receiver`. Реестр хранит интерфейсы, поэтому Go-объект жив, пока жив виджет, даже если приложение не держит на него ссылку.
+- Каждый тип nui регистрирует в реестре свой `*xxxEv` — он реализует `core.Receiver`. Реестр хранит интерфейсы, поэтому Go-объект жив, пока жив виджет, даже если приложение не держит на него ссылку.
+- `Window` не встраивает `widget`: у окна свой набор методов, и `Widget` оно не реализует — в контейнер его не вставить.
 - Таймеры (`*Timer`) и наблюдатели (`*Watcher`) тоже реализуют `Receiver` и лежат в том же реестре: один механизм на всё.
 - Методы публичного API **встраиваются** из `widget` (`SetEnabled`, `SetVisible` …). Каждый метод начинается с `if w.id == 0 { return }`: вызов у уничтоженного объекта ничего не делает.
 
