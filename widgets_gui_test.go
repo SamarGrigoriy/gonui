@@ -7,6 +7,7 @@ package nui
 // уничтожение. Помощники ui, waitUntil, shot, expectPanic, alloc — в nui_gui_test.go.
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -279,8 +280,12 @@ func TestTextView(t *testing.T) {
 			t.Errorf("правка пустого буфера: OnChange %d, ожидался 1", n)
 		}
 		drv.SimEdit(tv.view, "ещё правка")
-		if n != 3 {
-			t.Errorf("правка непустого буфера: OnChange %d, ожидалось 3 (удаление и вставка)", n)
+		want := 3 // GTK: удаление и вставка
+		if runtime.GOOS == "windows" {
+			want = 2 // Windows: один EN_CHANGE на замену текста
+		}
+		if n != want {
+			t.Errorf("правка непустого буфера: OnChange %d, ожидалось %d", n, want)
 		}
 	})
 }

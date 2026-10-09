@@ -8,7 +8,8 @@
 static HINSTANCE inst;
 static HWND msgWnd;  // служебное окно (HWND_MESSAGE): Do, таймеры, Enter
 static HWND parking; // скрытый родитель контролов, ещё не вставленных в окно
-static nui_TaskDialog_fn taskDialog;
+static nui_TaskDialogIndirect_fn taskDialog;
+static int dlgKind; // открытый модальный диалог — для тестов (sim_windows.go)
 
 // Запасной путь для exe без манифеста (driver-win32.md, §8): контекст активации из
 // манифеста shell32.dll (ресурс 124, Common Controls v6) — контекст процесса по умолчанию.
@@ -44,7 +45,7 @@ static void comctl_init(void) {
 			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS};
 		init(&icc);
 	}
-	taskDialog = (nui_TaskDialog_fn)(void (*)(void))GetProcAddress(m, "TaskDialog");
+	taskDialog = (nui_TaskDialogIndirect_fn)(void (*)(void))GetProcAddress(m, "TaskDialogIndirect");
 }
 
 int nui_init(void) {
@@ -217,19 +218,35 @@ void nui_client_size(HWND hwnd, int out[2]) {
 	out[1] = r.bottom - r.top;
 }
 
-// Сообщение (§9): TaskDialog из comctl32 v6, если нашёлся, иначе MessageBoxW.
+// Сообщение (§9): TaskDialogIndirect из comctl32 v6, если нашлась, иначе MessageBoxW.
 // kind: 0 — информация, 1 — ошибка, 2 — вопрос «Да/Нет». 1 — OK или «Да».
+// Esc и крестик закрывают и вопрос (TDF_ALLOW_DIALOG_CANCELLATION) — ответ «нет», как на GTK.
+// Если родителя уничтожили, пока диалог открыт, TaskDialogIndirect вернётся с ошибкой или
+// без нажатой кнопки — это «нет»; второй диалог (MessageBoxW) тогда не открывается.
 int nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text) {
+	int r = 0;
+	dlgKind = kind == 2 ? 2 : 1;
 	if (taskDialog) {
+		TASKDIALOGCONFIG c = {0};
+		c.cbSize = sizeof c;
+		c.hwndParent = parent;
+		c.hInstance = inst;
+		c.dwFlags = NUI_TDF_ALLOW_DIALOG_CANCELLATION | (parent ? NUI_TDF_POSITION_RELATIVE_TO_WINDOW : 0);
+		c.dwCommonButtons = kind == 2 ? NUI_TDCBF_YES_BUTTON | NUI_TDCBF_NO_BUTTON : NUI_TDCBF_OK_BUTTON;
+		c.pszWindowTitle = app;
+		c.pszMainIcon = kind == 0 ? RES(-3) : kind == 1 ? RES(-2) : 0; // TD_INFORMATION_ICON, TD_ERROR_ICON
+		c.pszMainInstruction = title;
+		c.pszContent = text;
 		int pressed = 0;
-		int buttons = kind == 2 ? NUI_TDCBF_YES_BUTTON | NUI_TDCBF_NO_BUTTON : NUI_TDCBF_OK_BUTTON;
-		LPCWSTR icon = kind == 0 ? RES(-3) : kind == 1 ? RES(-2) : 0; // TD_INFORMATION_ICON, TD_ERROR_ICON
-		if (taskDialog(parent, inst, app, title, text, buttons, icon, &pressed) >= 0)
-			return pressed == NUI_IDOK || pressed == NUI_IDYES;
+		if (taskDialog(&c, &pressed, 0, 0) >= 0)
+			r = pressed == NUI_IDOK || pressed == NUI_IDYES;
+	} else {
+		UINT t = kind == 2 ? NUI_MB_YESNO | NUI_MB_ICONQUESTION : NUI_MB_OK | (kind == 1 ? NUI_MB_ICONERROR : NUI_MB_ICONINFORMATION);
+		int b = MessageBoxW(parent, text, title, t);
+		r = b == NUI_IDOK || b == NUI_IDYES;
 	}
-	UINT t = kind == 2 ? NUI_MB_YESNO | NUI_MB_ICONQUESTION : NUI_MB_OK | (kind == 1 ? NUI_MB_ICONERROR : NUI_MB_ICONINFORMATION);
-	int r = MessageBoxW(parent, text, title, t);
-	return r == NUI_IDOK || r == NUI_IDYES;
+	dlgKind = 0;
+	return r;
 }
 
 // Открыть/сохранить (§9). filter — пары «имя\0шаблоны\0», в конце ещё \0. buf — на входе
@@ -244,12 +261,17 @@ int nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR
 	o.nMaxFile = (DWORD)cap;
 	o.lpstrTitle = title;
 	o.Flags = NUI_OFN_EXPLORER | NUI_OFN_NOCHANGEDIR | NUI_OFN_HIDEREADONLY | NUI_OFN_PATHMUSTEXIST;
+	dlgKind = 3;
+	int ok;
 	if (save) {
 		o.Flags |= NUI_OFN_OVERWRITEPROMPT;
-		return GetSaveFileNameW(&o);
+		ok = GetSaveFileNameW(&o);
+	} else {
+		o.Flags |= NUI_OFN_FILEMUSTEXIST;
+		ok = GetOpenFileNameW(&o);
 	}
-	o.Flags |= NUI_OFN_FILEMUSTEXIST;
-	return GetOpenFileNameW(&o);
+	dlgKind = 0;
+	return ok;
 }
 
 // Выбор папки (§9). buf — не меньше MAX_PATH (260) символов.
@@ -259,7 +281,9 @@ int nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf) {
 	bi.pszDisplayName = buf;
 	bi.lpszTitle = title;
 	bi.ulFlags = NUI_BIF_RETURNONLYFSDIRS | NUI_BIF_NEWDIALOGSTYLE;
+	dlgKind = 4;
 	PIDLIST_ABSOLUTE id = SHBrowseForFolderW(&bi);
+	dlgKind = 0;
 	if (!id)
 		return 0;
 	int ok = SHGetPathFromIDListW(id, buf);
@@ -310,3 +334,26 @@ void nui_text_append(HWND e, LPCWSTR s, int autoscroll, int maxLines) {
 	if (now != want)
 		SendMessageW(e, NUI_EM_LINESCROLL, 0, (LPARAM)(want - now));
 }
+
+#ifdef NUI_GUI_TEST
+// Помощники интеграционных тестов (sim_windows.go): открытый модальный диалог потока.
+int nui_dialog_kind(void) { return dlgKind; }
+int nui_task_dialog(void) { return taskDialog != 0; }
+
+static BOOL find_dialog(HWND h, LPARAM out) {
+	WCHAR cls[16];
+	if (IsWindowVisible(h) && GetClassNameW(h, cls, 16) == 6 && cls[0] == '#' && cls[1] == '3' && cls[2] == '2' &&
+		cls[3] == '7' && cls[4] == '7' && cls[5] == '0') {
+		*(HWND *)out = h;
+		return 0;
+	}
+	return 1;
+}
+
+HWND nui_find_dialog(void) {
+	HWND h = 0;
+	if (dlgKind)
+		EnumThreadWindows(GetCurrentThreadId(), find_dialog, (LPARAM)&h);
+	return h;
+}
+#endif

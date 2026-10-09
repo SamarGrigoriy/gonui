@@ -5,7 +5,7 @@
 | Уровень | Что проверяет | Тулчейн | Где запускается |
 |---|---|---|---|
 | Юнит-тесты `internal/core` | реестр, ud, диспетчер, очередь `Do` | gc (+ `-race`) | везде, без GTK и без cgo |
-| Интеграционные (тег `gui`) | каждый виджет и правило из [api.md](api.md) на настоящем GTK | gc | Linux, `xvfb-run` |
+| Интеграционные (тег `gui`) | каждый виджет и правило из [api.md](api.md) на настоящем GTK и на драйвере Win32 | gc | Linux, `xvfb-run`; Windows — под Wine (`make win-test`, образ `nui-win`) |
 | Selftest примеров | сборка, запуск, цикл событий, выход — обоими тулчейнами | gc, TinyGo | Linux, `xvfb-run` |
 | Golden-тесты раскладки | движок Win32 (`internal/layout`) раскладывает так же, как nui на GTK ([layout.md](layout.md), §8) | gc | сторона GTK — Linux + Xvfb (`TestLayoutGTK`, в `make test`); снимки — `make golden` в контейнере; движок по снимкам — везде |
 | Статические проверки | прототипы, импорты, размер | — | CI |
@@ -124,6 +124,14 @@ C-хелперы для тестов лежат в `wrap_linux.c` под `#ifdef
 | Файловые диалоги | `OpenFile` с фильтром, отмена, `SaveFile` с предложенным именем, `ChooseFolder` (`drv.SimChooserSet`, `SimChooserDone`) |
 | Оболочка | дочерний процесс с подставной программой по умолчанию (`mimeapps.list` во временном `XDG_CONFIG_HOME`): `OpenURI` и `ShowInFolder` без сессии D-Bus и с сессией без `FileManager1` |
 | Раскладка (GTK) | `Expand` забирает свободное место; `Stretch` прижимает соседей; скрытый виджет не занимает места (замер через `drv.Allocation(h)` с тегом `gui`) |
+
+### Windows
+
+Те же тесты собираются под Windows (`GOOS=windows`, mingw-w64) и идут под Wine 8.0 в Xvfb: `NUI_IMAGE=nui-win tools/docker-run.sh make win-test`, обычная и отладочная сборка.
+- Помощники `drv.Sim*` для Windows (`sim_windows.go`) шлют контролам и их родителям те же сообщения, что Windows при вводе: `BN_CLICKED`, `CBN_SELCHANGE`, `EN_CHANGE`, `WM_HSCROLL`, `WM_KEYDOWN VK_RETURN` через настоящий цикл. В открытом диалоге они нажимают кнопки: `TDM_CLICK_BUTTON` у `TaskDialog`, `WM_COMMAND` у `MessageBoxW` и файловых диалогов, `BFFM_SETSELECTIONW` у выбора папки.
+- Только на Linux (`*_linux_test.go`): `Watch`, запуск без дисплея, `OpenURI`/`ShowInFolder` с подставной программой XDG, сверка раскладки с GTK (`TestLayoutGTK`).
+- Различия платформ отмечены в тестах `runtime.GOOS`: `TextView.OnChange` при замене текста (Windows — один вызов).
+- Wine 8.0 не умеет `os.RemoveAll` (`FileDispositionInfoEx`) — временные каталоги тестов под Windows убираются без проверки ошибок.
 
 ## 4. Selftest примеров
 

@@ -65,6 +65,18 @@ func fromUTF16(w []uint16) string {
 	return string(b)
 }
 
+// osText — строка такой, какой её увидит и вернёт ОС: до первого нулевого символа,
+// битый UTF-8 — U+FFFD (как cstr у GTK). Её хранят узлы, которые отдают свой текст.
+func osText(s string) string {
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0 {
+			s = s[:i]
+			break
+		}
+	}
+	return core.FixUTF8(s)
+}
+
 // crlf: "\n" → "\r\n" для многострочного EDIT; уже готовые "\r\n" не удваиваются.
 func crlf(s string) string {
 	n := 0

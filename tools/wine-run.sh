@@ -3,6 +3,7 @@
 #   tools/wine-run.sh exe…                 — selftest: каждый exe сам выходит, код должен быть 0
 #   tools/wine-run.sh -shots DIR exe…      — снимок окна каждого exe, затем exe закрывается
 #   -dpi N — масштаб Windows в точках на дюйм: 96 = 100 %, 144 = 150 %, 192 = 200 %
+#   WINE_ARGS — аргументы exe (например, -test.v для тестового бинарника)
 # Окно Wine ищется по классу (имени exe): заголовки не в ASCII xwininfo в локали C не печатает.
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
@@ -21,6 +22,8 @@ while [ $# -gt 0 ]; do
 	esac
 done
 export WINEPREFIX=${WINEPREFIX:-$HOME/.wine-nui} WINEDEBUG=-all WINEDLLOVERRIDES="mscoree,mshtml="
+# Локаль UTF-8: в локали C Wine не может создать файл с именем не в ASCII («журнал.log»).
+export LANG=ru_RU.UTF-8
 openbox >/dev/null 2>&1 &
 sleep 1
 wineboot -i >/dev/null 2>&1
@@ -33,7 +36,7 @@ wine reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$dpi" /f
 fail=0
 for f in "$@"; do
 	n=$(basename "$f" .exe)
-	wine "$f" & pid=$!
+	wine "$f" ${WINE_ARGS:-} & pid=$!
 	t=0 seen=нет
 	while [ $t -lt 120 ]; do
 		if xwininfo -root -tree 2>/dev/null | grep -q "(\"$n.exe\""; then seen=да; break; fi

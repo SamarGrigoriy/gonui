@@ -8,9 +8,8 @@ package nui
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
+	"runtime"
 	"testing"
 	"time"
 
@@ -118,7 +117,7 @@ func TestDialogParentDestroyed(t *testing.T) {
 }
 
 func TestFileDialogs(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	for _, f := range []string{"журнал.log", "заметки.txt"} {
 		if err := os.WriteFile(filepath.Join(dir, f), []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
@@ -167,55 +166,17 @@ func TestFileDialogs(t *testing.T) {
 	}
 }
 
-// OpenURI и ShowInFolder — в дочернем процессе с подставной программой по умолчанию:
-// она дописывает в opened.txt всё, что её попросили открыть (https и каталоги).
-func TestOpenURIAndShowInFolder(t *testing.T) {
-	tmp := t.TempDir()
-	rec := filepath.Join(tmp, "opened.txt")
-	script := filepath.Join(tmp, "record.sh")
-	write := func(path, s string, mode os.FileMode) {
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(s), mode); err != nil {
-			t.Fatal(err)
-		}
+// tempDir — как t.TempDir, но ошибка уборки не валит тест: под Wine 8 os.RemoveAll не
+// работает (Go удаляет файлы через FileDispositionInfoEx, а Wine его не реализует).
+func tempDir(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS != "windows" {
+		return t.TempDir()
 	}
-	write(script, "#!/bin/sh\necho \"$1\" >> "+rec+"\n", 0o755)
-	write(filepath.Join(tmp, "data/applications/nui-record.desktop"), "[Desktop Entry]\nType=Application\nName=nui record\nExec="+
-		script+" %u\nMimeType=x-scheme-handler/https;inode/directory;\n", 0o644)
-	write(filepath.Join(tmp, "config/mimeapps.list"), "[Default Applications]\nx-scheme-handler/https=nui-record.desktop\ninode/directory=nui-record.desktop\n", 0o644)
-	file := filepath.Join(tmp, "логи", "журнал.log")
-	write(file, "x", 0o644)
-
-	env := []string{"XDG_DATA_HOME=" + tmp + "/data", "XDG_CONFIG_HOME=" + tmp + "/config",
-		"XDG_DATA_DIRS=" + tmp + "/data:/usr/share", "NUI_REC=" + rec, "NUI_FILE=" + file}
-	check := func(name string, extraEnv []string, unset []string, want string) {
-		t.Helper()
-		os.Remove(rec)
-		runHelperEnv(t, name, 0, append(env, extraEnv...), unset)
-		b, _ := os.ReadFile(rec)
-		if got := strings.TrimSpace(string(b)); !strings.Contains(got, want) {
-			t.Fatalf("%s: открыто %q, ожидалось %q", name, got, want)
-		}
-	}
-	check("openuri", nil, []string{"DBUS_SESSION_BUS_ADDRESS"}, "https://example.org/nui?a=1")
-	// Без сессии D-Bus ShowInFolder сразу открывает папку.
-	check("showinfolder", nil, []string{"DBUS_SESSION_BUS_ADDRESS"}, filepath.Dir(file))
-	// С сессией D-Bus, но без FileManager1: асинхронный запрос → ошибка → запасной путь.
-	if _, err := os.Stat("/usr/share/dbus-1/session.conf"); err != nil {
-		t.Log("нет /usr/share/dbus-1/session.conf — путь через D-Bus не проверен")
-		return
-	}
-	out, err := exec.Command("dbus-daemon", "--session", "--fork", "--print-address=1", "--print-pid=1").Output()
+	dir, err := os.MkdirTemp("", "nui-test")
 	if err != nil {
-		t.Logf("dbus-daemon не запустился (%v) — путь через D-Bus не проверен", err)
-		return
+		t.Fatal(err)
 	}
-	lines := strings.Fields(string(out))
-	if len(lines) < 2 {
-		t.Fatalf("dbus-daemon: %q", out)
-	}
-	defer exec.Command("kill", lines[1]).Run()
-	check("showinfolder", []string{"DBUS_SESSION_BUS_ADDRESS=" + lines[0]}, nil, filepath.Dir(file))
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
 }

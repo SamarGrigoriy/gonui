@@ -75,7 +75,7 @@ func SeparatorNew(id uint32, vertical bool) H {
 // FrameNew — рамка с заголовком; "" — без заголовка.
 func FrameNew(id uint32, title string) H {
 	h, n := newNode(kFrame, id)
-	n.text = title
+	n.text = osText(title)
 	n.lay.Kind = layout.Frame
 	control(h, "BUTTON", amp(title), C.NUI_BS_GROUPBOX, 0)
 	return h
@@ -83,7 +83,7 @@ func FrameNew(id uint32, title string) H {
 
 func FrameSetTitle(h H, s string) {
 	n := nodes[h]
-	n.text = s
+	n.text = osText(s)
 	C.SetWindowTextW(n.hwnd, wstr(amp(s)))
 	invalidate(h)
 }

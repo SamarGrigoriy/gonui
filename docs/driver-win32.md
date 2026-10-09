@@ -142,7 +142,7 @@ type node struct {
 
 | nui | Win32 |
 |---|---|
-| Message / Alert / Ask | `TaskDialog` (comctl32 v6): `pszMainInstruction = title`, `pszContent = text`, заголовок окна — имя приложения. `TaskDialog` ищется при первом вызове: `LoadLibraryW(L"comctl32.dll")` + `GetProcAddress` (ADR-16). Статический импорт не годится: без манифеста exe не запустится. Не нашёлся — `MessageBoxW(caption = title)` (логгер). Значки: INFORMATION / ERROR / без значка с кнопками YES/NO |
+| Message / Alert / Ask | `TaskDialogIndirect` (comctl32 v6): `pszMainInstruction = title`, `pszContent = text`, заголовок окна — имя приложения, `TDF_ALLOW_DIALOG_CANCELLATION` — Esc и крестик закрывают и вопрос (ответ «нет», как на GTK), `TDF_POSITION_RELATIVE_TO_WINDOW`. Функция ищется в `Init`: `LoadLibraryW(L"comctl32.dll")` + `GetProcAddress` (ADR-16). Статический импорт не годится: без манифеста exe не запустится. Не нашлась — `MessageBoxW(caption = title)` (логгер). Значки: INFORMATION / ERROR / без значка с кнопками YES/NO. Если родителя уничтожили, пока диалог открыт, — ответ «нет», второй диалог не открывается |
 | OpenFile / SaveFile | `GetOpenFileNameW` / `GetSaveFileNameW`, `OFN_EXPLORER \| OFN_FILEMUSTEXIST` / `OFN_OVERWRITEPROMPT`. Фильтр — строка `"Логи\0*.log;*.txt\0\0"` |
 | ChooseFolder | `SHBrowseForFolderW` (`BIF_NEWDIALOGSTYLE \| BIF_RETURNONLYFSDIRS`) → `SHGetPathFromIDListW` → `CoTaskMemFree`. Для этого `Init` вызывает `CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)` |
 | OpenURI | `ShellExecuteW(NULL, L"open", uri, …)`; результат > 32 — успех |
@@ -158,6 +158,8 @@ type node struct {
 | Тёмная тема | стандартные контролы Win32 её не поддерживают; окна светлые |
 | `SetIconName` | ищет иконку в ресурсах exe по имени, иначе берёт иконку приложения (ресурс 1, как в логгере) |
 | Положение окна | центр экрана работает (на Wayland его выбирает композитор) |
+| `TextView.OnChange` | замена выделенного текста — один вызов, а не два (Windows шлёт один `EN_CHANGE`) |
+| `SetTooltip`, `Label.SetSelectable` | пока не реализованы: вызовы ничего не делают |
 
 ## 11. Порядок работ в фазе 5
 

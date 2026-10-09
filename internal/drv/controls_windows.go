@@ -12,7 +12,7 @@ import "C"
 
 func LabelNew(id uint32, text string) H {
 	h, n := newNode(kLabel, id)
-	n.text = text
+	n.text = osText(text)
 	control(h, "STATIC", text, labelStyle(n), 0)
 	return h
 }
@@ -55,7 +55,7 @@ func restyle(n *node, style uint32) {
 
 func LabelSetText(h H, s string) {
 	n := nodes[h]
-	n.text = s
+	n.text = osText(s)
 	restyle(n, labelStyle(n))
 	C.SetWindowTextW(n.hwnd, wstr(s))
 	remeasure(h)
@@ -106,21 +106,21 @@ func LabelSetColor(h H, color uint32) {
 
 func ButtonNew(id uint32, text string) H {
 	h, n := newNode(kButton, id)
-	n.text = text
+	n.text = osText(text)
 	control(h, "BUTTON", amp(text), C.NUI_BS_PUSHBUTTON|C.NUI_WS_TABSTOP, 0)
 	return h
 }
 
 func CheckNew(id uint32, text string) H {
 	h, n := newNode(kCheck, id)
-	n.text = text
+	n.text = osText(text)
 	control(h, "BUTTON", amp(text), C.NUI_BS_AUTOCHECKBOX|C.NUI_WS_TABSTOP, 0)
 	return h
 }
 
 func ButtonSetText(h H, s string) {
 	n := nodes[h]
-	n.text = s
+	n.text = osText(s)
 	C.SetWindowTextW(n.hwnd, wstr(amp(s)))
 	remeasure(h)
 }
@@ -201,9 +201,12 @@ func ComboClear(h H) {
 
 func ComboSetSelected(h H, i int) { send(nodes[h].hwnd, C.NUI_CB_SETCURSEL, uintptr(i), 0) }
 
+// ComboSelected: у ComboEntry, как в GTK, ввод своего текста снимает выбор — Win32 же
+// помнит последний выбранный пункт, поэтому выбор засчитывается, только пока текст совпадает.
 func ComboSelected(h H) int {
-	r := int(int32(send(nodes[h].hwnd, C.NUI_CB_GETCURSEL, 0, 0)))
-	if r < 0 {
+	n := nodes[h]
+	r := int(int32(send(n.hwnd, C.NUI_CB_GETCURSEL, 0, 0)))
+	if r < 0 || r >= len(n.items) || n.editable && windowText(n.hwnd) != n.items[r] {
 		return -1
 	}
 	return r

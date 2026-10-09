@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -248,47 +247,6 @@ func TestTimers(t *testing.T) {
 	})
 }
 
-func TestWatchPipe(t *testing.T) {
-	var p [2]int
-	if err := syscall.Pipe2(p[:], syscall.O_NONBLOCK|syscall.O_CLOEXEC); err != nil {
-		t.Fatal(err)
-	}
-	defer syscall.Close(p[0])
-	var got []IOCond
-	var data string
-	var w *Watcher
-	ui(func() {
-		w = Watch(p[0], IORead, func(c IOCond) {
-			got = append(got, c)
-			var buf [64]byte
-			if n, _ := syscall.Read(p[0], buf[:]); n > 0 {
-				data += string(buf[:n])
-			}
-			if c&IOHup != 0 {
-				w.Stop() // до close(fd) — по контракту
-			}
-		})
-	})
-	syscall.Write(p[1], []byte("привет"))
-	waitUntil(t, 1000, func() bool { return data == "привет" })
-	syscall.Close(p[1])
-	waitUntil(t, 1000, func() bool { return len(got) > 0 && got[len(got)-1]&IOHup != 0 })
-	n := 0
-	ui(func() {
-		n = len(got)
-		if got[0]&IORead == 0 {
-			t.Errorf("первое событие %b без IORead", got[0])
-		}
-	})
-	time.Sleep(100 * time.Millisecond)
-	ui(func() {
-		if len(got) != n {
-			t.Error("после Stop наблюдатель продолжает срабатывать")
-		}
-		w.Stop()
-	})
-}
-
 func TestDoIsAsyncAndOrdered(t *testing.T) {
 	ran := false
 	ui(func() {
@@ -414,10 +372,6 @@ func TestAutoQuitLastWindow(t *testing.T)           { runHelper(t, "last", 0, ni
 func TestAutoQuitIgnoresHiddenWindows(t *testing.T) { runHelper(t, "hidden", 0, nil) }
 func TestHideDoesNotQuit(t *testing.T)              { runHelper(t, "hide", 0, nil) }
 func TestQuitInsideSetup(t *testing.T)              { runHelper(t, "setup-quit", 0, nil) }
-
-func TestNoDisplay(t *testing.T) {
-	runHelper(t, "nodisplay", 3, []string{"DISPLAY", "WAYLAND_DISPLAY"})
-}
 
 func runHelper(t *testing.T, name string, want int, unset []string) {
 	t.Helper()

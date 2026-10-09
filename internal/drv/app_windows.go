@@ -96,10 +96,8 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 		}
 		return 0, true
 	}
-	h, n := nodeOf(hwnd)
-	if n == nil {
-		return 0, false
-	}
+	// Уведомления контролов приходят их родителю — окну, прокрутке или парковочному окну
+	// (у него нет узла): разбираются по HWND контрола в lParam.
 	switch m {
 	case C.NUI_WM_COMMAND:
 		if lp != 0 {
@@ -116,6 +114,20 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			}
 			return 0, true
 		}
+	case C.NUI_WM_CTLCOLORSTATIC:
+		if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kLabel && c.color != noColor {
+			dc := hdcOf(wp)
+			C.SetTextColor(dc, C.COLORREF(c.color>>16&0xFF|c.color&0xFF00|(c.color&0xFF)<<16))
+			C.SetBkColor(dc, C.COLORREF(C.GetSysColor(C.NUI_COLOR_BTNFACE)))
+			return uintptr(unsafe.Pointer(C.GetSysColorBrush(C.NUI_COLOR_BTNFACE))), true
+		}
+	}
+	h, n := nodeOf(hwnd)
+	if n == nil {
+		return 0, false
+	}
+	switch m {
+	case C.NUI_WM_HSCROLL, C.NUI_WM_VSCROLL:
 		if n.kind == kScroll { // свои полосы прокрутки
 			scrollBy(h, m == C.NUI_WM_VSCROLL, int(wp&0xFFFF), int(int16(wp>>16)), 0)
 			return 0, true
@@ -124,13 +136,6 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 		if n.kind == kScroll {
 			scrollBy(h, true, 0, 0, int(int16(wp>>16)))
 			return 0, true
-		}
-	case C.NUI_WM_CTLCOLORSTATIC:
-		if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kLabel && c.color != noColor {
-			dc := hdcOf(wp)
-			C.SetTextColor(dc, C.COLORREF(c.color>>16&0xFF|c.color&0xFF00|(c.color&0xFF)<<16))
-			C.SetBkColor(dc, C.COLORREF(C.GetSysColor(C.NUI_COLOR_BTNFACE)))
-			return uintptr(unsafe.Pointer(C.GetSysColorBrush(C.NUI_COLOR_BTNFACE))), true
 		}
 	}
 	if n.kind == kWindow {

@@ -27,8 +27,8 @@ if command -v "$WINCC" >/dev/null; then
 	WFLAGS="-std=c11 -DNUI_CHECK -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -Wall -Werror"
 	WINC="-include windows.h -include commctrl.h -include shlobj.h -include commdlg.h"
 	"$WINCC" $WFLAGS $WINC -fsyntax-only -x c internal/drv/win32_windows.h
-	"$WINCC" $WFLAGS $WINC -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
-	"$WINCC" -std=c11 -Wall -Werror -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
+	"$WINCC" $WFLAGS $WINC -DNUI_GUI_TEST -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
+	"$WINCC" -std=c11 -Wall -Werror -DNUI_GUI_TEST -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
 	echo "check-protos: Win32 — ok"
 else
 	echo "check-protos: Win32 пропущен — нет $WINCC (apt install gcc-mingw-w64-x86-64)"

@@ -21,7 +21,7 @@ GOFLAGS_REL := -trimpath -ldflags="-s -w -buildid="
 # Выпущенный TinyGo + target-файл nui: системная glibc вместо musl (ADR-17).
 TINYFLAGS   := -target=targets/linux-glibc-$(ARCH).json -opt=z -no-debug -panic=trap -gc=conservative -scheduler=$(TINYGO_SCHED)
 
-.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots golden win win-selftest win-shots clean FORCE
+.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots golden win win-selftest win-test win-shots clean FORCE
 
 all: dev
 
@@ -142,6 +142,14 @@ win-selftest: $(EXAMPLES:%=examples/%/rsrc_windows_amd64.syso)   ## пример
 		$(WIN_PREFIX)objcopy --subsystem windows bin/win/selftest/$$e-small.tmp bin/win/selftest/$$e-small.exe || exit 1; \
 	done
 	./tools/wine-run.sh bin/win/selftest/*.exe
+
+# Интеграционные тесты nui (-tags gui) на драйвере Win32 — те же, что на GTK, без
+# привязанных к Linux (*_linux_test.go); обычная и отладочная сборка.
+win-test:                                    ## интеграционные тесты под Wine
+	@mkdir -p bin/win
+	$(WIN_GO) CGO_CFLAGS= $(GO) test -c -tags gui -o bin/win/nui.test.exe .
+	$(WIN_GO) CGO_CFLAGS= $(GO) test -c -tags 'gui nuidebug' -o bin/win/nui-debug.test.exe .
+	WINE_ARGS="-test.timeout=300s" ./tools/wine-run.sh bin/win/nui.test.exe bin/win/nui-debug.test.exe
 
 win-shots: win                               ## снимки примеров под Wine: 100 % и 150 %
 	@mkdir -p $(WIN_SHOTS)

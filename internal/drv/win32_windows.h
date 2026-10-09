@@ -39,7 +39,10 @@ typedef struct DPI_AWARENESS_CONTEXT__ *DPI_AWARENESS_CONTEXT;
 typedef LRESULT (*WNDPROC)(HWND, UINT, WPARAM, LPARAM);
 typedef void (*TIMERPROC)(HWND, UINT, UINT_PTR, DWORD);
 typedef long long (*FARPROC)(void);
-typedef int TASKDIALOG_COMMON_BUTTON_FLAGS;
+typedef BOOL (*WNDENUMPROC)(HWND, LPARAM);
+typedef int TASKDIALOG_COMMON_BUTTON_FLAGS, TASKDIALOG_FLAGS;
+typedef struct _TASKDIALOG_BUTTON TASKDIALOG_BUTTON;
+typedef HRESULT (*PFTASKDIALOGCALLBACK)(HWND, UINT, WPARAM, LPARAM, LONG_PTR);
 typedef struct _ITEMIDLIST ITEMIDLIST;
 typedef ITEMIDLIST *PIDLIST_ABSOLUTE;
 typedef const ITEMIDLIST *PCIDLIST_ABSOLUTE;
@@ -123,6 +126,30 @@ typedef struct tagOFNW {
 	void *pvReserved;
 	DWORD dwReserved, FlagsEx;
 } OPENFILENAMEW;
+#pragma pack(push, 1) /* как в commctrl.h: TASKDIALOGCONFIG упакована */
+typedef struct _TASKDIALOGCONFIG {
+	UINT cbSize;
+	HWND hwndParent;
+	HINSTANCE hInstance;
+	TASKDIALOG_FLAGS dwFlags;
+	TASKDIALOG_COMMON_BUTTON_FLAGS dwCommonButtons;
+	PCWSTR pszWindowTitle;
+	union { HICON hMainIcon; PCWSTR pszMainIcon; };
+	PCWSTR pszMainInstruction, pszContent;
+	UINT cButtons;
+	const TASKDIALOG_BUTTON *pButtons;
+	int nDefaultButton;
+	UINT cRadioButtons;
+	const TASKDIALOG_BUTTON *pRadioButtons;
+	int nDefaultRadioButton;
+	PCWSTR pszVerificationText, pszExpandedInformation, pszExpandedControlText, pszCollapsedControlText;
+	union { HICON hFooterIcon; PCWSTR pszFooterIcon; };
+	PCWSTR pszFooter;
+	PFTASKDIALOGCALLBACK pfCallback;
+	LONG_PTR lpCallbackData;
+	UINT cxWidth;
+} TASKDIALOGCONFIG;
+#pragma pack(pop)
 typedef struct _browseinfoW {
 	HWND hwndOwner;
 	PCIDLIST_ABSOLUTE pidlRoot;
@@ -147,6 +174,7 @@ _Static_assert(sizeof(SCROLLINFO) == 28, "SCROLLINFO");
 _Static_assert(sizeof(ACTCTXW) == 56, "ACTCTXW");
 _Static_assert(sizeof(OPENFILENAMEW) == 152, "OPENFILENAMEW");
 _Static_assert(sizeof(BROWSEINFOW) == 64, "BROWSEINFOW");
+_Static_assert(sizeof(TASKDIALOGCONFIG) == 160, "TASKDIALOGCONFIG");
 
 /* ---------- 2. Макросы сверки ---------- */
 #ifdef NUI_CHECK
@@ -332,6 +360,12 @@ NUI_CONST(IDYES, 6)
 NUI_CONST(TDCBF_OK_BUTTON, 0x1)
 NUI_CONST(TDCBF_YES_BUTTON, 0x2)
 NUI_CONST(TDCBF_NO_BUTTON, 0x4)
+NUI_CONST(TDF_ALLOW_DIALOG_CANCELLATION, 0x0008)
+NUI_CONST(TDF_POSITION_RELATIVE_TO_WINDOW, 0x1000)
+NUI_CONST(TDM_CLICK_BUTTON, 0x0466)
+NUI_CONST(IDCANCEL, 2)
+NUI_CONST(IDNO, 7)
+NUI_CONST(GW_CHILD, 5)
 NUI_CONST(OFN_OVERWRITEPROMPT, 0x00000002)
 NUI_CONST(OFN_HIDEREADONLY, 0x00000004)
 NUI_CONST(OFN_NOCHANGEDIR, 0x00000008)
@@ -398,6 +432,11 @@ NUI_FN(BOOL, GetMonitorInfoW, (HMONITOR hMonitor, MONITORINFO *lpmi))
 NUI_FN(int, MessageBoxW, (HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType))
 NUI_FN(int, SetScrollInfo, (HWND hwnd, int nBar, const SCROLLINFO *lpsi, BOOL redraw))
 NUI_FN(BOOL, GetScrollInfo, (HWND hwnd, int nBar, SCROLLINFO *lpsi))
+NUI_FN(HWND, GetWindow, (HWND hWnd, UINT uCmd))
+NUI_FN(HWND, GetParent, (HWND hWnd))
+NUI_FN(HWND, GetDlgItem, (HWND hDlg, int nIDDlgItem))
+NUI_FN(int, GetClassNameW, (HWND hWnd, LPWSTR lpClassName, int nMaxCount))
+NUI_FN(BOOL, EnumThreadWindows, (DWORD dwThreadId, WNDENUMPROC lpfn, LPARAM lParam))
 
 /* user32: DPI (Windows 10 1607+, есть и в Wine 8) */
 NUI_FN(BOOL, SetProcessDpiAwarenessContext, (DPI_AWARENESS_CONTEXT value))
@@ -432,9 +471,8 @@ NUI_FN(BOOL, GetSaveFileNameW, (OPENFILENAMEW *lpofn))
 
 /* comctl32 — только через LoadLibraryW + GetProcAddress (ADR-16) */
 NUI_FNPTR(BOOL, InitCommonControlsEx, (const INITCOMMONCONTROLSEX *picce))
-NUI_FNPTR(HRESULT, TaskDialog, (HWND hwndOwner, HINSTANCE hInstance, PCWSTR pszWindowTitle,
-          PCWSTR pszMainInstruction, PCWSTR pszContent, TASKDIALOG_COMMON_BUTTON_FLAGS dwCommonButtons,
-          PCWSTR pszIcon, int *pnButton))
+NUI_FNPTR(HRESULT, TaskDialogIndirect, (const TASKDIALOGCONFIG *pTaskConfig, int *pnButton, int *pnRadioButton,
+          BOOL *pfVerificationFlagChecked))
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
@@ -458,5 +496,9 @@ int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWS
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);
 void  nui_text_append(HWND edit, LPCWSTR s, int autoscroll, int maxLines);
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */
+/* Только с NUI_GUI_TEST (sim_windows.go): открытый диалог и ответ за пользователя. */
+int   nui_dialog_kind(void); /* 0 — нет; 1 — сообщение, 2 — вопрос, 3 — файл, 4 — папка */
+HWND  nui_find_dialog(void);
+int   nui_task_dialog(void); /* 1 — сообщения показывает TaskDialogIndirect */
 
 #endif
