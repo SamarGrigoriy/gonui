@@ -167,8 +167,9 @@ func emit(n *node, k core.Kind) uintptr { return core.Dispatch(core.UD(n.id, k),
 // Целые из wParam/lParam — хендлы и указатели Windows, а не память Go. Они
 // переинтерпретируются через адрес переменной, а не преобразуются uintptr → unsafe.Pointer
 // (go vet: possible misuse of unsafe.Pointer).
-func hwndOf(v uintptr) C.HWND          { return *(*C.HWND)(unsafe.Pointer(&v)) }
-func hdcOf(v uintptr) C.HDC            { return *(*C.HDC)(unsafe.Pointer(&v)) }
-func handleOf(v uintptr) C.HANDLE      { return *(*C.HANDLE)(unsafe.Pointer(&v)) }
-func minmaxOf(v uintptr) *C.MINMAXINFO { return *(**C.MINMAXINFO)(unsafe.Pointer(&v)) }
-func rectOf(v uintptr) *C.RECT         { return *(**C.RECT)(unsafe.Pointer(&v)) }
+func hwndOf(v uintptr) C.HWND                { return *(*C.HWND)(unsafe.Pointer(&v)) }
+func hdcOf(v uintptr) C.HDC                  { return *(*C.HDC)(unsafe.Pointer(&v)) }
+func handleOf(v uintptr) C.HANDLE            { return *(*C.HANDLE)(unsafe.Pointer(&v)) }
+func minmaxOf(v uintptr) *C.MINMAXINFO       { return *(**C.MINMAXINFO)(unsafe.Pointer(&v)) }
+func rectOf(v uintptr) *C.RECT               { return *(**C.RECT)(unsafe.Pointer(&v)) }
+func drawItemOf(v uintptr) *C.DRAWITEMSTRUCT { return *(**C.DRAWITEMSTRUCT)(unsafe.Pointer(&v)) }

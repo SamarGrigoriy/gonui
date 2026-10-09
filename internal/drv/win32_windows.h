@@ -150,6 +150,13 @@ typedef struct _TASKDIALOGCONFIG {
 	UINT cxWidth;
 } TASKDIALOGCONFIG;
 #pragma pack(pop)
+typedef struct tagDRAWITEMSTRUCT {
+	UINT CtlType, CtlID, itemID, itemAction, itemState;
+	HWND hwndItem;
+	HDC hDC;
+	RECT rcItem;
+	ULONG_PTR itemData;
+} DRAWITEMSTRUCT;
 typedef struct tagTOOLINFOW {
 	UINT cbSize, uFlags;
 	HWND hwnd;
@@ -186,6 +193,7 @@ _Static_assert(sizeof(OPENFILENAMEW) == 152, "OPENFILENAMEW");
 _Static_assert(sizeof(BROWSEINFOW) == 64, "BROWSEINFOW");
 _Static_assert(sizeof(TASKDIALOGCONFIG) == 160, "TASKDIALOGCONFIG");
 _Static_assert(sizeof(TOOLINFOW) == 72, "TOOLINFOW");
+_Static_assert(sizeof(DRAWITEMSTRUCT) == 64, "DRAWITEMSTRUCT");
 
 /* ---------- 2. Макросы сверки ---------- */
 #ifdef NUI_CHECK
@@ -209,6 +217,10 @@ NUI_CONST(WM_SIZE, 0x0005)
 NUI_CONST(WM_CLOSE, 0x0010)
 NUI_CONST(WM_GETMINMAXINFO, 0x0024)
 NUI_CONST(WM_SETFONT, 0x0030)
+NUI_CONST(WM_GETFONT, 0x0031)
+NUI_CONST(WM_ERASEBKGND, 0x0014)
+NUI_CONST(WM_DRAWITEM, 0x002B)
+NUI_CONST(WM_CTLCOLORBTN, 0x0135)
 NUI_CONST(WM_SETICON, 0x0080)
 NUI_CONST(WM_KEYDOWN, 0x0100)
 NUI_CONST(WM_KEYFIRST, 0x0100)
@@ -264,6 +276,17 @@ NUI_CONST(SPI_GETNONCLIENTMETRICS, 0x0029)
 NUI_CONST(COLOR_WINDOW, 5)
 NUI_CONST(COLOR_WINDOWTEXT, 8)
 NUI_CONST(COLOR_BTNFACE, 15)
+NUI_CONST(COLOR_GRAYTEXT, 17)
+NUI_CONST(COLOR_BTNTEXT, 18)
+NUI_CONST(RDW_INVALIDATE, 0x0001)
+NUI_CONST(RDW_ERASE, 0x0004)
+NUI_CONST(RDW_ALLCHILDREN, 0x0080)
+NUI_CONST(ODS_SELECTED, 0x0001)
+NUI_CONST(ODS_DISABLED, 0x0004)
+NUI_CONST(ODS_FOCUS, 0x0010)
+NUI_CONST(ODS_NOFOCUSRECT, 0x0200)
+NUI_CONST(DT_CENTER, 0x00000001)
+NUI_CONST(DT_VCENTER, 0x00000004)
 NUI_CONST(SM_CXVSCROLL, 2)
 NUI_CONST(SM_CYHSCROLL, 3)
 NUI_CONST(SM_CXEDGE, 45)
@@ -300,6 +323,7 @@ NUI_CONST(BS_PUSHBUTTON, 0x0000)
 NUI_CONST(BS_DEFPUSHBUTTON, 0x0001)
 NUI_CONST(BS_AUTOCHECKBOX, 0x0003)
 NUI_CONST(BS_GROUPBOX, 0x0007)
+NUI_CONST(BS_OWNERDRAW, 0x000B)
 NUI_CONST(BM_GETCHECK, 0x00F0)
 NUI_CONST(BM_SETCHECK, 0x00F1)
 NUI_CONST(BM_SETSTYLE, 0x00F4)
@@ -483,6 +507,12 @@ NUI_FN(int, DrawTextW, (HDC hdc, LPCWSTR lpchText, int cchText, RECT *lprc, UINT
 NUI_FN(COLORREF, SetTextColor, (HDC hdc, COLORREF color))
 NUI_FN(COLORREF, SetBkColor, (HDC hdc, COLORREF color))
 NUI_FN(int, SetBkMode, (HDC hdc, int mode))
+NUI_FN(HBRUSH, CreateSolidBrush, (COLORREF color))
+NUI_FN(int, GetObjectW, (HANDLE h, int c, LPVOID pv))
+NUI_FN(int, FillRect, (HDC hDC, const RECT *lprc, HBRUSH hbr))
+NUI_FN(int, FrameRect, (HDC hDC, const RECT *lprc, HBRUSH hbr))
+NUI_FN(BOOL, DrawFocusRect, (HDC hDC, const RECT *lprc))
+NUI_FN(BOOL, RedrawWindow, (HWND hWnd, const RECT *lprcUpdate, HRGN hrgnUpdate, UINT flags))
 
 /* shell32, ole32, comdlg32 */
 NUI_FN(HINSTANCE, ShellExecuteW, (HWND hwnd, LPCWSTR lpOperation, LPCWSTR lpFile, LPCWSTR lpParameters,
@@ -517,6 +547,9 @@ void  nui_ideal_size(HWND button, int out[2]);
 void  nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]);
 void  nui_client_size(HWND hwnd, int out[2]);
 void  nui_monitor_rect(HWND hwnd, int out[4]);
+HFONT nui_font_scaled(HFONT base, int pct, int bold);
+void  nui_fill(HDC dc, int x, int y, int w, int h, COLORREF c);
+void  nui_draw_button(const DRAWITEMSTRUCT *d, unsigned fg, unsigned bg, int isDefault); /* цвета — COLORREF; ~0u — темы */
 int   nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text);
 int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);

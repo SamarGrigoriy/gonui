@@ -36,7 +36,7 @@ guint nui_watch(int fd, unsigned cond, uintptr_t ud) {
 #define NUI_STYLE_NOCOLOR (1u << 24)
 #define NUI_STYLE_BOLD    (1u << 25)
 #define NUI_STYLE_SET     (1u << 26)
-void nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigned color) {
+void nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigned color, int scale_pct) {
 	unsigned st = (unsigned)(uintptr_t)g_object_get_data((GObject *)l, "nui-style");
 	if (!st)
 		st = NUI_STYLE_SET | NUI_STYLE_NOCOLOR;
@@ -52,8 +52,113 @@ void nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigne
 		unsigned r = (st >> 16) & 255, g = (st >> 8) & 255, b = st & 255;
 		pango_attr_list_insert(a, pango_attr_foreground_new(r * 257, g * 257, b * 257));
 	}
+	/* Масштаб шрифта (SetFontScale) — в процентах, хранится отдельно; 0 — не менять. */
+	if (scale_pct > 0)
+		g_object_set_data((GObject *)l, "nui-scale", (gpointer)(uintptr_t)scale_pct);
+	int pct = (int)(uintptr_t)g_object_get_data((GObject *)l, "nui-scale");
+	if (pct > 0 && pct != 100)
+		pango_attr_list_insert(a, pango_attr_scale_new(pct / 100.0));
 	gtk_label_set_attributes(l, a);
 	pango_attr_list_unref(a);
+}
+
+/* --- Цвета и фон (ADR-19): свой GtkCssProvider на виджет. Состояние — в данных объекта
+   (значение + 1, 0 — не задано): у Go-структур nui нет лишних полей. ---------------------- */
+static const char *const css_keys[3] = {"nui-fg", "nui-bg", "nui-pad"};
+
+static unsigned css_get(GtkWidget *w, int what) {
+	return (unsigned)(uintptr_t)g_object_get_data((GObject *)w, css_keys[what]);
+}
+
+static char *css_put(char *p, const char *s) {
+	while (*s)
+		*p++ = *s++;
+	return p;
+}
+
+static char *css_hex(char *p, unsigned v) {
+	static const char d[] = "0123456789abcdef";
+	*p++ = '#';
+	for (int i = 20; i >= 0; i -= 4)
+		*p++ = d[(v >> i) & 15];
+	return p;
+}
+
+static char *css_dec(char *p, unsigned v) {
+	char t[12];
+	int n = 0;
+	do
+		t[n++] = (char)('0' + v % 10);
+	while ((v /= 10) && n < 11);
+	while (n)
+		*p++ = t[--n];
+	return p;
+}
+
+/* Цвета одного правила: текст и фон (фон — и вместо градиента темы). */
+static char *css_colors(char *p, unsigned fg, unsigned bg) {
+	if (fg && !((fg - 1) & NUI_STYLE_NOCOLOR)) {
+		p = css_put(p, "color:");
+		p = css_hex(p, fg - 1);
+		p = css_put(p, ";");
+	}
+	if (bg && !((bg - 1) & NUI_STYLE_NOCOLOR)) {
+		p = css_put(p, "background-color:");
+		p = css_hex(p, bg - 1);
+		p = css_put(p, ";background-image:none;");
+	}
+	return p;
+}
+
+/* nui_css: what — 0 цвет текста, 1 фон, 2 отступ панели (Padding цветного Box/Grid);
+   цвет — 0xRRGGBB или NUI_STYLE_NOCOLOR (цвет темы). Подузел text — поле TextView. */
+void nui_css(GtkWidget *w, int what, unsigned value) {
+	g_object_set_data((GObject *)w, css_keys[what], (gpointer)(uintptr_t)(value + 1));
+	unsigned fg = css_get(w, 0), bg = css_get(w, 1), pad = css_get(w, 2);
+	char css[192], *p = css;
+	p = css_put(p, "*{");
+	p = css_colors(p, fg, bg);
+	if (pad) {
+		p = css_put(p, "padding:");
+		p = css_dec(p, pad - 1);
+		p = css_put(p, "px;");
+	}
+	p = css_put(p, "}* text{");
+	p = css_colors(p, fg, bg);
+	p = css_put(p, "}");
+	*p = 0;
+	GtkCssProvider *prov = g_object_get_data((GObject *)w, "nui-css");
+	if (!prov) {
+		prov = gtk_css_provider_new();
+		gtk_style_context_add_provider(gtk_widget_get_style_context(w), (GtkStyleProvider *)prov,
+			NUI_GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		g_object_set_data_full((GObject *)w, "nui-css", prov, g_object_unref);
+	}
+	gtk_css_provider_load_from_data(prov, css, -1, 0);
+}
+
+/* Фон. panel — Box или Grid: их border-width лежит вне фона, поэтому у цветной панели он
+   становится CSS padding (раскладка детей та же, отступ закрашен); без цвета — обратно. */
+void nui_css_background(GtkWidget *w, unsigned color, int panel) {
+	if (panel) {
+		unsigned pad = css_get(w, 2);
+		if (!(color & NUI_STYLE_NOCOLOR) && !pad) {
+			nui_css(w, 2, gtk_container_get_border_width((GtkContainer *)w));
+			gtk_container_set_border_width((GtkContainer *)w, 0);
+		} else if ((color & NUI_STYLE_NOCOLOR) && pad) {
+			g_object_set_data((GObject *)w, css_keys[2], 0);
+			gtk_container_set_border_width((GtkContainer *)w, pad - 1);
+		}
+	}
+	nui_css(w, 1, color);
+}
+
+/* Padding: у цветной панели — CSS padding (закрашивается вместе с фоном), иначе border-width. */
+void nui_set_padding(GtkWidget *w, unsigned px) {
+	if (css_get(w, 2))
+		nui_css(w, 2, px);
+	else
+		gtk_container_set_border_width((GtkContainer *)w, px);
 }
 
 /* Весь текст буфера. Строку освобождает вызывающий (g_free). GtkTextIter — только на стеке C. */

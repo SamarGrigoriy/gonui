@@ -62,12 +62,20 @@ func WindowSetResizable(h H, on bool) {
 func WindowSetDefault(h, btn H) {
 	n := nodes[h]
 	if old := get(n.defBtn); old != nil && old.hwnd != nil {
-		send(old.hwnd, C.NUI_BM_SETSTYLE, C.NUI_BS_PUSHBUTTON, 1)
+		old.isDefault = false
+		if !old.ownerDraw { // у цветной кнопки стиль BS_OWNERDRAW: «по умолчанию» рисует драйвер
+			send(old.hwnd, C.NUI_BM_SETSTYLE, C.NUI_BS_PUSHBUTTON, 1)
+		}
+		C.InvalidateRect(old.hwnd, nil, 1)
 		C.SetWindowLongPtrW(old.hwnd, C.NUI_GWLP_ID, 0)
 	}
 	n.defBtn = btn
 	if b := get(btn); b != nil && b.hwnd != nil {
-		send(b.hwnd, C.NUI_BM_SETSTYLE, C.NUI_BS_DEFPUSHBUTTON, 1)
+		b.isDefault = true
+		if !b.ownerDraw {
+			send(b.hwnd, C.NUI_BM_SETSTYLE, C.NUI_BS_DEFPUSHBUTTON, 1)
+		}
+		C.InvalidateRect(b.hwnd, nil, 1)
 		C.SetWindowLongPtrW(b.hwnd, C.NUI_GWLP_ID, C.NUI_IDOK)
 	}
 }
@@ -141,13 +149,16 @@ func WindowSetFullscreen(h H, on bool) {
 	}
 }
 
+// wsPopup — WS_POPUP: в перечислении C 0x80000000 отрицательное, uintptr из него не получить.
+const wsPopup uintptr = 0x80000000
+
 func enterFullscreen(n *node) {
 	if C.IsWindowVisible(n.hwnd) != 0 {
 		C.ShowWindow(n.hwnd, C.NUI_SW_RESTORE) // из развёрнутого — к обычному: запомнить его место
 	}
 	n.savedStyle = uintptr(C.GetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE))
 	C.GetWindowRect(n.hwnd, &n.savedRect)
-	style := n.savedStyle&^uintptr(C.NUI_WS_OVERLAPPEDWINDOW) | uintptr(C.NUI_WS_POPUP)
+	style := n.savedStyle&^uintptr(C.NUI_WS_OVERLAPPEDWINDOW) | wsPopup
 	C.SetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE, C.LONG_PTR(style))
 	var m [4]C.int
 	C.nui_monitor_rect(n.hwnd, &m[0])

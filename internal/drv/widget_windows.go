@@ -106,3 +106,55 @@ func Focus(h H) {
 		C.SetFocus(n.hwnd)
 	}
 }
+
+// SetForeground — цвет текста (Button, Entry, TextView); noColor — цвет темы (ADR-19).
+func SetForeground(h H, color uint32) {
+	n := nodes[h]
+	n.fg = themeColor(color)
+	restyleColors(n)
+}
+
+// SetBackground — фон. Box, Grid (panel) и окно красит WM_ERASEBKGND вместе с отступом;
+// подписи и флажки внутри берут этот фон (WM_CTLCOLORSTATIC).
+func SetBackground(h H, color uint32, panel bool) {
+	n := nodes[h]
+	n.bg = themeColor(color)
+	restyleColors(n)
+}
+
+func themeColor(c uint32) uint32 {
+	if c > noColor {
+		return noColor
+	}
+	return c
+}
+
+// restyleColors: цветная кнопка рисуется драйвером (BS_OWNERDRAW) — визуальный стиль
+// Windows её не перекрашивает; без цветов — снова обычная. Затем — перерисовка окна.
+func restyleColors(n *node) {
+	if n.kind == kButton {
+		colored := n.fg != noColor || n.bg != noColor
+		if colored != n.ownerDraw {
+			n.ownerDraw = colored
+			style := uint32(C.NUI_BS_PUSHBUTTON)
+			switch {
+			case colored:
+				style = C.NUI_BS_OWNERDRAW
+			case n.isDefault:
+				style = C.NUI_BS_DEFPUSHBUTTON
+			}
+			restyle(n, style)
+			n.measured = false
+		}
+	}
+	w := n
+	if n.kind != kWindow {
+		w = get(n.win)
+	}
+	if w != nil {
+		invalidate(n.parent)
+		C.RedrawWindow(w.hwnd, nil, nil, C.NUI_RDW_INVALIDATE|C.NUI_RDW_ERASE|C.NUI_RDW_ALLCHILDREN)
+	} else if n.hwnd != nil {
+		C.InvalidateRect(n.hwnd, nil, 1)
+	}
+}

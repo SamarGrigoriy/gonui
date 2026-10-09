@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync"
 	"unicode/utf8"
+
+	"nui/internal/drv"
 )
 
 // Chat — готовый чат (api.md, §18): лента сообщений, поле ввода, кнопки «Отправить»
@@ -143,6 +145,22 @@ func (c *Chat) SetLabels(you, send, stop string) {
 	if stop != "" {
 		c.stop.SetText(stop)
 	}
+}
+
+// SetColor — цвет текста ленты; NoColor — цвет темы.
+func (c *Chat) SetColor(col Color) {
+	if !c.dead() {
+		c.log.SetColor(col)
+	}
+}
+
+// SetBackground — фон чата: лента и полоса с полем ввода; NoColor — фон темы.
+func (c *Chat) SetBackground(col Color) {
+	if c.dead() {
+		return
+	}
+	c.log.SetBackground(col)
+	drv.SetBackground(c.h, uint32(col), true)
 }
 
 // Focus передаёт фокус полю ввода.

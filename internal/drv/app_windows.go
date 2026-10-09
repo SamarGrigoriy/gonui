@@ -114,12 +114,17 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			}
 			return 0, true
 		}
-	case C.NUI_WM_CTLCOLORSTATIC:
-		if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kLabel && c.color != noColor {
-			dc := hdcOf(wp)
-			C.SetTextColor(dc, C.COLORREF(c.color>>16&0xFF|c.color&0xFF00|(c.color&0xFF)<<16))
-			C.SetBkColor(dc, C.COLORREF(C.GetSysColor(C.NUI_COLOR_BTNFACE)))
-			return uintptr(unsafe.Pointer(C.GetSysColorBrush(C.NUI_COLOR_BTNFACE))), true
+	case C.NUI_WM_CTLCOLORSTATIC, C.NUI_WM_CTLCOLOREDIT, C.NUI_WM_CTLCOLORBTN:
+		if _, c := nodeOf(hwndOf(lp)); c != nil {
+			if r, ok := ctlColor(c, hdcOf(wp), m); ok {
+				return r, true
+			}
+		}
+	case C.NUI_WM_DRAWITEM: // цветная кнопка (BS_OWNERDRAW)
+		d := drawItemOf(lp)
+		if _, c := nodeOf(d.hwndItem); c != nil && c.kind == kButton {
+			C.nui_draw_button(d, colorref(c.fg), colorref(c.bg), b2i(c.isDefault))
+			return 1, true
 		}
 	}
 	h, n := nodeOf(hwnd)
@@ -131,6 +136,10 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 		if n.kind == kScroll { // свои полосы прокрутки
 			scrollBy(h, m == C.NUI_WM_VSCROLL, int(wp&0xFFFF), int(int16(wp>>16)), 0)
 			return 0, true
+		}
+	case C.NUI_WM_ERASEBKGND:
+		if (n.kind == kWindow || n.kind == kScroll) && eraseBackground(n, hdcOf(wp)) {
+			return 1, true
 		}
 	case C.NUI_WM_MOUSEWHEEL:
 		if n.kind == kScroll {

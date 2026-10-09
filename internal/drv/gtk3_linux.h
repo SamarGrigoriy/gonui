@@ -22,6 +22,7 @@ typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
 typedef double gdouble;
+typedef long gssize;
 typedef void (*GCallback)(void);
 typedef gboolean (*GSourceFunc)(gpointer);
 typedef gboolean (*GUnixFDSourceFunc)(gint, GIOCondition, gpointer);
@@ -50,6 +51,8 @@ typedef struct _GError GError;             typedef struct _GVariant GVariant;
 typedef struct _GVariantType GVariantType; typedef struct _GDBusConnection GDBusConnection;
 typedef struct _GCancellable GCancellable; typedef struct _GAsyncResult GAsyncResult;
 typedef struct _GdkWindow GdkWindow;
+typedef struct _GtkCssProvider GtkCssProvider; typedef struct _GtkStyleContext GtkStyleContext;
+typedef struct _GtkStyleProvider GtkStyleProvider;
 typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
 typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
@@ -97,6 +100,7 @@ NUI_CONST(GTK_POLICY_AUTOMATIC, 1)
 NUI_CONST(GTK_POLICY_NEVER, 2)
 NUI_CONST(GTK_WRAP_NONE, 0)
 NUI_CONST(GTK_WRAP_WORD_CHAR, 3)
+NUI_CONST(GTK_STYLE_PROVIDER_PRIORITY_APPLICATION, 600)
 NUI_CONST(GTK_JUSTIFY_LEFT, 0)
 NUI_CONST(GTK_JUSTIFY_RIGHT, 1)
 NUI_CONST(GTK_JUSTIFY_CENTER, 2)
@@ -148,6 +152,7 @@ NUI_FN(void, g_object_set_data, (GObject *object, const gchar *key, gpointer dat
 NUI_FN(gpointer, g_object_get_data, (GObject *object, const gchar *key))              /* (w) */
 NUI_FN(gpointer, g_object_ref, (gpointer object))                                      /* (w) */
 NUI_FN(void, g_object_unref, (gpointer object))
+NUI_FN(void, g_object_set_data_full, (GObject *object, const gchar *key, gpointer data, GDestroyNotify destroy)) /* (w) */
 NUI_FN(gchar *, g_strdup, (const gchar *str))                                          /* (w) */
 NUI_FN(void, g_error_free, (GError *error))
 NUI_FN(gchar *, g_filename_to_uri, (const gchar *filename, const gchar *hostname, GError **error)) /* g_free */
@@ -183,6 +188,12 @@ NUI_FN(gint, gdk_window_get_origin, (GdkWindow *window, gint *x, gint *y))      
 NUI_FN(void, gtk_container_add, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_remove, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_set_border_width, (GtkContainer *container, guint border_width))
+NUI_FN(guint, gtk_container_get_border_width, (GtkContainer *container))                     /* (w) */
+NUI_FN(GtkStyleContext *, gtk_widget_get_style_context, (GtkWidget *widget))                  /* (w) */
+NUI_FN(void, gtk_style_context_add_provider, (GtkStyleContext *context, GtkStyleProvider *provider, guint priority)) /* (w) */
+NUI_FN(GtkCssProvider *, gtk_css_provider_new, (void))                                       /* (w) */
+NUI_FN(gboolean, gtk_css_provider_load_from_data, (GtkCssProvider *css_provider, const gchar *data, gssize length,
+       GError **error))                                                                     /* (w) */
 NUI_FN(GtkWidget *, gtk_bin_get_child, (GtkBin *bin))
 
 /* GtkWindow */
@@ -221,6 +232,7 @@ NUI_FN(void, pango_attr_list_insert, (PangoAttrList *list, PangoAttribute *attr)
 NUI_FN(void, pango_attr_list_unref, (PangoAttrList *list))                                  /* (w) */
 NUI_FN(PangoAttribute *, pango_attr_weight_new, (PangoWeight weight))                       /* (w) */
 NUI_FN(PangoAttribute *, pango_attr_foreground_new, (guint16 red, guint16 green, guint16 blue)) /* (w) */
+NUI_FN(PangoAttribute *, pango_attr_scale_new, (double scale_factor))                        /* (w) */
 NUI_FN(GtkWidget *, gtk_button_new_with_label, (const gchar *label))
 NUI_FN(void, gtk_button_set_label, (GtkButton *button, const gchar *label))
 NUI_FN(const gchar *, gtk_button_get_label, (GtkButton *button))
@@ -341,7 +353,10 @@ gulong nui_connect_ret(gpointer obj, const gchar *sig, uintptr_t ud);
 guint  nui_timeout(guint ms, uintptr_t ud);
 guint  nui_idle(uintptr_t ud);
 guint  nui_watch(int fd, unsigned cond, uintptr_t ud);
-void   nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigned color);
+void   nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsigned color, int scale_pct);
+void   nui_css(GtkWidget *w, int what, unsigned value);
+void   nui_css_background(GtkWidget *w, unsigned color, int panel);
+void   nui_set_padding(GtkWidget *w, unsigned px);
 char  *nui_text_get(GtkTextBuffer *b);
 void   nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, int max_lines);
 int    nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text);

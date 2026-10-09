@@ -37,6 +37,21 @@ func (b *Button) Text() string {
 	return drv.ButtonText(b.h)
 }
 
+// SetColor — цвет текста кнопки; NoColor — цвет темы.
+func (b *Button) SetColor(c Color) {
+	if !b.dead() {
+		drv.SetForeground(b.h, uint32(c))
+	}
+}
+
+// SetBackground — цвет кнопки; NoColor — вид темы. На Windows цветная кнопка рисуется
+// драйвером (плоская, без визуального стиля системы).
+func (b *Button) SetBackground(c Color) {
+	if !b.dead() {
+		drv.SetBackground(b.h, uint32(c), false)
+	}
+}
+
 // OnClick: нажатие мышью, пробелом или Enter (если кнопка по умолчанию).
 // Повторный вызов заменяет обработчик, nil снимает его (ADR-8).
 func (b *Button) OnClick(fn func()) { b.onClick = fn }

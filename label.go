@@ -85,6 +85,21 @@ func (l *Label) SetColor(c Color) {
 	}
 }
 
+// SetBackground — фон подписи; NoColor — фон контейнера или окна (по умолчанию).
+func (l *Label) SetBackground(c Color) {
+	if !l.dead() {
+		drv.SetBackground(l.h, uint32(c), false)
+	}
+}
+
+// SetFontScale — размер шрифта относительно обычного: 1.5 — заголовок, 0.85 — мелкий
+// текст. Жирность и цвет сохраняются.
+func (l *Label) SetFontScale(f float64) {
+	if !l.dead() {
+		drv.LabelSetFontScale(l.h, int(f*100+0.5))
+	}
+}
+
 type labelEv Label
 
 func (l *labelEv) Event(k core.Kind, _ uintptr) uintptr {

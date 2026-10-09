@@ -140,6 +140,27 @@ const (
 | `SetMinSize(w, h int)` | минимальный размер; `-1` — не задавать по этой оси |
 | `Focus()` | передать фокус ввода |
 
+**Цвет и фон** (ADR-19). Не у всех виджетов, а там, где это нужно для разделения зон:
+
+| Виджет | Методы |
+|---|---|
+| `Window` | `SetBackground(c Color)` |
+| `Box`, `Grid` | `Background(c Color)` — цепочкой, как `Spacing` и `Padding`. Фон закрашивает и отступ `Padding`; подписи, флажки, ползунки и рамки внутри получают тот же фон, поля ввода остаются белыми |
+| `Label` | `SetColor`, `SetBackground`, `SetBold`, `SetFontScale(f float64)` — размер шрифта относительно обычного: `1.5` — заголовок |
+| `Button`, `Entry`, `TextView`, `Chat` | `SetColor(c Color)` — цвет текста, `SetBackground(c Color)` — фон |
+
+- `Color` — `nui.RGB(r, g, b)`; `NoColor` возвращает вид темы.
+- Цвета не следуют за тёмной темой ОС: задавая фон, задавайте и цвет текста.
+- На Windows цветную кнопку рисует драйвер: она плоская, без визуального стиля системы.
+
+```go
+title := nui.NewLabel("Рабочее место")
+title.SetFontScale(1.6)
+title.SetBold(true)
+title.SetColor(nui.RGB(255, 255, 255))
+header := nui.HBox(title).Padding(10).Background(nui.RGB(40, 70, 120))
+```
+
 ---
 
 ## 5. Window
@@ -162,6 +183,7 @@ func NewWindow(title string, child Widget) *Window // child может быть 
 | `SetMaximized(on bool)` | развернуть на весь экран (с рамкой и заголовком, пользователь может восстановить); `false` — восстановить. До `Show` — окно сразу откроется развёрнутым, а `SetSize` задаст его размер после восстановления. На Linux разворачивает оконный менеджер |
 | `SetFullscreen(on bool)` | полноэкранный режим: без рамки и заголовка, поверх панелей; `false` — вернуть обычный. Можно до `Show` |
 | `SetPadding(px int)` | отступ между краем окна и содержимым |
+| `SetBackground(c Color)` | фон окна; `NoColor` — фон темы (§4, «Цвет и фон») |
 | `SetDefault(b *Button)` | кнопка по умолчанию: её нажимает Enter в `Entry` без `OnEnter` и в поле `ComboEntry` |
 | `SetIconName(name string)` | иконка из темы иконок по имени, например `"utilities-terminal"` или имя из вашего `.desktop` |
 | `OnClose(fn func() bool)` | пользователь закрывает окно (крестик, Alt+F4). `fn` возвращает `false` — окно остаётся. Без обработчика окно закрывается |
@@ -196,6 +218,8 @@ const NoColor Color = 1 << 24 // цвет темы (по умолчанию)
 | `SetTextAlign(a Align)` | выравнивание текста внутри метки: Start (по умолчанию), Center или End; Fill считается Start |
 | `SetBold(on bool)` | жирное начертание |
 | `SetColor(c Color)` | цвет текста; `NoColor` возвращает цвет темы |
+| `SetBackground(c Color)` | фон подписи; `NoColor` — фон контейнера |
+| `SetFontScale(f float64)` | размер шрифта относительно обычного: `1.5` — заголовок, `0.85` — мелкий текст. Жирность и цвет сохраняются |
 
 `SetBold` и `SetColor` — единственные средства оформления в nui (ADR-1). Они нужны для строк состояния.
 

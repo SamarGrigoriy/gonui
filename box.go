@@ -59,6 +59,15 @@ func (b *Box) Padding(px int) *Box {
 	return b
 }
 
+// Background — фон ряда вместе с отступом Padding: цветная зона (боковое меню, строка
+// состояния). Подписи и флажки внутри получают тот же фон. NoColor — без фона.
+func (b *Box) Background(c Color) *Box {
+	if !b.dead() {
+		drv.SetBackground(b.h, uint32(c), true)
+	}
+	return b
+}
+
 type boxEv Box
 
 func (b *boxEv) Event(k core.Kind, _ uintptr) uintptr {

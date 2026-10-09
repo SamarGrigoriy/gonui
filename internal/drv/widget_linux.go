@@ -72,7 +72,23 @@ func SetPadding(h H, px int) {
 	if px < 0 {
 		px = 0
 	}
-	C.gtk_container_set_border_width((*C.GtkContainer)(h), C.guint(px))
+	C.nui_set_padding(widget(h), C.uint(px))
+}
+
+// SetForeground — цвет текста виджета (Button, Entry, TextView); 1<<24 — цвет темы (ADR-19).
+func SetForeground(h H, color uint32) { C.nui_css(widget(h), 0, C.uint(themeColor(color))) }
+
+// SetBackground — фон; 1<<24 — фон темы. panel — Box или Grid: их Padding закрашивается
+// вместе с фоном (driver-gtk3.md, §7).
+func SetBackground(h H, color uint32, panel bool) {
+	C.nui_css_background(widget(h), C.uint(themeColor(color)), C.int(b2i(panel)))
+}
+
+func themeColor(c uint32) uint32 {
+	if c > 1<<24 {
+		return 1 << 24
+	}
+	return c
 }
 
 func Focus(h H) { C.gtk_widget_grab_focus(widget(h)) }

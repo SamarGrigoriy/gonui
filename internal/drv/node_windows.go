@@ -62,10 +62,14 @@ type node struct {
 	colGap     int // Grid
 	rowGap     int
 
-	text     string   // исходный текст: Label, Button, Check, Frame
-	tooltip  string   // SetTooltip
-	items    []string // пункты Combo — для измерения
-	measured bool     // размеры листа посчитаны текущим шрифтом окна
+	text                 string   // исходный текст: Label, Button, Check, Frame
+	tooltip              string   // SetTooltip
+	fg, bg               uint32   // SetForeground, SetBackground: 0xRRGGBB; noColor — цвет темы (ADR-19)
+	font                 C.HFONT  // свой шрифт подписи (SetFontScale), удаляется вместе с узлом
+	fontPct              int      // SetFontScale, проценты; 0 — обычный
+	ownerDraw, isDefault bool     // Button: цветная (BS_OWNERDRAW) и кнопка по умолчанию
+	items                []string // пункты Combo — для измерения
+	measured             bool     // размеры листа посчитаны текущим шрифтом окна
 
 	// Label
 	ellipsis, textAlign uint8
@@ -101,6 +105,7 @@ type node struct {
 	defBtn     H
 	tip        C.HWND // окно подсказок (tooltips_class32), создаётся при первой подсказке
 	maximized  bool   // SetMaximized: развернуть при первом показе
+	panels     bool   // в окне есть цветные Box или Grid: их фон рисует WM_ERASEBKGND
 	fullscreen bool   // SetFullscreen
 	savedStyle uintptr
 	savedRect  C.RECT // окно до полноэкранного режима
@@ -114,7 +119,7 @@ var (
 )
 
 func newNode(kind uint8, id uint32) (H, *node) {
-	n := &node{kind: kind, id: id, minW: -1, minH: -1, color: noColor}
+	n := &node{kind: kind, id: id, minW: -1, minH: -1, color: noColor, fg: noColor, bg: noColor}
 	if l := len(freeList); l > 0 {
 		h := freeList[l-1]
 		freeList = freeList[:l-1]
@@ -250,6 +255,10 @@ func destroyTree(h H, hwndToo bool) {
 		}
 		n.hwnd = nil
 	}
+	if n.font != nil {
+		C.DeleteObject(C.HGDIOBJ(n.font))
+		n.font = nil
+	}
 	if n.kind == kWindow {
 		for i, f := range n.fonts {
 			if f != nil {
@@ -322,6 +331,9 @@ func relayout(wh H) {
 	C.nui_client_size(w.hwnd, &cs[0])
 	layout.Arrange(&root.lay, layout.Rect{X: p, Y: p, W: max(1, int(cs[0])-2*p), H: max(1, int(cs[1])-2*p)})
 	place(w, firstKid(w), 0, 0, false)
+	if w.panels || w.bg != noColor { // цветные зоны переехали — перерисовать фон
+		C.RedrawWindow(w.hwnd, nil, nil, C.NUI_RDW_INVALIDATE|C.NUI_RDW_ERASE|C.NUI_RDW_ALLCHILDREN)
+	}
 	if w.reorder {
 		w.reorder = false
 		var prev C.HWND
@@ -353,6 +365,9 @@ func prepare(w *node, h H) {
 	for _, k := range n.kids {
 		prepare(w, k)
 		l.Children = append(l.Children, &nodes[k].lay)
+	}
+	if n.bg != noColor && (n.kind == kBox || n.kind == kGrid) {
+		w.panels = true
 	}
 	switch n.kind {
 	case kBox:
@@ -457,6 +472,9 @@ func fontsFor(n *node) *[3]C.HFONT {
 }
 
 func fontOf(n *node) C.HFONT {
+	if n.font != nil {
+		return n.font
+	}
 	f := fontsFor(n)
 	switch {
 	case n.kind == kLabel && n.bold:
@@ -467,9 +485,20 @@ func fontOf(n *node) C.HFONT {
 	return f[fontNormal]
 }
 
+// setFont даёт контролу шрифт окна; подписи с SetFontScale — свой, из шрифта окна
+// (он же пересоздаётся при смене dpi и жирности).
 func setFont(n *node) {
-	if n.hwnd != nil {
-		send(n.hwnd, C.NUI_WM_SETFONT, uintptr(unsafe.Pointer(fontOf(n))), 1)
+	if n.hwnd == nil {
+		return
+	}
+	old := n.font
+	n.font = nil
+	if n.kind == kLabel && n.fontPct > 0 && n.fontPct != 100 {
+		n.font = C.nui_font_scaled(fontsFor(n)[fontNormal], C.int(n.fontPct), b2i(n.bold))
+	}
+	send(n.hwnd, C.NUI_WM_SETFONT, uintptr(unsafe.Pointer(fontOf(n))), 1)
+	if old != nil {
+		C.DeleteObject(C.HGDIOBJ(old))
 	}
 }
 
@@ -726,4 +755,115 @@ func recreate(h H, cls, text string, style, exstyle uint32) {
 		w.reorder = true
 	}
 	invalidate(h)
+}
+
+// --- цвета (ADR-19) ---
+
+// bgr — 0xRRGGBB в COLORREF (0x00BBGGRR).
+func bgr(c uint32) C.COLORREF { return C.COLORREF(c>>16&0xFF | c&0xFF00 | (c&0xFF)<<16) }
+
+func colorref(c uint32) C.uint {
+	if c == noColor {
+		return ^C.uint(0)
+	}
+	return C.uint(bgr(c))
+}
+
+var brushes = map[uint32]C.HBRUSH{} // кисти цветов фона: их немного, живут до конца программы
+
+func brushFor(c uint32) C.HBRUSH {
+	b := brushes[c]
+	if b == nil {
+		b = C.CreateSolidBrush(bgr(c))
+		brushes[c] = b
+	}
+	return b
+}
+
+// inheritedBg — фон ближайшей цветной панели (Box, Grid) или окна выше узла.
+func inheritedBg(n *node) uint32 {
+	for p := get(n.parent); p != nil; p = get(p.parent) {
+		if p.bg != noColor && (p.kind == kBox || p.kind == kGrid || p.kind == kWindow) {
+			return p.bg
+		}
+	}
+	if w := get(n.win); w != nil {
+		return w.bg
+	}
+	return noColor
+}
+
+// ctlColor — ответ на WM_CTLCOLOR*: цвет текста и фон контрола. Подписи, флажки,
+// ползунки, рамки берут фон панели; поля ввода — только свой (как в GTK: поле белое
+// и на цветной панели), а поле только для чтения тоже белое.
+func ctlColor(c *node, dc C.HDC, m uint32) (uintptr, bool) {
+	fg, bg := c.fg, c.bg
+	if c.kind == kLabel && c.color != noColor {
+		fg = c.color
+	}
+	field := c.kind == kEntry || c.kind == kText
+	if bg == noColor && !field {
+		bg = inheritedBg(c)
+	}
+	if fg != noColor {
+		C.SetTextColor(dc, bgr(fg))
+	}
+	if bg != noColor {
+		C.SetBkColor(dc, bgr(bg))
+		return uintptr(unsafe.Pointer(brushFor(bg))), true
+	}
+	if fg == noColor && !(field && m == C.NUI_WM_CTLCOLORSTATIC) {
+		return 0, false
+	}
+	sys := C.int(C.NUI_COLOR_BTNFACE)
+	if field {
+		sys = C.NUI_COLOR_WINDOW
+	}
+	C.SetBkColor(dc, C.COLORREF(C.GetSysColor(sys)))
+	return uintptr(unsafe.Pointer(C.GetSysColorBrush(sys))), true
+}
+
+// eraseBackground — фон окна или прокрутки: цвет окна, поверх — цветные панели этого
+// хоста (вместе с их отступом), родители раньше детей. false — фон по умолчанию.
+func eraseBackground(n *node, dc C.HDC) bool {
+	w := n
+	if n.kind != kWindow {
+		w = get(n.win)
+	}
+	if w == nil || !w.panels && w.bg == noColor && n.bg == noColor {
+		return false
+	}
+	base := w.bg
+	if n.kind == kScroll {
+		base = inheritedBg(n)
+	}
+	var cs [2]C.int
+	C.nui_client_size(n.hwnd, &cs[0])
+	if base == noColor {
+		C.nui_fill(dc, 0, 0, cs[0], cs[1], C.COLORREF(C.GetSysColor(C.NUI_COLOR_BTNFACE)))
+	} else {
+		C.nui_fill(dc, 0, 0, cs[0], cs[1], bgr(base))
+	}
+	ox, oy := 0, 0
+	if n.kind == kScroll {
+		ox, oy = n.lay.Out.X+n.scrollX, n.lay.Out.Y+n.scrollY
+	}
+	for _, k := range n.kids {
+		paintPanels(w, k, dc, ox, oy)
+	}
+	return true
+}
+
+func paintPanels(w *node, h H, dc C.HDC, ox, oy int) {
+	n := nodes[h]
+	if n.hidden || n.kind == kScroll { // прокрутка рисует своё сама
+		return
+	}
+	if n.bg != noColor && (n.kind == kBox || n.kind == kGrid) {
+		p, o := w.px(n.padding), n.lay.Out
+		C.nui_fill(dc, C.int(o.X-p-ox), C.int(o.Y-p-oy), C.int(o.W+2*p), C.int(o.H+2*p), bgr(n.bg))
+	}
+	for _, k := range n.kids {
+		paintPanels(w, k, dc, ox, oy)
+	}
 }

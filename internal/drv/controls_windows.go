@@ -124,6 +124,17 @@ func LabelSetTextAlign(h H, a uint8) {
 	labelRestyle(h)
 }
 
+// LabelSetFontScale — свой шрифт подписи: шрифт окна в pct процентов (setFont).
+func LabelSetFontScale(h H, pct int) {
+	n := nodes[h]
+	if pct < 1 {
+		pct = 100
+	}
+	n.fontPct = pct
+	setFont(n)
+	remeasure(h)
+}
+
 // LabelSetSelectable: текст можно выделить и скопировать — read-only EDIT без рамки
 // (driver-win32.md, §5). Многоточие EDIT не рисует.
 func LabelSetSelectable(h H, on bool) {

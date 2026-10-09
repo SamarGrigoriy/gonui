@@ -98,6 +98,14 @@ func (g *Grid) Spacing(colGap, rowGap int) *Grid {
 	return g
 }
 
+// Background — фон сетки вместе с отступом Padding; NoColor — без фона.
+func (g *Grid) Background(c Color) *Grid {
+	if !g.dead() {
+		drv.SetBackground(g.h, uint32(c), true)
+	}
+	return g
+}
+
 // Padding — отступ вокруг, по умолчанию 0.
 func (g *Grid) Padding(px int) *Grid {
 	if !g.dead() {

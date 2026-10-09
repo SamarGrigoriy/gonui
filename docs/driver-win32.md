@@ -160,6 +160,7 @@ type node struct {
 | Положение окна | центр экрана работает (на Wayland его выбирает композитор) |
 | `TextView.OnChange` | замена выделенного текста — один вызов, а не два (Windows шлёт один `EN_CHANGE`) |
 | `Label.SetSelectable` | read-only EDIT без рамки: многоточие (`SetEllipsis`) у выделяемой подписи не рисуется |
+| Цветная кнопка (`Button.SetColor`, `SetBackground`) | `BS_OWNERDRAW`, рисует драйвер: плоская, без визуального стиля системы (ADR-19). Фон Box и Grid — `WM_ERASEBKGND` окна; подписи, флажки, ползунки берут его через `WM_CTLCOLORSTATIC` |
 
 ## 11. Порядок работ в фазе 5
 

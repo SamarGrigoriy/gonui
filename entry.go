@@ -65,6 +65,20 @@ func (e *Entry) SetWidthChars(n int) {
 	}
 }
 
+// SetColor — цвет текста в поле; NoColor — цвет темы.
+func (e *Entry) SetColor(c Color) {
+	if !e.dead() {
+		drv.SetForeground(e.h, uint32(c))
+	}
+}
+
+// SetBackground — фон поля; NoColor — фон темы.
+func (e *Entry) SetBackground(c Color) {
+	if !e.dead() {
+		drv.SetBackground(e.h, uint32(c), false)
+	}
+}
+
 // OnChange: текст изменён пользователем (ввод, вставка, удаление).
 func (e *Entry) OnChange(fn func()) { e.onChange = fn }
 

@@ -53,14 +53,22 @@ func LabelSetTextAlign(h H, a uint8) {
 }
 
 // LabelSetBold — жирное начертание. Цвет при этом сохраняется (он хранится в самой метке).
-func LabelSetBold(h H, on bool) { C.nui_label_style((*C.GtkLabel)(h), 1, C.int(b2i(on)), 0, 0) }
+func LabelSetBold(h H, on bool) { C.nui_label_style((*C.GtkLabel)(h), 1, C.int(b2i(on)), 0, 0, 0) }
+
+// LabelSetFontScale — размер шрифта относительно обычного, в процентах (Pango scale).
+func LabelSetFontScale(h H, pct int) {
+	if pct < 1 {
+		pct = 100
+	}
+	C.nui_label_style((*C.GtkLabel)(h), 0, 0, 0, 0, C.int(pct))
+}
 
 // LabelSetColor — цвет 0xRRGGBB; 1<<24 (nui.NoColor) — цвет темы. Жирность сохраняется.
 func LabelSetColor(h H, color uint32) {
 	if color > 1<<24 {
 		color = 1 << 24
 	}
-	C.nui_label_style((*C.GtkLabel)(h), 0, 0, 1, C.uint(color))
+	C.nui_label_style((*C.GtkLabel)(h), 0, 0, 1, C.uint(color), 0)
 }
 
 // CheckNew: toggled → EvChange. Текст — через ButtonSetText/ButtonText.

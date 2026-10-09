@@ -94,6 +94,20 @@ func (t *TextView) Focus() {
 	}
 }
 
+// SetColor — цвет текста; NoColor — цвет темы.
+func (t *TextView) SetColor(c Color) {
+	if !t.dead() {
+		drv.SetForeground(t.view, uint32(c))
+	}
+}
+
+// SetBackground — фон поля текста; NoColor — фон темы.
+func (t *TextView) SetBackground(c Color) {
+	if !t.dead() {
+		drv.SetBackground(t.view, uint32(c), false)
+	}
+}
+
 // OnChange: текст изменён пользователем. Вставка поверх выделения — это удаление
 // и вставка, поэтому обработчик может сработать дважды.
 func (t *TextView) OnChange(fn func()) { t.onChange = fn }

@@ -126,6 +126,13 @@ func (w *Window) SetFullscreen(on bool) {
 	}
 }
 
+// SetBackground — фон окна; NoColor — фон темы.
+func (w *Window) SetBackground(c Color) {
+	if !w.dead() {
+		drv.SetBackground(w.h, uint32(c), false)
+	}
+}
+
 // SetPadding — отступ между краем окна и содержимым, по умолчанию 12.
 func (w *Window) SetPadding(px int) {
 	if !w.dead() {

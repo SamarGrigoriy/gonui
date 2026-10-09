@@ -222,6 +222,68 @@ void nui_monitor_rect(HWND hwnd, int out[4]) {
 	out[3] = mi.rcMonitor.bottom - mi.rcMonitor.top;
 }
 
+// Шрифт подписи с SetFontScale: шрифт окна base в pct процентов, жирный по bold.
+HFONT nui_font_scaled(HFONT base, int pct, int bold) {
+	LOGFONTW lf;
+	if (!GetObjectW(base, sizeof lf, &lf))
+		return 0;
+	lf.lfHeight = lf.lfHeight * pct / 100;
+	lf.lfWeight = bold ? NUI_FW_BOLD : NUI_FW_NORMAL;
+	return CreateFontIndirectW(&lf);
+}
+
+void nui_fill(HDC dc, int x, int y, int w, int h, COLORREF c) {
+	RECT r = {x, y, x + w, y + h};
+	HBRUSH b = CreateSolidBrush(c);
+	FillRect(dc, &r, b);
+	DeleteObject(b);
+}
+
+static COLORREF shade(COLORREF c, int pct) { // pct < 100 — темнее
+	unsigned r = (c & 255) * pct / 100, g = ((c >> 8) & 255) * pct / 100, b = ((c >> 16) & 255) * pct / 100;
+	return (r > 255 ? 255 : r) | (g > 255 ? 255 : g) << 8 | (b > 255 ? 255 : b) << 16;
+}
+
+// Цветная кнопка (SetBackground, SetColor): стандартную кнопку Windows перекрасить нельзя,
+// поэтому BS_OWNERDRAW — плоская заливка, рамка темнее заливки (у кнопки по умолчанию —
+// двойная), текст по центру; нажатая — темнее и сдвинута, недоступная — серый текст.
+void nui_draw_button(const DRAWITEMSTRUCT *d, unsigned fg, unsigned bg, int isDefault) {
+	RECT r = d->rcItem;
+	int pressed = d->itemState & NUI_ODS_SELECTED;
+	COLORREF face = bg == ~0u ? GetSysColor(NUI_COLOR_BTNFACE) : bg;
+	if (pressed)
+		face = shade(face, 85);
+	HBRUSH b = CreateSolidBrush(face);
+	FillRect(d->hDC, &r, b);
+	DeleteObject(b);
+	HBRUSH e = CreateSolidBrush(shade(face, 65));
+	FrameRect(d->hDC, &r, e);
+	if (isDefault) {
+		RECT in = {r.left + 1, r.top + 1, r.right - 1, r.bottom - 1};
+		FrameRect(d->hDC, &in, e);
+	}
+	DeleteObject(e);
+	WCHAR t[256];
+	int n = GetWindowTextW(d->hwndItem, t, 256);
+	HGDIOBJ old = SelectObject(d->hDC, (HGDIOBJ)SendMessageW(d->hwndItem, NUI_WM_GETFONT, 0, 0));
+	SetBkMode(d->hDC, NUI_TRANSPARENT);
+	SetTextColor(d->hDC, d->itemState & NUI_ODS_DISABLED ? GetSysColor(NUI_COLOR_GRAYTEXT)
+		: fg == ~0u ? GetSysColor(NUI_COLOR_BTNTEXT) : fg);
+	RECT tr = r;
+	if (pressed) {
+		tr.left += 1;
+		tr.top += 1;
+		tr.right += 1;
+		tr.bottom += 1;
+	}
+	DrawTextW(d->hDC, t, n, &tr, NUI_DT_CENTER | NUI_DT_VCENTER | NUI_DT_SINGLELINE);
+	SelectObject(d->hDC, old);
+	if ((d->itemState & NUI_ODS_FOCUS) && !(d->itemState & NUI_ODS_NOFOCUSRECT)) {
+		RECT f = {r.left + 3, r.top + 3, r.right - 3, r.bottom - 3};
+		DrawFocusRect(d->hDC, &f);
+	}
+}
+
 void nui_client_size(HWND hwnd, int out[2]) {
 	RECT r = {0, 0, 0, 0};
 	GetClientRect(hwnd, &r);

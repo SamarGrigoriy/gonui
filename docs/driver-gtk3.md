@@ -71,6 +71,9 @@ func LabelSetSelectable(h H, on bool)
 func LabelSetTextAlign(h H, a uint8)
 func LabelSetBold(h H, on bool)         // жирность и цвет хранятся в самой метке (g_object_set_data),
 func LabelSetColor(h H, color uint32)   // поэтому каждый вызов меняет только своё; 1<<24 — без цвета
+func LabelSetFontScale(h H, pct int)    // размер шрифта в процентах (Pango scale), ADR-19
+func SetForeground(h H, color uint32)   // цвет текста: Button, Entry, TextView (view); свой GtkCssProvider
+func SetBackground(h H, color uint32, panel bool) // фон; panel — Box/Grid: border-width → CSS padding
 
 // Button, Check
 func ButtonNew(id uint32, text string) H
