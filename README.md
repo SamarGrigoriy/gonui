@@ -1,6 +1,9 @@
 # nui — нативный GUI для Go
 
-> **Статус: фазы 1–3 готовы** (отчёты с фотоотчётами: [фаза 1](docs/reports/phase-1.md), [фаза 2](docs/reports/phase-2.md), [фаза 3](docs/reports/phase-3.md)): ядро, драйвер GTK3, все виджеты MVP, диалоги (сообщения, выбор файла и папки) и оболочка (`OpenURI`, `ShowInFolder`). `examples/form` со всеми виджетами — 41 808 байт в TinyGo. Реализация ведётся на Debian.
+> **Статус (09.10.2026): Linux готов, Windows — первая версия.**
+> - **Linux, фазы 1–3** ([фаза 1](docs/reports/phase-1.md), [фаза 2](docs/reports/phase-2.md), [фаза 3](docs/reports/phase-3.md)): ядро, драйвер GTK3, все виджеты MVP, диалоги и оболочка. `examples/form` со всеми виджетами — 41 808 байт в TinyGo.
+> - **Windows, фаза 5** ([отчёт](docs/reports/phase-5.md)): движок раскладки, повторяющий GTK до пикселя; драйвер Win32. Примеры и интеграционные тесты проходят под Wine; на настоящей Windows их ещё не запускали.
+> - Фаза 4 (приёмочное приложение) отложена. Реализация ведётся на Debian.
 
 nui — маленькая библиотека для настольных приложений на Go. Интерфейс строится из **настоящих виджетов операционной системы**: GTK3 на Linux, Win32 на Windows. Виджеты вызываются напрямую, без браузера, OpenGL и толстых обёрток.
 
@@ -37,14 +40,35 @@ func main() {
 }
 ```
 
+## Как подключить к своей программе
+
+Модуль пока не опубликован, поэтому подключается локально, через `replace`:
+
+```sh
+mkdir myapp && cd myapp
+go mod init myapp
+go mod edit -require=nui@v0.0.0 -replace=nui=/путь/к/nui
+# main.go — как в примере выше
+go build -o myapp .        # Linux: нужны Go 1.22+, gcc и libgtk-3-0; -dev-пакеты не нужны
+```
+
+Windows — кросс-сборкой на Linux (пакет `gcc-mingw-w64-x86-64`):
+
+```sh
+CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc go build -ldflags "-H windowsgui" -o myapp.exe .
+```
+
+Для современных контролов и правильного масштаба на Windows положите рядом `app.manifest` и `app.rc` из [examples/hello](examples/hello) и соберите ресурс: `x86_64-w64-mingw32-windres app.rc -O coff -o rsrc_windows_amd64.syso`. Малая сборка TinyGo и всё прочее описаны в [build.md](docs/build.md).
+
 ## Как это устроено
 
 Публичный пакет `nui` даёт простые типы (`Window`, `Button`, `Entry` и т. д.). Под ним лежат два внутренних пакета:
 
 - `internal/core` — чистый Go без cgo. В нём реестр объектов, диспетчер событий и очередь `Do`. Тестируется на любой машине.
-- `internal/drv` — драйвер ОС. Он вызывает GTK3 через cgo, но вместо системных заголовков использует **собственные прототипы функций**. Поэтому `-dev`-пакеты не нужны, а код собирается и обычным Go (gc), и TinyGo.
+- `internal/drv` — драйвер ОС: GTK3 на Linux, Win32 на Windows. Он вызывает систему через cgo, но вместо системных заголовков использует **собственные прототипы функций**, сверенные с настоящими заголовками (`make check-protos`). Поэтому `-dev`-пакеты не нужны, а код собирается и обычным Go (gc), и TinyGo.
+- `internal/layout` — движок раскладки на чистом Go для Windows, где нет контейнеров. Он повторяет раскладку GTK до пикселя, это проверяют golden-тесты, снятые с GTK.
 
-События из C возвращаются в Go через 4 общих «трамплина». Объекты передаются только числовыми id, Go-указатели в C не попадают. Таймеры, ожидание файловых дескрипторов и `Do` работают на цикле событий GLib, поэтому библиотеке не нужны собственные горутины.
+События из C возвращаются в Go через общие «трамплины»: четыре на GTK, один WndProc на Windows. Объекты передаются только числовыми id, Go-указатели в C не попадают. Таймеры, ожидание файловых дескрипторов и `Do` работают на цикле событий ОС, поэтому библиотеке не нужны собственные горутины.
 
 ## Документы
 
@@ -62,11 +86,11 @@ func main() {
 | 8 | [driver-win32.md](docs/driver-win32.md) | Драйвер Windows (фаза 5) |
 | 9 | [size.md](docs/size.md) | Бюджет размера и правила кода, которые его держат |
 | 10 | [build.md](docs/build.md) | Сборка на Debian: пакеты, Go, TinyGo, цели Makefile |
-| 11 | [roadmap.md](docs/roadmap.md) | Спайки S1–S3 и фазы 1–6 с критериями готовности |
+| 11 | [roadmap.md](docs/roadmap.md) | Спайки S1–S4 и фазы 1–6 с критериями готовности |
 | 12 | [testing.md](docs/testing.md) | Юнит-тесты, тесты под Xvfb, selftest, контроль размера, ручной чек-лист |
 | 13 | [acceptance.md](docs/acceptance.md) | Приёмочное приложение: Linux-версия «Записи логов ESP32» |
 
-**Сборка и проверки** ([build.md](docs/build.md), §4): `make dev` — примеры обычным Go, `make small` — TinyGo, `make check` — статические проверки, `make docker-ci` — тесты на GTK под Xvfb, selftest, размеры и ABI в чистом Debian 12. Спайки S1 и S3, подтвердившие оба рискованных допущения, — в [spike/](spike/).
+**Сборка и проверки** ([build.md](docs/build.md), §4, §7): `make dev` — примеры обычным Go, `make small` — TinyGo, `make check` — статические проверки (Linux и Win32), `make docker-ci` — тесты на GTK под Xvfb, selftest, размеры и ABI в чистом Debian 12. Для Windows: `NUI_IMAGE=nui-win tools/docker-run.sh make win win-selftest win-test` — сборка обоими тулчейнами, selftest и интеграционные тесты под Wine. Спайки S1, S3 и S4 — в [spike/](spike/).
 
 ## Чего здесь нет и не будет
 

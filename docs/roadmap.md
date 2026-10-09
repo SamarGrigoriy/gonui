@@ -159,11 +159,13 @@ S1 ─► S2 ─┬─(успех)───────────────�
 
 ## Фаза 5. Windows (2–3 недели)
 
+**Статус (09.10.2026):** всё, что проверяется без Windows, готово: движок раскладки, спайк S4, драйвер Win32, примеры, интеграционные тесты под Wine. Остаётся ручная проверка на Windows 10/11 (первый пункт DoD) и открытый вопрос с `TaskDialog` под Wine ([отчёт](reports/phase-5.md)).
+
 **Состав:**
 - спайк S4 ([driver-win32.md](driver-win32.md), §11) — **пройден** под Wine ([spike/s4/RESULT.md](../spike/s4/RESULT.md));
 - `internal/layout` + golden-тесты ([layout.md](layout.md), §8) — **готово**: эталон снимает сам драйвер nui на GTK, `libgtk-3-dev` не нужен (ADR-18);
 - драйвер `*_windows.*` — первая версия: hello и form под Wine обоими тулчейнами ([отчёт](reports/phase-5.md));
-- `examples/*` на Windows.
+- `examples/*` на Windows — hello и form собираются gc и TinyGo, selftest и интеграционные тесты nui проходят под Wine (`make win-selftest win-test`).
 
 **DoD:**
 - [x] Golden-тесты проходят на всех случаях: 11 случаев, движок совпадает с GTK до пикселя ([отчёт](reports/phase-5.md)).

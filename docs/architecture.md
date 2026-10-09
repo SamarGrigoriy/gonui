@@ -90,9 +90,17 @@ nui/
 │   ├── layout_linux.go      Box*, Grid*, Frame*, Scroll*, Separator*
 │   ├── dialog_linux.go      Message, FileDialog, OpenURI, ShowInFolder
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
-│   └── *_windows.*          то же для Win32 (фаза 5)
+│   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)
+│   ├── win32_windows.h      собственные прототипы Win32
+│   ├── wrap_windows.c       класс окна, цикл, шрифты под DPI, измерение текста, диалоги
+│   ├── export_windows.go    трамплин nuiWndProc //export
+│   ├── node_windows.go      узлы (Box, Grid — без HWND), раскладка, DPI, прокрутка
+│   ├── *_windows.go         остальное — как у Linux: app, window, widget, controls, layout, dialog, sim
+│   └── link_tinygo_windows.go  путь к библиотекам импорта mingw для TinyGo
 │
-├── internal/layout/         фаза 5
+├── internal/layout/         движок раскладки для Win32: Measure, Arrange (layout.md, §7)
+│   ├── golden/              язык случаев и golden-файлы (только для тестов)
+│   └── testdata/            cases/*.txt, golden/*.txt — снимаются с GTK (make golden)
 │
 ├── examples/
 │   ├── hello/               минимальный пример (≤ 15 строк)
