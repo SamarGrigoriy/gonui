@@ -120,10 +120,13 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 				return r, true
 			}
 		}
-	case C.NUI_WM_DRAWITEM: // цветная кнопка (BS_OWNERDRAW)
+	case C.NUI_WM_DRAWITEM: // цветная кнопка (BS_OWNERDRAW) и картинка (SS_OWNERDRAW)
 		d := drawItemOf(lp)
 		if _, c := nodeOf(d.hwndItem); c != nil && c.kind == kButton {
 			C.nui_draw_button(d, colorref(c.fg), colorref(c.bg), b2i(c.isDefault))
+			return 1, true
+		} else if c != nil && c.kind == kImage {
+			drawImage(c, d)
 			return 1, true
 		}
 	}

@@ -23,23 +23,46 @@ func MessageBox(parent H, kind uint8, title, text string) bool {
 	return C.nui_message(ownerOf(parent), C.int(kind), wstr(appTitle), wstr(title), wstr(text)) != 0
 }
 
-// FileDialog — GetOpenFileNameW / GetSaveFileNameW / SHBrowseForFolderW.
-func FileDialog(parent H, mode uint8, title, name string, f []Filter) (string, bool) {
+// FileDialog — GetOpenFileNameW / GetSaveFileNameW / SHBrowseForFolderW. nil — отмена.
+func FileDialog(parent H, mode uint8, title, name string, f []Filter) []string {
 	if mode == FileFolder {
 		buf := make([]uint16, 260)
 		if C.nui_folder_dialog(ownerOf(parent), wstr(title), wptr(buf)) == 0 {
-			return "", false
+			return nil
 		}
-		return fromUTF16(zstr(buf)), true
+		return []string{fromUTF16(zstr(buf))}
 	}
-	buf := make([]uint16, 32768) // длинные пути Windows
+	n := 32768 // длинные пути Windows
+	if mode == FileOpenMany {
+		n = 1 << 20 // тысячи имён
+	}
+	buf := make([]uint16, n)
 	copy(buf[:len(buf)-1], utf16z(name))
-	ok := C.nui_file_dialog(ownerOf(parent), b2i(mode == FileSave), wstr(title), filterSpec(f), wptr(buf),
-		C.int(len(buf)))
-	if ok == 0 {
-		return "", false
+	if C.nui_file_dialog(ownerOf(parent), C.int(mode), wstr(title), filterSpec(f), wptr(buf), C.int(len(buf))) == 0 {
+		return nil
 	}
-	return fromUTF16(zstr(buf)), true
+	return splitFiles(buf)
+}
+
+// splitFiles разбирает ответ диалога: «путь\0\0» или «каталог\0имя1\0имя2\0\0».
+func splitFiles(buf []uint16) []string {
+	var parts []string
+	for len(buf) > 0 && buf[0] != 0 {
+		s := zstr(buf)
+		parts = append(parts, fromUTF16(s))
+		buf = buf[min(len(s)+1, len(buf)):]
+	}
+	if len(parts) < 2 {
+		return parts
+	}
+	dir := parts[0]
+	if dir[len(dir)-1] != '\\' { // корень диска — «C:\»
+		dir += `\`
+	}
+	for i := range parts[1:] {
+		parts[i] = dir + parts[i+1]
+	}
+	return parts[:len(parts)-1]
 }
 
 // filterSpec — фильтры в виде "Логи\0*.log;*.txt\0\0"; без фильтров — nil (все файлы).

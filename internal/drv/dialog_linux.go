@@ -22,8 +22,9 @@ func MessageBox(parent H, kind uint8, title, text string) bool {
 
 // FileDialog — системный диалог выбора файла (GtkFileChooserNative: в песочнице — портал).
 // Подписи кнопок — по умолчанию GTK, переведённые на язык системы. Save сам спрашивает
-// о перезаписи; name — предлагаемое имя. Путь возвращается как есть, в кодировке ФС.
-func FileDialog(parent H, mode uint8, title, name string, filters []Filter) (string, bool) {
+// о перезаписи; name — предлагаемое имя. Пути возвращаются как есть, в кодировке ФС;
+// nil — отмена. Один путь, кроме FileOpenMany.
+func FileDialog(parent H, mode uint8, title, name string, filters []Filter) []string {
 	action := C.GtkFileChooserAction(C.NUI_GTK_FILE_CHOOSER_ACTION_OPEN)
 	switch mode {
 	case FileSave:
@@ -35,6 +36,9 @@ func FileDialog(parent H, mode uint8, title, name string, filters []Filter) (str
 	nd := (*C.GtkNativeDialog)(C.gpointer(n))
 	fc := (*C.GtkFileChooser)(C.gpointer(n))
 	C.gtk_native_dialog_set_modal(nd, 1)
+	if mode == FileOpenMany {
+		C.gtk_file_chooser_set_select_multiple(fc, 1)
+	}
 	if mode == FileSave {
 		C.gtk_file_chooser_set_do_overwrite_confirmation(fc, 1)
 		if name != "" {
@@ -49,14 +53,16 @@ func FileDialog(parent H, mode uint8, title, name string, filters []Filter) (str
 		}
 		C.gtk_file_chooser_add_filter(fc, ff)
 	}
-	path, ok := "", false
+	var paths []string
 	if C.gtk_native_dialog_run(nd) == C.NUI_GTK_RESPONSE_ACCEPT {
-		if p := C.gtk_file_chooser_get_filename(fc); p != nil {
-			path, ok = gostrFree(p), true
+		list := C.gtk_file_chooser_get_filenames(fc)
+		for it := list; it != nil; it = it.next {
+			paths = append(paths, gostrFree((*C.gchar)(it.data)))
 		}
+		C.g_slist_free(list)
 	}
 	C.g_object_unref(C.gpointer(n))
-	return path, ok
+	return paths
 }
 
 // OpenURI открывает "https://…" или "file:///…" программой по умолчанию.

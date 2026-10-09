@@ -272,6 +272,71 @@ func TestDir(t *testing.T) {
 	}
 }
 
+func TestFit(t *testing.T) {
+	cases := []struct{ w, h, maxW, maxH, wantW, wantH int }{
+		{4000, 3000, 0, 0, 4000, 3000},   // без ограничений
+		{4000, 3000, 400, 0, 400, 300},   // по ширине
+		{4000, 3000, 0, 300, 400, 300},   // по высоте
+		{4000, 3000, 400, 200, 267, 200}, // высота строже ширины; округление
+		{4000, 3000, 200, 400, 200, 150}, // ширина строже высоты
+		{100, 50, 400, 300, 100, 50},     // меньше рамки — не увеличивается
+		{1000, 1, 10, 0, 10, 1},          // не меньше 1 пикселя
+		{0, 10, 100, 100, 0, 0},          // пустая
+		{10, -1, 100, 100, 0, 0},
+	}
+	for _, c := range cases {
+		if w, h := Fit(c.w, c.h, c.maxW, c.maxH); w != c.wantW || h != c.wantH {
+			t.Errorf("Fit(%d, %d, %d, %d) = %d×%d, ожидалось %d×%d", c.w, c.h, c.maxW, c.maxH, w, h, c.wantW, c.wantH)
+		}
+	}
+}
+
+// exifJPEG — начало JPEG: SOI, APP1 с TIFF-заголовком tiff, затем SOS.
+func exifJPEG(app1 []byte) []byte {
+	n := len(app1) + 2
+	b := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0, 4, 1, 2} // SOI и APP0 (пропускается)
+	b = append(b, 0xFF, 0xE1, byte(n>>8), byte(n))
+	b = append(b, app1...)
+	return append(b, 0xFF, 0xDA, 0, 2)
+}
+
+func TestOrientation(t *testing.T) {
+	le := func(o byte) []byte { // IFD0: другой тег, потом Orientation
+		return []byte("Exif\x00\x00II\x2a\x00\x08\x00\x00\x00\x02\x00" +
+			"\x0f\x01\x02\x00\x01\x00\x00\x00\x00\x00\x00\x00" +
+			"\x12\x01\x03\x00\x01\x00\x00\x00" + string([]byte{o, 0}) + "\x00\x00\x00\x00\x00\x00")
+	}
+	be := []byte("Exif\x00\x00MM\x00\x2a\x00\x00\x00\x08\x00\x01" +
+		"\x01\x12\x00\x03\x00\x00\x00\x01\x00\x08\x00\x00\x00\x00\x00\x00")
+	badType := le(6)
+	badType[6+8+2+12+2] = 4 // LONG вместо SHORT
+	cases := []struct {
+		name string
+		b    []byte
+		want int
+	}{
+		{"II, 6", exifJPEG(le(6)), 6},
+		{"MM, 8", exifJPEG(be), 8},
+		{"значение вне 1…8", exifJPEG(le(9)), 1},
+		{"тип не SHORT", exifJPEG(badType), 1},
+		{"нет тега", exifJPEG(append(append([]byte{}, le(6)[:6+8]...), "\x01\x00\x0f\x01\x02\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"...)), 1},
+		{"IFD обрезан", exifJPEG(le(6)[:6+8+2+12]), 1},
+		{"обрезанная запись", exifJPEG(le(6)[:6+8+2+12+5]), 1},
+		{"смещение за концом", exifJPEG([]byte("Exif\x00\x00II\x2a\x00\xff\x00\x00\x00\x00\x00")), 1},
+		{"не TIFF", exifJPEG([]byte("Exif\x00\x00XX\x2a\x00\x08\x00\x00\x00\x00\x00")), 1},
+		{"не Exif", exifJPEG([]byte("XMP\x00 какой-то текст")), 1},
+		{"заполняющие FF", append([]byte{0xFF, 0xD8, 0xFF}, exifJPEG(le(3))[2:]...), 3},
+		{"сегмент длиннее файла", []byte{0xFF, 0xD8, 0xFF, 0xE1, 0x10, 0}, 1},
+		{"не JPEG", []byte("\x89PNG\r\n"), 1},
+		{"пусто", nil, 1},
+	}
+	for _, c := range cases {
+		if got := Orientation(c.b); got != c.want {
+			t.Errorf("%s: Orientation = %d, ожидалось %d", c.name, got, c.want)
+		}
+	}
+}
+
 func TestDebugHooksAreHarmlessWithoutUIThread(t *testing.T) {
 	MarkUIThread(nil)
 	CheckThread() // без зарегистрированной проверки — ничего не делает

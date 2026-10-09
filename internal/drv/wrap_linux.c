@@ -171,6 +171,103 @@ GtkClipboard *nui_clipboard(void) {
 #endif
 }
 
+/* ---------- Картинка (Image) ----------
+   Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
+   картинка перерисовывается из них и остаётся чёткой. src — только что декодированная
+   картинка между load и show, чтобы не декодировать её дважды. */
+typedef struct {
+	guchar *data;
+	gsize len;
+	int w, h; /* размер показа, логические пиксели */
+	GdkPixbuf *src;
+} NuiImage;
+
+static void nui_image_free(gpointer p) {
+	NuiImage *im = p;
+	g_free(im->data);
+	if (im->src)
+		g_object_unref(im->src);
+	g_free(im);
+}
+
+/* Декодировать и повернуть по EXIF; 0 — не картинка. Новая ссылка. */
+static GdkPixbuf *nui_decode(const guchar *data, gsize len) {
+	GdkPixbufLoader *l = gdk_pixbuf_loader_new();
+	int ok = gdk_pixbuf_loader_write(l, data, len, 0);
+	ok = gdk_pixbuf_loader_close(l, 0) && ok; /* закрыть нужно и после ошибки */
+	GdkPixbuf *pb = ok ? gdk_pixbuf_loader_get_pixbuf(l) : 0;
+	if (pb)
+		pb = gdk_pixbuf_apply_embedded_orientation(pb);
+	g_object_unref(l);
+	return pb;
+}
+
+/* Картинка размером w×h логических пикселей: w·k×h·k точек при масштабе k. */
+static void nui_image_render(GtkWidget *w) {
+	NuiImage *im = g_object_get_data((GObject *)w, "nui-image");
+	if (!im->data || im->w <= 0)
+		return;
+	GdkPixbuf *src = im->src ? im->src : nui_decode(im->data, im->len);
+	im->src = 0;
+	if (!src)
+		return;
+	int k = gtk_widget_get_scale_factor(w), pw = im->w * k, ph = im->h * k;
+	GdkPixbuf *pb = gdk_pixbuf_get_width(src) == pw && gdk_pixbuf_get_height(src) == ph
+		? g_object_ref(src) : gdk_pixbuf_scale_simple(src, pw, ph, NUI_GDK_INTERP_BILINEAR);
+	g_object_unref(src);
+	if (!pb)
+		return;
+	cairo_surface_t *s = gdk_cairo_surface_create_from_pixbuf(pb, k, 0);
+	g_object_unref(pb);
+	gtk_image_set_from_surface((GtkImage *)w, s);
+	cairo_surface_destroy(s);
+}
+
+static void nui_image_rescale(GtkWidget *w, gpointer pspec, gpointer data) {
+	(void)pspec;
+	(void)data;
+	nui_image_render(w);
+}
+
+GtkWidget *nui_image_new(void) {
+	GtkWidget *w = gtk_image_new();
+	g_object_set_data_full((GObject *)w, "nui-image", g_malloc0(sizeof(NuiImage)), nui_image_free);
+	g_signal_connect_data(w, "notify::scale-factor", (GCallback)nui_image_rescale, 0, 0, 0);
+	return w;
+}
+
+/* len == 0 — убрать картинку. Иначе 0 — не картинка (прежняя остаётся), 1 — wh = размер. */
+int nui_image_load(GtkWidget *w, const guchar *data, gsize len, int wh[2]) {
+	NuiImage *im = g_object_get_data((GObject *)w, "nui-image");
+	GdkPixbuf *pb = len ? nui_decode(data, len) : 0;
+	if (len && !pb)
+		return 0;
+	g_free(im->data);
+	im->data = 0;
+	im->len = 0;
+	if (im->src)
+		g_object_unref(im->src);
+	im->src = pb;
+	if (!pb) {
+		im->w = im->h = 0;
+		gtk_image_clear((GtkImage *)w);
+		return 1;
+	}
+	im->data = g_malloc(len);
+	memcpy(im->data, data, len);
+	im->len = len;
+	wh[0] = gdk_pixbuf_get_width(pb);
+	wh[1] = gdk_pixbuf_get_height(pb);
+	return 1;
+}
+
+void nui_image_show(GtkWidget *w, int width, int height) {
+	NuiImage *im = g_object_get_data((GObject *)w, "nui-image");
+	im->w = width;
+	im->h = height;
+	nui_image_render(w);
+}
+
 /* Весь текст буфера. Строку освобождает вызывающий (g_free). GtkTextIter — только на стеке C. */
 char *nui_text_get(GtkTextBuffer *b) {
 	NuiTextIter s, e;
@@ -316,5 +413,36 @@ int nui_sim_file_chooser_set(const gchar *path) {
 	if (!d)
 		return 0;
 	return gtk_file_chooser_set_filename((GtkFileChooser *)d, path);
+}
+
+/* Список файлов диалога — видимый GtkTreeView (боковая панель мест в 3.24 — GtkListBox). */
+static void nui_find_tree(GtkWidget *w, gpointer out) {
+	if (*(GtkWidget **)out)
+		return;
+	if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_tree_view_get_type()) && gtk_widget_get_mapped(w))
+		*(GtkWidget **)out = w;
+	else if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_container_get_type()))
+		gtk_container_forall((GtkContainer *)w, nui_find_tree, out);
+}
+
+/* Добавить файл к выбранным, как Ctrl+щелчок; каталог уже загружен. select_filename ставит
+   на файл курсор и тем снимает прежнее выделение (show_and_select_files в GTK 3.24),
+   поэтому выделенные строки запоминаются и выделяются снова. */
+int nui_sim_file_chooser_add(const gchar *path) {
+	GtkWidget *d = nui_find_dialog(1), *tv = 0;
+	if (!d)
+		return 0;
+	nui_find_tree(d, &tv);
+	if (!tv)
+		return 0;
+	GtkTreeSelection *sel = gtk_tree_view_get_selection((GtkTreeView *)tv);
+	GList *rows = gtk_tree_selection_get_selected_rows(sel, 0), *it;
+	int ok = gtk_file_chooser_select_filename((GtkFileChooser *)d, path);
+	for (it = rows; it; it = it->next) {
+		gtk_tree_selection_select_path(sel, it->data);
+		gtk_tree_path_free(it->data);
+	}
+	g_list_free(rows);
+	return ok;
 }
 #endif

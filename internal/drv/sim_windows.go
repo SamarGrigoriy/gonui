@@ -142,11 +142,8 @@ func SimChooserSet(path string) bool {
 	case C.nui_dialog_kind() == 4: // SHBrowseForFolderW: BFFM_SETSELECTIONW
 		sendStr(d, 0x400+103, 1, path)
 		return true
-	case C.nui_dialog_kind() == 3: // поле имени: cmb13 (проводник) или edt1
-		e := C.GetDlgItem(d, 0x47C)
-		if e == nil {
-			e = C.GetDlgItem(d, 0x480)
-		}
+	case C.nui_dialog_kind() == 3:
+		e := fileNameBox(d)
 		if e == nil {
 			return false
 		}
@@ -154,6 +151,51 @@ func SimChooserSet(path string) bool {
 		return true
 	}
 	return false
+}
+
+// SimChooserAdd добавляет файл к выбранным (OpenFiles) — того же каталога, что выбран
+// SimChooserSet. Несколько файлов диалог принимает только из текущего каталога в виде
+// "имя1" "имя2", поэтому в первый раз — переход в каталог (его путь в поле имени и OK:
+// диалог остаётся открытым), а полный путь первого файла становится именем в кавычках.
+func SimChooserAdd(path string) bool {
+	d := C.nui_find_dialog()
+	if d == nil || C.nui_dialog_kind() != 3 {
+		return false
+	}
+	e := fileNameBox(d)
+	if e == nil {
+		return false
+	}
+	text := windowText(e)
+	if text == "" {
+		return false
+	}
+	if text[0] != '"' {
+		dir, name := splitPath(text)
+		C.SetWindowTextW(e, wstr(dir))
+		C.SendMessageW(d, C.NUI_WM_COMMAND, C.NUI_IDOK, 0)
+		text = `"` + name + `"`
+	}
+	_, name := splitPath(path)
+	C.SetWindowTextW(e, wstr(text+` "`+name+`"`))
+	return true
+}
+
+// fileNameBox — поле имени файла: cmb13 (диалог в стиле проводника) или edt1.
+func fileNameBox(d C.HWND) C.HWND {
+	if e := C.GetDlgItem(d, 0x47C); e != nil {
+		return e
+	}
+	return C.GetDlgItem(d, 0x480)
+}
+
+func splitPath(p string) (dir, name string) {
+	for i := len(p) - 1; i >= 0; i-- {
+		if p[i] == '\\' || p[i] == '/' {
+			return p[:i], p[i+1:]
+		}
+	}
+	return "", p
 }
 
 // SimChooserDone — «Открыть/Сохранить/OK» (accept) или «Отмена» в файловом диалоге.

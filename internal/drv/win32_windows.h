@@ -177,6 +177,41 @@ typedef struct _browseinfoW {
 	LPARAM lParam;
 	int iImage;
 } BROWSEINFOW;
+typedef struct HBITMAP__ *HBITMAP;
+typedef HANDLE HGLOBAL;
+typedef unsigned int UINT32;
+typedef struct _SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
+typedef struct _OVERLAPPED OVERLAPPED;
+typedef struct tagBITMAPINFOHEADER {
+	DWORD biSize;
+	LONG biWidth, biHeight;
+	WORD biPlanes, biBitCount;
+	DWORD biCompression, biSizeImage;
+	LONG biXPelsPerMeter, biYPelsPerMeter;
+	DWORD biClrUsed, biClrImportant;
+} BITMAPINFOHEADER;
+typedef struct tagRGBQUAD { BYTE rgbBlue, rgbGreen, rgbRed, rgbReserved; } RGBQUAD;
+typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO;
+typedef struct _BLENDFUNCTION { BYTE BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat; } BLENDFUNCTION;
+/* IStream: драйвер вызывает только Release (третий метод IUnknown). */
+typedef struct IStream IStream;
+typedef struct IStreamVtbl {
+	HRESULT (*QueryInterface)(IStream *, const void *, void **);
+	ULONG (*AddRef)(IStream *);
+	ULONG (*Release)(IStream *);
+} IStreamVtbl;
+struct IStream { const IStreamVtbl *lpVtbl; };
+/* GDI+, плоский API (gdiplus.h в режиме C): объекты — void, перечисления — int. */
+typedef void GpImage, GpBitmap, GpGraphics, GpImageAttributes;
+typedef int GpStatus, PixelFormat, InterpolationMode, PixelOffsetMode, WrapMode, GpUnit, RotateFlipType;
+typedef DWORD ARGB;
+typedef void *DrawImageAbort;
+typedef struct GdiplusStartupInput {
+	UINT32 GdiplusVersion;
+	void *DebugEventCallback;
+	BOOL SuppressBackgroundThread, SuppressExternalCodecs;
+} GdiplusStartupInput;
+typedef struct GdiplusStartupOutput GdiplusStartupOutput;
 #endif
 
 /* Раскладка структур: в обоих режимах — одни и те же размеры (x86-64). */
@@ -194,6 +229,9 @@ _Static_assert(sizeof(BROWSEINFOW) == 64, "BROWSEINFOW");
 _Static_assert(sizeof(TASKDIALOGCONFIG) == 160, "TASKDIALOGCONFIG");
 _Static_assert(sizeof(TOOLINFOW) == 72, "TOOLINFOW");
 _Static_assert(sizeof(DRAWITEMSTRUCT) == 64, "DRAWITEMSTRUCT");
+_Static_assert(sizeof(BITMAPINFO) == 44, "BITMAPINFO");
+_Static_assert(sizeof(BLENDFUNCTION) == 4, "BLENDFUNCTION");
+_Static_assert(sizeof(GdiplusStartupInput) == 24, "GdiplusStartupInput");
 
 /* ---------- 2. Макросы сверки ---------- */
 #ifdef NUI_CHECK
@@ -317,6 +355,7 @@ NUI_CONST(SS_ETCHEDHORZ, 0x0010)
 NUI_CONST(SS_ETCHEDVERT, 0x0011)
 NUI_CONST(SS_NOPREFIX, 0x0080)
 NUI_CONST(SS_CENTERIMAGE, 0x0200)
+NUI_CONST(SS_OWNERDRAW, 0x000D)
 NUI_CONST(SS_ENDELLIPSIS, 0x4000)
 NUI_CONST(SS_PATHELLIPSIS, 0x8000)
 NUI_CONST(BS_PUSHBUTTON, 0x0000)
@@ -420,6 +459,7 @@ NUI_CONST(IDNO, 7)
 NUI_CONST(GW_CHILD, 5)
 NUI_CONST(OFN_OVERWRITEPROMPT, 0x00000002)
 NUI_CONST(OFN_HIDEREADONLY, 0x00000004)
+NUI_CONST(OFN_ALLOWMULTISELECT, 0x00000200)
 NUI_CONST(OFN_NOCHANGEDIR, 0x00000008)
 NUI_CONST(OFN_PATHMUSTEXIST, 0x00000800)
 NUI_CONST(OFN_FILEMUSTEXIST, 0x00001000)
@@ -429,6 +469,20 @@ NUI_CONST(BIF_NEWDIALOGSTYLE, 0x00000040)
 NUI_CONST(COINIT_APARTMENTTHREADED, 0x2)
 NUI_CONST(CF_UNICODETEXT, 13)
 NUI_CONST(GMEM_MOVEABLE, 0x0002)
+NUI_CONST(GENERIC_READ, 0x80000000)
+NUI_CONST(FILE_SHARE_READ, 0x00000001)
+NUI_CONST(OPEN_EXISTING, 3)
+NUI_CONST(FILE_ATTRIBUTE_NORMAL, 0x80)
+NUI_CONST(BI_RGB, 0)
+NUI_CONST(DIB_RGB_COLORS, 0)
+NUI_CONST(AC_SRC_OVER, 0x00)
+NUI_CONST(AC_SRC_ALPHA, 0x01)
+/* GDI+ */
+NUI_CONST(PixelFormat32bppPARGB, 0xE200B)
+NUI_CONST(InterpolationModeHighQualityBicubic, 7)
+NUI_CONST(PixelOffsetModeHighQuality, 2)
+NUI_CONST(WrapModeTileFlipXY, 3)
+NUI_CONST(UnitPixel, 2)
 
 /* ---------- 4. Функции ---------- */
 /* kernel32 */
@@ -447,6 +501,13 @@ NUI_FN(LPVOID, GlobalLock, (HANDLE hMem))
 NUI_FN(BOOL, GlobalUnlock, (HANDLE hMem))
 NUI_FN(HANDLE, GlobalFree, (HANDLE hMem))
 NUI_FN(void, Sleep, (DWORD dwMilliseconds))
+NUI_FN(HANDLE, CreateFileW, (LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+       SECURITY_ATTRIBUTES *lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes,
+       HANDLE hTemplateFile))
+NUI_FN(DWORD, GetFileSize, (HANDLE hFile, DWORD *lpFileSizeHigh))
+NUI_FN(BOOL, ReadFile, (HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, DWORD *lpNumberOfBytesRead,
+       OVERLAPPED *lpOverlapped))
+NUI_FN(BOOL, CloseHandle, (HANDLE hObject))
 
 /* user32: окна и сообщения */
 NUI_FN(ATOM, RegisterClassExW, (const WNDCLASSEXW *wc))
@@ -525,6 +586,13 @@ NUI_FN(int, SetBkMode, (HDC hdc, int mode))
 NUI_FN(HBRUSH, CreateSolidBrush, (COLORREF color))
 NUI_FN(int, GetObjectW, (HANDLE h, int c, LPVOID pv))
 NUI_FN(int, FillRect, (HDC hDC, const RECT *lprc, HBRUSH hbr))
+NUI_FN(HBITMAP, CreateDIBSection, (HDC hdc, const BITMAPINFO *pbmi, UINT usage, void **ppvBits, HANDLE hSection,
+       DWORD offset))
+NUI_FN(HDC, CreateCompatibleDC, (HDC hdc))
+NUI_FN(BOOL, DeleteDC, (HDC hdc))
+NUI_FN(BOOL, GdiAlphaBlend, (HDC hdcDest, int xoriginDest, int yoriginDest, int wDest, int hDest, HDC hdcSrc,
+       int xoriginSrc, int yoriginSrc, int wSrc, int hSrc, BLENDFUNCTION ftn))
+NUI_FN(BOOL, GdiFlush, (void))
 NUI_FN(int, FrameRect, (HDC hDC, const RECT *lprc, HBRUSH hbr))
 NUI_FN(BOOL, DrawFocusRect, (HDC hDC, const RECT *lprc))
 NUI_FN(BOOL, RedrawWindow, (HWND hWnd, const RECT *lprcUpdate, HRGN hrgnUpdate, UINT flags))
@@ -536,6 +604,8 @@ NUI_FN(PIDLIST_ABSOLUTE, SHBrowseForFolderW, (BROWSEINFOW *lpbi))
 NUI_FN(BOOL, SHGetPathFromIDListW, (PCIDLIST_ABSOLUTE pidl, LPWSTR pszPath))
 NUI_FN(HRESULT, CoInitializeEx, (LPVOID pvReserved, DWORD dwCoInit))
 NUI_FN(void, CoTaskMemFree, (LPVOID pv))
+NUI_FN(LPVOID, CoTaskMemAlloc, (SIZE_T cb))
+NUI_FN(HRESULT, CreateStreamOnHGlobal, (HGLOBAL hGlobal, BOOL fDeleteOnRelease, IStream **ppstm))
 NUI_FN(BOOL, GetOpenFileNameW, (OPENFILENAMEW *lpofn))
 NUI_FN(BOOL, GetSaveFileNameW, (OPENFILENAMEW *lpofn))
 
@@ -543,6 +613,26 @@ NUI_FN(BOOL, GetSaveFileNameW, (OPENFILENAMEW *lpofn))
 NUI_FNPTR(BOOL, InitCommonControlsEx, (const INITCOMMONCONTROLSEX *picce))
 NUI_FNPTR(HRESULT, TaskDialogIndirect, (const TASKDIALOGCONFIG *pTaskConfig, int *pnButton, int *pnRadioButton,
           BOOL *pfVerificationFlagChecked))
+/* GDI+ (Image) — тоже через GetProcAddress: gdiplus.dll грузится при первой картинке */
+NUI_FNPTR(GpStatus, GdiplusStartup, (ULONG_PTR *token, const GdiplusStartupInput *input, GdiplusStartupOutput *output))
+NUI_FNPTR(GpStatus, GdipCreateBitmapFromStream, (IStream *stream, GpBitmap **bitmap))
+NUI_FNPTR(GpStatus, GdipCreateBitmapFromScan0, (INT width, INT height, INT stride, PixelFormat format, BYTE *scan0,
+          GpBitmap **bitmap))
+NUI_FNPTR(GpStatus, GdipDisposeImage, (GpImage *image))
+NUI_FNPTR(GpStatus, GdipGetImageWidth, (GpImage *image, UINT *width))
+NUI_FNPTR(GpStatus, GdipGetImageHeight, (GpImage *image, UINT *height))
+NUI_FNPTR(GpStatus, GdipImageRotateFlip, (GpImage *image, RotateFlipType rfType))
+NUI_FNPTR(GpStatus, GdipGetImageGraphicsContext, (GpImage *image, GpGraphics **graphics))
+NUI_FNPTR(GpStatus, GdipSetInterpolationMode, (GpGraphics *graphics, InterpolationMode interpolationMode))
+NUI_FNPTR(GpStatus, GdipSetPixelOffsetMode, (GpGraphics *graphics, PixelOffsetMode pixelOffsetMode))
+NUI_FNPTR(GpStatus, GdipDrawImageRectRectI, (GpGraphics *graphics, GpImage *image, INT dstx, INT dsty, INT dstwidth,
+          INT dstheight, INT srcx, INT srcy, INT srcwidth, INT srcheight, GpUnit srcUnit,
+          const GpImageAttributes *imageAttributes, DrawImageAbort callback, void *callbackData))
+NUI_FNPTR(GpStatus, GdipDeleteGraphics, (GpGraphics *graphics))
+NUI_FNPTR(GpStatus, GdipCreateImageAttributes, (GpImageAttributes **imageattr))
+NUI_FNPTR(GpStatus, GdipSetImageAttributesWrapMode, (GpImageAttributes *imageAttr, WrapMode wrap, ARGB argb,
+          BOOL clamp))
+NUI_FNPTR(GpStatus, GdipDisposeImageAttributes, (GpImageAttributes *imageattr))
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
@@ -566,11 +656,15 @@ HFONT nui_font_scaled(HFONT base, int pct, int bold);
 void  nui_fill(HDC dc, int x, int y, int w, int h, COLORREF c);
 void  nui_draw_button(const DRAWITEMSTRUCT *d, unsigned fg, unsigned bg, int isDefault); /* цвета — COLORREF; ~0u — темы */
 int   nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text);
-int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
+int   nui_file_dialog(HWND parent, int mode, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);
 void  nui_text_append(HWND edit, LPCWSTR s, int autoscroll, int maxLines);
 int   nui_clip_set(LPCWSTR s, int len);
 int   nui_clip_get(LPWSTR buf, int cap); /* длина текста в буфере; buf == 0 — только длина */
+void *nui_image_decode(const BYTE *data, int len, int orient, int wh[2]); /* 0 — не картинка или нет GDI+ */
+HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита, альфа умножена */
+void  nui_image_free(void *pic);
+void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 HWND  nui_tooltip_new(HWND owner);
 void  nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text); /* text == 0 — убрать */
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */

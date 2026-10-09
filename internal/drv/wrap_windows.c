@@ -330,7 +330,9 @@ int nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text)
 
 // Открыть/сохранить (§9). filter — пары «имя\0шаблоны\0», в конце ещё \0. buf — на входе
 // предлагаемое имя, на выходе путь.
-int nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap) {
+// mode — FileOpen, FileSave или FileOpenMany (contract.go). При выборе нескольких файлов
+// в buf «каталог\0имя1\0имя2\0\0», одного — полный путь.
+int nui_file_dialog(HWND parent, int mode, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap) {
 	OPENFILENAMEW o = {0};
 	o.lStructSize = sizeof o;
 	o.hwndOwner = parent;
@@ -342,7 +344,9 @@ int nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR
 	o.Flags = NUI_OFN_EXPLORER | NUI_OFN_NOCHANGEDIR | NUI_OFN_HIDEREADONLY | NUI_OFN_PATHMUSTEXIST;
 	dlgKind = 3;
 	int ok;
-	if (save) {
+	if (mode == 3)
+		o.Flags |= NUI_OFN_ALLOWMULTISELECT;
+	if (mode == 1) {
 		o.Flags |= NUI_OFN_OVERWRITEPROMPT;
 		ok = GetSaveFileNameW(&o);
 	} else {
@@ -486,6 +490,160 @@ int nui_clip_get(LPWSTR buf, int cap) {
 	}
 	CloseClipboard();
 	return n;
+}
+
+// --- Картинки (Image, driver-win32.md, §5) ---
+// GDI+ (gdiplus.dll) грузится при первой картинке: программы без Image её не трогают.
+// GdiplusShutdown не нужен — библиотека живёт до конца процесса.
+static struct {
+	int state; // 0 — не загружали, 1 — готов, -1 — нет GDI+
+	nui_GdipCreateBitmapFromStream_fn fromStream;
+	nui_GdipCreateBitmapFromScan0_fn fromScan0;
+	nui_GdipDisposeImage_fn dispose;
+	nui_GdipGetImageWidth_fn width;
+	nui_GdipGetImageHeight_fn height;
+	nui_GdipImageRotateFlip_fn rotateFlip;
+	nui_GdipGetImageGraphicsContext_fn graphics;
+	nui_GdipSetInterpolationMode_fn interpolation;
+	nui_GdipSetPixelOffsetMode_fn pixelOffset;
+	nui_GdipDrawImageRectRectI_fn draw;
+	nui_GdipDeleteGraphics_fn deleteGraphics;
+	nui_GdipCreateImageAttributes_fn newAttrs;
+	nui_GdipSetImageAttributesWrapMode_fn wrapMode;
+	nui_GdipDisposeImageAttributes_fn disposeAttrs;
+} gp;
+
+#define GP_LOAD(field, name) \
+	if (!(gp.field = (nui_##name##_fn)(void (*)(void))GetProcAddress(m, #name))) \
+		return 0;
+
+static int gp_load(void) {
+	HMODULE m = LoadLibraryW(L"gdiplus.dll");
+	if (!m)
+		return 0;
+	nui_GdiplusStartup_fn startup = (nui_GdiplusStartup_fn)(void (*)(void))GetProcAddress(m, "GdiplusStartup");
+	GP_LOAD(fromStream, GdipCreateBitmapFromStream)
+	GP_LOAD(fromScan0, GdipCreateBitmapFromScan0)
+	GP_LOAD(dispose, GdipDisposeImage)
+	GP_LOAD(width, GdipGetImageWidth)
+	GP_LOAD(height, GdipGetImageHeight)
+	GP_LOAD(rotateFlip, GdipImageRotateFlip)
+	GP_LOAD(graphics, GdipGetImageGraphicsContext)
+	GP_LOAD(interpolation, GdipSetInterpolationMode)
+	GP_LOAD(pixelOffset, GdipSetPixelOffsetMode)
+	GP_LOAD(draw, GdipDrawImageRectRectI)
+	GP_LOAD(deleteGraphics, GdipDeleteGraphics)
+	GP_LOAD(newAttrs, GdipCreateImageAttributes)
+	GP_LOAD(wrapMode, GdipSetImageAttributesWrapMode)
+	GP_LOAD(disposeAttrs, GdipDisposeImageAttributes)
+	GdiplusStartupInput in = {1, 0, 0, 0};
+	ULONG_PTR token;
+	return startup && startup(&token, &in, 0) == 0;
+}
+
+static int gp_ready(void) {
+	if (!gp.state)
+		gp.state = gp_load() ? 1 : -1;
+	return gp.state > 0;
+}
+
+// Декодированная картинка. GDI+ читает поток лениво, поэтому поток живёт вместе с ней.
+typedef struct {
+	IStream *stream;
+	GpBitmap *bmp;
+	UINT w, h;
+} NuiPicture;
+
+void nui_image_free(void *p) {
+	NuiPicture *pic = p;
+	if (!pic)
+		return;
+	gp.dispose(pic->bmp);
+	pic->stream->lpVtbl->Release(pic->stream);
+	CoTaskMemFree(pic);
+}
+
+// orient — тег Orientation из EXIF (1…8; его читает Go, core.Orientation): GDI+ сам
+// картинку не поворачивает, а Wine и не отдаёт этот тег.
+void *nui_image_decode(const BYTE *data, int len, int orient, int wh[2]) {
+	static const int rotateFlip[9] = {0, 0, 4, 2, 6, 5, 1, 7, 3}; // → RotateFlipType
+	if (len <= 0 || !gp_ready())
+		return 0;
+	HGLOBAL mem = GlobalAlloc(NUI_GMEM_MOVEABLE, (SIZE_T)len);
+	if (!mem)
+		return 0;
+	BYTE *p = GlobalLock(mem);
+	for (int i = 0; i < len; i++)
+		p[i] = data[i];
+	GlobalUnlock(mem);
+	NuiPicture *pic = CoTaskMemAlloc(sizeof *pic);
+	if (!pic || CreateStreamOnHGlobal(mem, 1, &pic->stream) < 0) {
+		GlobalFree(mem);
+		CoTaskMemFree(pic);
+		return 0;
+	}
+	if (gp.fromStream(pic->stream, &pic->bmp) != 0) {
+		pic->stream->lpVtbl->Release(pic->stream); // освобождает и mem
+		CoTaskMemFree(pic);
+		return 0;
+	}
+	if (orient >= 2 && orient <= 8)
+		gp.rotateFlip(pic->bmp, rotateFlip[orient]);
+	gp.width(pic->bmp, &pic->w);
+	gp.height(pic->bmp, &pic->h);
+	if (!pic->w || !pic->h) {
+		nui_image_free(pic);
+		return 0;
+	}
+	wh[0] = (int)pic->w;
+	wh[1] = (int)pic->h;
+	return pic;
+}
+
+// Картинка w×h точек: DIB 32 бита сверху вниз с умноженной альфой (её ждёт AlphaBlend).
+// Уменьшение — бикубическое высокого качества; WrapModeTileFlipXY убирает полупрозрачную
+// кайму, которую GDI+ иначе рисует по краям.
+HBITMAP nui_image_render(void *p, int w, int h) {
+	NuiPicture *pic = p;
+	BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), w, -h, 1, 32, NUI_BI_RGB, 0, 0, 0, 0, 0}, {{0, 0, 0, 0}}};
+	void *bits = 0;
+	HBITMAP dib = CreateDIBSection(0, &bi, NUI_DIB_RGB_COLORS, &bits, 0, 0);
+	if (!dib)
+		return 0;
+	GpBitmap *dst = 0;
+	GpGraphics *g = 0;
+	GpImageAttributes *attrs = 0;
+	if (gp.fromScan0(w, h, w * 4, NUI_PixelFormat32bppPARGB, bits, &dst) == 0) {
+		if (gp.graphics(dst, &g) == 0) {
+			gp.interpolation(g, NUI_InterpolationModeHighQualityBicubic);
+			gp.pixelOffset(g, NUI_PixelOffsetModeHighQuality);
+			if (gp.newAttrs(&attrs) == 0)
+				gp.wrapMode(attrs, NUI_WrapModeTileFlipXY, 0, 0);
+			gp.draw(g, pic->bmp, 0, 0, w, h, 0, 0, (INT)pic->w, (INT)pic->h, NUI_UnitPixel, attrs, 0, 0);
+			if (attrs)
+				gp.disposeAttrs(attrs);
+			gp.deleteGraphics(g);
+		}
+		gp.dispose(dst);
+	}
+	GdiFlush();
+	return dib;
+}
+
+// WM_DRAWITEM картинки: фон под ней (панель или окно), картинка — по центру места,
+// как у GtkImage.
+void nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg) {
+	FillRect(d->hDC, &d->rcItem, bg);
+	if (!bmp)
+		return;
+	int x = d->rcItem.left + (d->rcItem.right - d->rcItem.left - w) / 2;
+	int y = d->rcItem.top + (d->rcItem.bottom - d->rcItem.top - h) / 2;
+	HDC m = CreateCompatibleDC(d->hDC);
+	HGDIOBJ old = SelectObject(m, bmp);
+	BLENDFUNCTION bf = {NUI_AC_SRC_OVER, 0, 255, NUI_AC_SRC_ALPHA};
+	GdiAlphaBlend(d->hDC, x, y, w, h, m, 0, 0, w, h, bf);
+	SelectObject(m, old);
+	DeleteDC(m);
 }
 
 #ifdef NUI_GUI_TEST

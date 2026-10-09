@@ -401,10 +401,12 @@ type Filter struct {
 }
 
 func OpenFile(parent *Window, title string, filters ...Filter) (path string, ok bool)
+func OpenFiles(parent *Window, title string, filters ...Filter) (paths []string, ok bool)
 func SaveFile(parent *Window, title, name string, filters ...Filter) (path string, ok bool)
 func ChooseFolder(parent *Window, title string) (path string, ok bool)
 ```
 - `ok == false`, если пользователь отменил выбор.
+- `OpenFiles` — один или несколько файлов одного каталога (Ctrl или Shift + щелчок). При `ok == true` срез не пуст; порядок — как отдал диалог ОС.
 - `SaveFile` сам спрашивает подтверждение, если файл уже существует; `name` — предлагаемое имя.
 - На Linux используется системный диалог, в песочнице — через портал.
 
@@ -498,7 +500,50 @@ w.Show()
 
 ---
 
-## 19. Не в MVP (наброски для фазы 6)
+## 19. Image — картинка
+
+```go
+func NewImage() *Image                        // пустая, 0×0
+func (i *Image) SetData(data []byte) error    // байты файла: PNG, JPEG, GIF, BMP
+func (i *Image) SetFile(path string) error
+func (i *Image) SetFit(width, height int)     // вписать с сохранением пропорций; 0 — без ограничения
+func (i *Image) Clear()
+func (i *Image) ImageSize() (width, height int) // размер в файле, после поворота по EXIF
+var ErrImage error
+```
+
+| Что | Семантика |
+|---|---|
+| Форматы | PNG (с прозрачностью), JPEG, GIF (первый кадр), BMP — на всех ОС. Декодирует ОС: GdkPixbuf на Linux, GDI+ на Windows. Свой декодер в бинарник не попадает, программы без `Image` не растут |
+| Размер | в логических пикселях: картинка 100×100 при масштабе экрана 200 % занимает 200×200 точек. Картинка рисуется из исходных точек под масштаб экрана, поэтому крупный файл остаётся чётким. Без `SetFit` — размер файла |
+| `SetFit(w, h)` | большая картинка уменьшается, чтобы влезть в `w×h`, пропорции сохраняются; маленькая не увеличивается. Действует и на картинки, заданные позже. `(0, 0)` — исходный размер |
+| Место | минимальный и естественный размер — размер картинки. Если места больше (`Expand`, `AlignFill`), картинка стоит по центру, лишнее место — фон панели |
+| EXIF | JPEG с тегом поворота (снимки с телефона) показывается повёрнутым, как в просмотрщиках; `ImageSize` — уже повёрнутый размер |
+| Ошибки | `SetData` с данными, которые не картинка, — `ErrImage`; `SetFile` — ошибка чтения или `ErrImage`. Прежняя картинка остаётся |
+| Память | хранятся байты файла (из них картинка перерисовывается при смене масштаба) и картинка в размере показа; полноразмерная декодированная копия не хранится |
+
+Картинка, выбранная пользователем:
+
+```go
+img := nui.NewImage()
+img.SetFit(480, 360)
+open := nui.NewButton("Открыть картинку…", func() {
+	path, ok := nui.OpenFile(w, "Картинка", nui.Filter{Name: "Картинки", Patterns: []string{"*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp"}})
+	if ok {
+		if err := img.SetFile(path); err != nil {
+			nui.Alert(w, "Не удалось открыть картинку", err.Error())
+		}
+	}
+})
+```
+
+Картинка, вшитая в программу: `//go:embed logo.png` и `img.SetData(logo)`.
+
+Не умеет: анимацию GIF, SVG (на Linux может сработать, если в системе есть загрузчик librsvg, но это не гарантируется), растягивание под размер окна — размер задаёт `SetFit`.
+
+---
+
+## 20. Не в MVP (наброски для фазы 6)
 
 Сигнатуры ориентировочные и закрепляются при реализации. Порядок — по пользе.
 
@@ -523,16 +568,13 @@ func NewList(columns ...string) *List
 func (l *List) SetRows(n int, cell func(row, col int) string)
 func (l *List) Selected() int
 func (l *List) OnSelect(fn func())
-
-// Картинка
-func NewImage(png []byte) *Image
 ```
 
 Не планируется: иконка в трее (в GTK3 устарела, AppIndicator — отдельная библиотека), веб-содержимое, свои темы.
 
 ---
 
-## 20. Пример целиком
+## 21. Пример целиком
 
 ```go
 package main

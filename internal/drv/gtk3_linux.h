@@ -12,12 +12,15 @@ typedef int gint, gboolean;
 typedef unsigned int guint;
 typedef unsigned long gulong;
 typedef char gchar;
+typedef unsigned char guchar;
+typedef unsigned long gsize;
 typedef float gfloat;
 typedef void *gpointer;
 /* Перечисления: в ABI это int. В режиме проверки — настоящие enum. */
 typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnectFlags, GIOCondition,
             GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight,
-            GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags;
+            GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
+            GdkInterpType;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -55,9 +58,16 @@ typedef struct _GtkCssProvider GtkCssProvider; typedef struct _GtkStyleContext G
 typedef struct _GtkStyleProvider GtkStyleProvider;
 typedef struct _GtkClipboard GtkClipboard; typedef struct _GdkAtom *GdkAtom;
 typedef struct _GtkTargetEntry GtkTargetEntry;
+typedef struct _GtkImage GtkImage;         typedef struct _GdkPixbuf GdkPixbuf;
+typedef struct _GdkPixbufLoader GdkPixbufLoader; typedef struct _cairo_surface cairo_surface_t;
 typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
 typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
+/* Одним объявлением: cgo TinyGo не видит полей структуры, описанной после typedef. */
+typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
+typedef struct _GtkTreeView GtkTreeView;   typedef struct _GtkTreeSelection GtkTreeSelection;
+typedef struct _GtkTreePath GtkTreePath;   typedef struct _GtkTreeModel GtkTreeModel;
+typedef void (*GtkCallback)(GtkWidget *, gpointer);
 /* GtkAllocation (= GdkRectangle) — только для тестового помощника nui_allocation */
 typedef struct { int x, y, width, height; } GtkAllocation;
 #endif
@@ -125,6 +135,7 @@ NUI_CONST(GTK_RESPONSE_OK, -5)
 NUI_CONST(GTK_RESPONSE_CANCEL, -6)
 NUI_CONST(GTK_RESPONSE_YES, -8)
 NUI_CONST(GTK_RESPONSE_NO, -9)
+NUI_CONST(GDK_INTERP_BILINEAR, 2)
 NUI_CONST(GTK_FILE_CHOOSER_ACTION_OPEN, 0)
 NUI_CONST(GTK_FILE_CHOOSER_ACTION_SAVE, 1)
 NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
@@ -160,6 +171,7 @@ NUI_FN(void, g_error_free, (GError *error))
 NUI_FN(gchar *, g_filename_to_uri, (const gchar *filename, const gchar *hostname, GError **error)) /* g_free */
 NUI_FN(gboolean, g_type_check_instance_is_a, (GTypeInstance *instance, GType iface_type))  /* тесты */
 NUI_FN(void, g_list_free, (GList *list))                                                   /* тесты */
+NUI_FN(void, g_slist_free, (GSList *list))
 NUI_FN(size_t, strlen, (const char *s))
 NUI_FN(int, gettid, (void)) /* pid_t; glibc ≥ 2.30 — ниже фактического минимума 2.34 */
 NUI_FN(int, getpid, (void))
@@ -196,6 +208,27 @@ NUI_FN(GtkClipboard *, gtk_clipboard_get, (GdkAtom selection))                  
 NUI_FN(void, gtk_clipboard_set_text, (GtkClipboard *clipboard, const gchar *text, gint len))
 NUI_FN(void, gtk_clipboard_set_can_store, (GtkClipboard *clipboard, const GtkTargetEntry *targets, gint n_targets))
 NUI_FN(gchar *, gtk_clipboard_wait_for_text, (GtkClipboard *clipboard)) /* g_free */
+/* Картинка (Image): GdkPixbuf декодирует, cairo-поверхность с масштабом экрана — чёткость на HiDPI */
+NUI_FN(GtkWidget *, gtk_image_new, (void))                                                   /* (w) */
+NUI_FN(void, gtk_image_set_from_surface, (GtkImage *image, cairo_surface_t *surface))       /* (w) */
+NUI_FN(void, gtk_image_clear, (GtkImage *image))                                             /* (w) */
+NUI_FN(gint, gtk_widget_get_scale_factor, (GtkWidget *widget))                               /* (w) */
+NUI_FN(GdkPixbufLoader *, gdk_pixbuf_loader_new, (void))                                     /* (w) */
+NUI_FN(gboolean, gdk_pixbuf_loader_write, (GdkPixbufLoader *loader, const guchar *buf, gsize count, GError **error)) /* (w) */
+NUI_FN(gboolean, gdk_pixbuf_loader_close, (GdkPixbufLoader *loader, GError **error))        /* (w) */
+NUI_FN(GdkPixbuf *, gdk_pixbuf_loader_get_pixbuf, (GdkPixbufLoader *loader))                 /* (w) */
+NUI_FN(GdkPixbuf *, gdk_pixbuf_apply_embedded_orientation, (GdkPixbuf *src))                 /* (w) */
+NUI_FN(int, gdk_pixbuf_get_width, (const GdkPixbuf *pixbuf))                                 /* (w) */
+NUI_FN(int, gdk_pixbuf_get_height, (const GdkPixbuf *pixbuf))                                /* (w) */
+NUI_FN(GdkPixbuf *, gdk_pixbuf_scale_simple, (const GdkPixbuf *src, int dest_width, int dest_height,
+       GdkInterpType interp_type))                                                           /* (w) */
+NUI_FN(cairo_surface_t *, gdk_cairo_surface_create_from_pixbuf, (const GdkPixbuf *pixbuf, int scale,
+       GdkWindow *for_window))                                                               /* (w) */
+NUI_FN(void, cairo_surface_destroy, (cairo_surface_t *surface))                              /* (w) */
+NUI_FN(gpointer, g_malloc, (gsize n_bytes))                                                  /* (w) */
+NUI_FN(gpointer, g_malloc0, (gsize n_bytes))                                                 /* (w) */
+NUI_FN(void *, memcpy, (void *dest, const void *src, size_t n))                              /* (w) */
+NUI_FN(gboolean, g_file_get_contents, (const gchar *filename, gchar **contents, gsize *length, GError **error))
 NUI_FN(void, gtk_style_context_add_provider, (GtkStyleContext *context, GtkStyleProvider *provider, guint priority)) /* (w) */
 NUI_FN(GtkCssProvider *, gtk_css_provider_new, (void))                                       /* (w) */
 NUI_FN(gboolean, gtk_css_provider_load_from_data, (GtkCssProvider *css_provider, const gchar *data, gssize length,
@@ -338,6 +371,17 @@ NUI_FN(gint, gtk_native_dialog_run, (GtkNativeDialog *self))
 NUI_FN(void, gtk_native_dialog_set_modal, (GtkNativeDialog *self, gboolean modal))
 NUI_FN(gchar *, gtk_file_chooser_get_filename, (GtkFileChooser *chooser)) /* g_free */
 NUI_FN(gboolean, gtk_file_chooser_set_filename, (GtkFileChooser *chooser, const char *filename))          /* тесты */
+NUI_FN(gboolean, gtk_file_chooser_select_filename, (GtkFileChooser *chooser, const char *filename))       /* тесты */
+NUI_FN_CONST(GType, gtk_tree_view_get_type)                                                               /* тесты */
+NUI_FN_CONST(GType, gtk_container_get_type)                                                               /* тесты */
+NUI_FN(void, gtk_container_forall, (GtkContainer *container, GtkCallback callback, gpointer callback_data)) /* тесты */
+NUI_FN(gboolean, gtk_widget_get_mapped, (GtkWidget *widget))                                              /* тесты */
+NUI_FN(GtkTreeSelection *, gtk_tree_view_get_selection, (GtkTreeView *tree_view))                         /* тесты */
+NUI_FN(GList *, gtk_tree_selection_get_selected_rows, (GtkTreeSelection *selection, GtkTreeModel **model)) /* тесты */
+NUI_FN(void, gtk_tree_selection_select_path, (GtkTreeSelection *selection, GtkTreePath *path))            /* тесты */
+NUI_FN(void, gtk_tree_path_free, (GtkTreePath *path))                                                     /* тесты */
+NUI_FN(void, gtk_file_chooser_set_select_multiple, (GtkFileChooser *chooser, gboolean select_multiple))
+NUI_FN(GSList *, gtk_file_chooser_get_filenames, (GtkFileChooser *chooser)) /* g_free каждую, g_slist_free */
 NUI_FN(void, gtk_file_chooser_set_current_name, (GtkFileChooser *chooser, const gchar *name))
 NUI_FN(void, gtk_file_chooser_set_do_overwrite_confirmation, (GtkFileChooser *chooser, gboolean do_overwrite_confirmation))
 NUI_FN(GtkFileFilter *, gtk_file_filter_new, (void))
@@ -368,6 +412,9 @@ void   nui_css(GtkWidget *w, int what, unsigned value);
 void   nui_css_background(GtkWidget *w, unsigned color, int panel);
 void   nui_set_padding(GtkWidget *w, unsigned px);
 GtkClipboard *nui_clipboard(void);
+GtkWidget *nui_image_new(void);
+int    nui_image_load(GtkWidget *w, const guchar *data, gsize len, int wh[2]);
+void   nui_image_show(GtkWidget *w, int width, int height);
 char  *nui_text_get(GtkTextBuffer *b);
 void   nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, int max_lines);
 int    nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text);
@@ -377,6 +424,7 @@ void   nui_preferred(GtkWidget *w, int out[4]);  /* только с NUI_GUI_TEST
 void   nui_window_pos(GtkWidget *w, int out[4]); /* только с NUI_GUI_TEST */
 int    nui_sim_dialog_response(int chooser, int response); /* только с NUI_GUI_TEST */
 int    nui_sim_file_chooser_set(const gchar *path);         /* только с NUI_GUI_TEST */
+int    nui_sim_file_chooser_add(const gchar *path);         /* только с NUI_GUI_TEST */
 int    nui_dialog_open(int chooser);                        /* только с NUI_GUI_TEST */
 
 void nuiSignal(void *obj, uintptr_t ud);

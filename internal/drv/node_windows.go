@@ -34,6 +34,7 @@ const (
 	kGrid
 	kFrame
 	kScroll
+	kImage
 )
 
 // Шрифты окна.
@@ -93,6 +94,14 @@ type node struct {
 	viewW     int
 	viewH     int
 	minClient [2]int // Window: минимальный размер клиентской области, физические пиксели
+
+	// Image
+	img        []byte         // закодированная картинка: из неё перерисовка при смене dpi
+	pic        unsafe.Pointer // только что декодированная (между ImageLoad и ImageShow)
+	imgW, imgH int            // размер показа, логические пиксели
+	bmp        C.HBITMAP      // картинка под dpi окна
+	bmpW, bmpH int            // её размер, физические пиксели
+	bmpDpi     uint32
 
 	// Window
 	dpi        uint32
@@ -258,6 +267,9 @@ func destroyTree(h H, hwndToo bool) {
 	if n.font != nil {
 		C.DeleteObject(C.HGDIOBJ(n.font))
 		n.font = nil
+	}
+	if n.kind == kImage {
+		freeImage(n)
 	}
 	if n.kind == kWindow {
 		for i, f := range n.fonts {
@@ -486,9 +498,15 @@ func fontOf(n *node) C.HFONT {
 }
 
 // setFont даёт контролу шрифт окна; подписи с SetFontScale — свой, из шрифта окна
-// (он же пересоздаётся при смене dpi и жирности).
+// (он же пересоздаётся при смене dpi и жирности). Картинка — перерисовывается под dpi.
 func setFont(n *node) {
 	if n.hwnd == nil {
+		return
+	}
+	if n.kind == kImage {
+		if n.bmp != nil && n.bmpDpi != dpiOf(n).dpi {
+			renderImage(n)
+		}
 		return
 	}
 	old := n.font
@@ -596,6 +614,8 @@ func measureLeaf(w *node, n *node) {
 		} else {
 			set(1, 1, 2)
 		}
+	case kImage:
+		set(n.bmpW, n.bmpW, n.bmpH)
 	}
 }
 

@@ -12,9 +12,10 @@ const (
 
 // Режимы FileDialog.
 const (
-	FileOpen   = 0
-	FileSave   = 1
-	FileFolder = 2
+	FileOpen     = 0
+	FileSave     = 1
+	FileFolder   = 2
+	FileOpenMany = 3 // несколько существующих файлов
 )
 
 // Filter — фильтр файлового диалога: имя и шаблоны вида "*.log".

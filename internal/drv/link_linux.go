@@ -9,6 +9,7 @@ package drv
 
 /*
 #cgo LDFLAGS: -l:libgtk-3.so.0 -l:libgobject-2.0.so.0 -l:libglib-2.0.so.0 -l:libpango-1.0.so.0 -l:libgio-2.0.so.0
+#cgo LDFLAGS: -l:libgdk-3.so.0 -l:libgdk_pixbuf-2.0.so.0 -l:libcairo.so.2
 #include "gtk3_linux.h"
 */
 import "C"

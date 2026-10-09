@@ -92,6 +92,7 @@ type node struct {
 | Separator | `STATIC`, `SS_ETCHEDHORZ` / `SS_ETCHEDVERT` | — |
 | Frame | `BUTTON`, `BS_GROUPBOX`. Это **не** родитель: дети — соседние окна внутри её прямоугольника. Рамка создаётся первой (ниже по Z-порядку) | — |
 | Scroll | Своё дочернее окно класса `nuiScroll` со `WS_VSCROLL`/`WS_HSCROLL`, дети — его дочерние окна; `WM_COMMAND` от них доставляется тем же `nuiWndProc` | `SetScrollInfo`, `ScrollWindowEx` |
+| Image | `STATIC`, `SS_OWNERDRAW`; рисует `WM_DRAWITEM` хоста | Декодирует GDI+: `gdiplus.dll` грузится через `LoadLibraryW` при первой картинке (программы без `Image` её не трогают), функции — через `GetProcAddress` (`NUI_FNPTR`, сверяются с `gdiplus.h`). Байты → `GlobalAlloc` → `CreateStreamOnHGlobal` → `GdipCreateBitmapFromStream` (поток живёт вместе с картинкой: GDI+ читает его лениво). Поворот по EXIF: тег читает Go (`core.Orientation` — GDI+ сам не поворачивает, а Wine и тега не отдаёт) → `GdipImageRotateFlip`. Показ: DIB-секция 32 бита (альфа умножена) нужного размера в физических пикселях, в неё `GdipDrawImageRectRectI` с `HighQualityBicubic` и `WrapModeTileFlipXY` (без полупрозрачной каймы по краям). `WM_DRAWITEM`: `FillRect` фоном панели или окна, картинка по центру — `GdiAlphaBlend`. Узел хранит байты файла и DIB; при смене dpi (`setFont`) картинка перерисовывается из байтов |
 
 Всем контролам: `WM_SETFONT` с текущим шрифтом окна (логгер, `ctl()`), `GWLP_USERDATA = id`.
 
@@ -107,6 +108,7 @@ type node struct {
 | Slider, Progress | 50 × стандартная высота | 150 × стандартная высота |
 | TextView | 46 × 46 — как у GTK с Adwaita (по полосам прокрутки) | то же: размер задают `SetMinSize` или `Expand` |
 | Separator | 1 px толщины | 1 px толщины |
+| Image | размер DIB (логический размер показа × dpi / 96) | то же |
 
 Средняя ширина символа берётся из `GetTextMetricsW` (`tmAveCharWidth`), как в диалоговых единицах Windows.
 
@@ -143,7 +145,7 @@ type node struct {
 | nui | Win32 |
 |---|---|
 | Message / Alert / Ask | `TaskDialogIndirect` (comctl32 v6): `pszMainInstruction = title`, `pszContent = text`, заголовок окна — имя приложения, `TDF_ALLOW_DIALOG_CANCELLATION` — Esc и крестик закрывают и вопрос (ответ «нет», как на GTK), `TDF_POSITION_RELATIVE_TO_WINDOW`. Функция ищется в `Init`: `LoadLibraryW(L"comctl32.dll")` + `GetProcAddress` (ADR-16). Статический импорт не годится: без манифеста exe не запустится. Не нашлась — `MessageBoxW(caption = title)` (логгер). Значки: INFORMATION / ERROR / без значка с кнопками YES/NO. Если родителя уничтожили, пока диалог открыт, — ответ «нет», второй диалог не открывается |
-| OpenFile / SaveFile | `GetOpenFileNameW` / `GetSaveFileNameW`, `OFN_EXPLORER \| OFN_FILEMUSTEXIST` / `OFN_OVERWRITEPROMPT`. Фильтр — строка `"Логи\0*.log;*.txt\0\0"` |
+| OpenFile / OpenFiles / SaveFile | `GetOpenFileNameW` / `GetSaveFileNameW`, `OFN_EXPLORER \| OFN_FILEMUSTEXIST` / `OFN_OVERWRITEPROMPT`. Фильтр — строка `"Логи\0*.log;*.txt\0\0"`. OpenFiles — `OFN_ALLOWMULTISELECT`, буфер на 1 М символов; ответ — `"каталог\0имя1\0имя2\0\0"`, а при одном файле — полный путь (`splitFiles`). В тестах несколько файлов выбирает `SimChooserAdd`: путь каталога в поле имени и OK (диалог переходит в каталог и остаётся открытым), затем имена в кавычках `"а.log" "б.txt"` — диалог принимает их только из текущего каталога |
 | ChooseFolder | `SHBrowseForFolderW` (`BIF_NEWDIALOGSTYLE \| BIF_RETURNONLYFSDIRS`) → `SHGetPathFromIDListW` → `CoTaskMemFree`. Для этого `Init` вызывает `CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)` |
 | OpenURI | `ShellExecuteW(NULL, L"open", uri, …)`; результат > 32 — успех |
 | ShowInFolder | `ShellExecuteW(…, L"explorer.exe", L"/select,\"путь\"", …)` (логгер, `open_folder`) |

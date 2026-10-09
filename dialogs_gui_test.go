@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sort"
 	"testing"
 	"time"
 
@@ -163,6 +165,40 @@ func TestFileDialogs(t *testing.T) {
 	}
 	if r := pick("choose-folder", func() (string, bool) { return ChooseFolder(w, "Папка для логов") }, dir, true); !r.ok || r.path != dir {
 		t.Fatalf("ChooseFolder: %q, %v; ожидалось %q", r.path, r.ok, dir)
+	}
+
+	// OpenFiles: два файла, один файл (на Windows ответ диалога тогда другого вида), отмена.
+	type many struct {
+		paths []string
+		ok    bool
+	}
+	pickMany := func(name string, choose []string, accept bool) many {
+		t.Helper()
+		res := openDialog(t, true, func() many { p, ok := OpenFiles(w, "Открыть журналы", logs); return many{p, ok} })
+		for i, f := range choose { // первый файл — как OpenFile, остальные — Ctrl+щелчок
+			ui(func() {
+				if i == 0 && !drv.SimChooserSet(f) || i > 0 && !drv.SimChooserAdd(f) {
+					t.Errorf("%s: не удалось выбрать %s", name, f)
+				}
+			})
+			time.Sleep(700 * time.Millisecond) // каталог загружается асинхронно
+		}
+		shot(t, name)
+		ui(func() { drv.SimChooserDone(accept) })
+		r := receive(t, res)
+		sort.Strings(r.paths)
+		return r
+	}
+	two := []string{filepath.Join(dir, "журнал.log"), filepath.Join(dir, "заметки.txt")}
+	sort.Strings(two)
+	if r := pickMany("open-files", two, true); !r.ok || !slices.Equal(r.paths, two) {
+		t.Fatalf("OpenFiles: %q, %v; ожидалось %q", r.paths, r.ok, two)
+	}
+	if r := pickMany("open-files-one", two[:1], true); !r.ok || !slices.Equal(r.paths, two[:1]) {
+		t.Fatalf("OpenFiles, один файл: %q, %v; ожидалось %q", r.paths, r.ok, two[:1])
+	}
+	if r := pickMany("open-files-cancel", nil, false); r.ok || r.paths != nil {
+		t.Fatalf("отмена OpenFiles: %q, %v", r.paths, r.ok)
 	}
 }
 

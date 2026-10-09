@@ -25,7 +25,7 @@ cc $CFLAGS -I internal/drv -include gtk/gtk.h -include glib-unix.h -include stdi
 WINCC=${WINCC:-x86_64-w64-mingw32-gcc}
 if command -v "$WINCC" >/dev/null; then
 	WFLAGS="-std=c11 -DNUI_CHECK -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -Wall -Werror"
-	WINC="-include windows.h -include commctrl.h -include shlobj.h -include commdlg.h"
+	WINC="-include windows.h -include commctrl.h -include shlobj.h -include commdlg.h -include gdiplus.h"
 	"$WINCC" $WFLAGS $WINC -fsyntax-only -x c internal/drv/win32_windows.h
 	"$WINCC" $WFLAGS $WINC -DNUI_GUI_TEST -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
 	"$WINCC" -std=c11 -Wall -Werror -DNUI_GUI_TEST -I internal/drv -fsyntax-only internal/drv/wrap_windows.c

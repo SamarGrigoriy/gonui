@@ -60,12 +60,14 @@ nui/
 ├── color.go                 Color, RGB, NoColor
 ├── window.go                Window
 ├── label.go  button.go  entry.go  check.go  combo.go
-├── slider.go  progress.go  textview.go
+├── slider.go  progress.go  textview.go  image.go
+├── chat.go                  Chat, ChatStream — готовый чат из виджетов выше
 ├── misc.go                  Separator, Frame, Scroll, spacer (Stretch)
 ├── box.go                   Box, VBox, HBox, Expand, Stretch
 ├── grid.go                  Grid
-├── dialog.go                Message, Alert, Ask, OpenFile, SaveFile, ChooseFolder, Filter
+├── dialog.go                Message, Alert, Ask, OpenFile, OpenFiles, SaveFile, ChooseFolder, Filter
 ├── shell.go                 OpenURI, ShowInFolder
+├── clipboard.go             SetClipboard, Clipboard
 ├── nui_gui_test.go          интеграционные тесты            //go:build gui
 │
 ├── internal/core/
@@ -74,6 +76,7 @@ nui/
 │   ├── dispatch.go          Dispatch
 │   ├── queue.go             Post, Drain
 │   ├── text.go              itoa, FixUTF8, dir — вместо fmt/strings/path (size.md)
+│   ├── image.go             Fit (SetFit), Orientation (EXIF-поворот JPEG)
 │   ├── debug_on.go          проверка потока и прочее         //go:build nuidebug
 │   ├── debug_off.go         пустые заглушки                  //go:build !nuidebug
 │   └── *_test.go
@@ -89,13 +92,16 @@ nui/
 │   ├── controls_linux.go    Label*, Button*, Entry*, Check*, Combo*, Slider*, Progress*, Text*
 │   ├── layout_linux.go      Box*, Grid*, Frame*, Scroll*, Separator*
 │   ├── dialog_linux.go      Message, FileDialog, OpenURI, ShowInFolder
+│   ├── image_linux.go       ImageNew, ImageLoad, ImageShow, ReadFile (GdkPixbuf)
+│   ├── clipboard_linux.go   ClipboardSet, ClipboardText
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)
 │   ├── win32_windows.h      собственные прототипы Win32
 │   ├── wrap_windows.c       класс окна, цикл, шрифты под DPI, измерение текста, диалоги
 │   ├── export_windows.go    трамплин nuiWndProc //export
 │   ├── node_windows.go      узлы (Box, Grid — без HWND), раскладка, DPI, прокрутка
-│   ├── *_windows.go         остальное — как у Linux: app, window, widget, controls, layout, dialog, sim
+│   ├── *_windows.go         остальное — как у Linux: app, window, widget, controls, layout, dialog,
+│   │                        image (GDI+), clipboard, sim
 │   └── link_tinygo_windows.go  путь к библиотекам импорта mingw для TinyGo
 │
 ├── internal/layout/         движок раскладки для Win32: Measure, Arrange (layout.md, §7)

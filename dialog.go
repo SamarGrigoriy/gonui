@@ -34,26 +34,40 @@ type Filter struct {
 
 // OpenFile — выбор существующего файла. ok == false — пользователь отменил выбор.
 func OpenFile(parent *Window, title string, filters ...Filter) (path string, ok bool) {
-	return fileDialog(parent, drv.FileOpen, title, "", filters)
+	return first(fileDialog(parent, drv.FileOpen, title, "", filters))
+}
+
+// OpenFiles — выбор одного или нескольких существующих файлов (Ctrl или Shift + щелчок).
+// ok == false — пользователь отменил выбор; иначе paths не пуст.
+func OpenFiles(parent *Window, title string, filters ...Filter) (paths []string, ok bool) {
+	return fileDialog(parent, drv.FileOpenMany, title, "", filters)
 }
 
 // SaveFile — выбор имени для сохранения; name — предлагаемое имя. Если файл уже есть,
 // диалог сам спрашивает о перезаписи.
 func SaveFile(parent *Window, title, name string, filters ...Filter) (path string, ok bool) {
-	return fileDialog(parent, drv.FileSave, title, name, filters)
+	return first(fileDialog(parent, drv.FileSave, title, name, filters))
 }
 
 // ChooseFolder — выбор каталога.
 func ChooseFolder(parent *Window, title string) (path string, ok bool) {
-	return fileDialog(parent, drv.FileFolder, title, "", nil)
+	return first(fileDialog(parent, drv.FileFolder, title, "", nil))
 }
 
-func fileDialog(parent *Window, mode uint8, title, name string, filters []Filter) (string, bool) {
+func fileDialog(parent *Window, mode uint8, title, name string, filters []Filter) ([]string, bool) {
 	var fs []drv.Filter
 	for _, f := range filters {
 		fs = append(fs, drv.Filter{Name: f.Name, Patterns: f.Patterns})
 	}
-	return drv.FileDialog(parentH(parent), mode, title, name, fs)
+	paths := drv.FileDialog(parentH(parent), mode, title, name, fs)
+	return paths, len(paths) > 0
+}
+
+func first(paths []string, ok bool) (string, bool) {
+	if !ok {
+		return "", false
+	}
+	return paths[0], true
 }
 
 // parentH — хендл окна-родителя или Nil; заодно проверка UI-потока.

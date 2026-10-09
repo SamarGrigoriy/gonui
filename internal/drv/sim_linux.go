@@ -5,11 +5,10 @@ package drv
 // Помощники интеграционных тестов: имитируют действия пользователя — вызывают GTK
 // напрямую, мимо счётчика quiet, поэтому обработчики On* срабатывают.
 // #cgo CFLAGS действует на все C-файлы пакета: тестовые C-помощники в wrap_linux.c
-// попадают только в сборку с тегом gui. libgdk-3 (gdk_window_get_origin) — тоже только ей.
+// попадают только в сборку с тегом gui.
 
 /*
 #cgo CFLAGS: -DNUI_GUI_TEST
-#cgo LDFLAGS: -l:libgdk-3.so.0
 #include "gtk3_linux.h"
 */
 import "C"
@@ -87,6 +86,10 @@ func SimEsc() bool { return C.nui_sim_dialog_response(0, C.NUI_GTK_RESPONSE_DELE
 
 // SimChooserSet выбирает путь в открытом файловом диалоге; false — диалога нет.
 func SimChooserSet(path string) bool { return C.nui_sim_file_chooser_set(cpath(path)) != 0 }
+
+// SimChooserAdd добавляет файл к выбранным (OpenFiles), как Ctrl+щелчок. Файл — из того
+// же каталога, что выбран SimChooserSet, и каталог уже загружен (дайте ему время).
+func SimChooserAdd(path string) bool { return C.nui_sim_file_chooser_add(cpath(path)) != 0 }
 
 // SimChooserDone — «Открыть/Сохранить» (accept) или «Отмена» в открытом файловом диалоге.
 func SimChooserDone(accept bool) bool {

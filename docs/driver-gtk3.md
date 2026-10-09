@@ -101,6 +101,10 @@ func ComboSetText(h H, s string); ComboText(h H) string   // для editable —
 func SliderNew(id uint32, min, max int) H
 func SliderSetValue(h H, v int); SliderValue(h H) int
 func ProgressNew(id uint32) H
+func ImageNew(id uint32) H
+func ImageLoad(h H, data []byte) (w, ht int, ok bool) // декодировать и запомнить байты; пустые — убрать
+func ImageShow(h H, w, ht int)                        // показать w×ht логических пикселей
+func ReadFile(path string) ([]byte, bool)              // у nui нет пакета os (ADR-7)
 func ProgressSetValue(h H, f float64); ProgressValue(h H) float64
 func ProgressPulse(h H)
 func ProgressSetText(h H, s string)
@@ -128,7 +132,7 @@ func ContainerSetChild(h, child H)      // Frame, Scroll: удалить ста�
 // Диалоги и оболочка
 type Filter struct{ Name string; Patterns []string }
 func MessageBox(parent H, kind uint8, title, text string) bool // kind: MsgInfo, MsgAlert, MsgAsk; true = OK/Да
-func FileDialog(parent H, mode uint8, title, name string, f []Filter) (string, bool) // FileOpen, FileSave, FileFolder
+func FileDialog(parent H, mode uint8, title, name string, f []Filter) []string // FileOpen, FileOpenMany, FileSave, FileFolder; nil — отмена
 func OpenURI(parent H, uri string) bool
 func ShowInFolder(path string) bool     // асинхронно, см. §7
 func ClipboardSet(s string)
@@ -448,7 +452,8 @@ void g_variant_unref(GVariant*)                                                 
 | Stretch | `gtk_box_new(HORIZONTAL, 0)` | — | Упаковывается с `expand = TRUE` |
 | Grid | `gtk_grid_new`, spacing 6/6 | — | См. [layout.md](layout.md), §6 |
 | Message/Alert/Ask | `nui_message` | — | Типы: INFO+OK, ERROR+OK, QUESTION+YES_NO; ответ YES/OK → `true` |
-| OpenFile/SaveFile/ChooseFolder | `gtk_file_chooser_native_new` | — | `accept_label` и `cancel_label` = `NULL`: подписи по умолчанию GTK переведёт на язык системы сам. Save → `do_overwrite_confirmation(TRUE)`, `set_current_name`. Ответ `ACCEPT` → `get_filename` → `gostrFree`; затем `g_object_unref(native)` |
+| OpenFile/OpenFiles/SaveFile/ChooseFolder | `gtk_file_chooser_native_new` | — | `accept_label` и `cancel_label` = `NULL`: подписи по умолчанию GTK переведёт на язык системы сам. OpenFiles → `set_select_multiple(TRUE)`. Save → `do_overwrite_confirmation(TRUE)`, `set_current_name`. Ответ `ACCEPT` → `get_filenames` (GSList: каждую строку — `gostrFree`, список — `g_slist_free`); затем `g_object_unref(native)`. В тестах несколько файлов выбирает `nui_sim_file_chooser_add`: `select_filename` ставит курсор и снимает прежнее выделение (GTK 3.24), поэтому выделенные строки запоминаются и выделяются снова |
+| Image | `nui_image_new` = `gtk_image_new` + данные `NuiImage` + `notify::scale-factor` | — | `GdkPixbufLoader` (`write`, `close` — и после ошибки) → `gdk_pixbuf_apply_embedded_orientation` (EXIF). Показ: `gdk_pixbuf_scale_simple(BILINEAR)` до w·k×h·k точек (k — `gtk_widget_get_scale_factor`) → `gdk_cairo_surface_create_from_pixbuf(pb, k)` → `gtk_image_set_from_surface`: на HiDPI картинка чёткая. Байты файла хранятся в `NuiImage`; при смене масштаба C-обработчик перерисовывает картинку из них сам, без Go. Декодированная копия живёт только между `ImageLoad` и `ImageShow` |
 | OpenURI | `gtk_show_uri_on_window(parent, uri, 0, NULL)` | — | — |
 | ShowInFolder | `g_filename_to_uri(path)` и `g_filename_to_uri(dir(path))` → `nui_show_items(uri, dir_uri)` | — | URI строит GLib (`%20`, не-UTF-8 байты имени); путь передаётся через `cpath`, без замены байтов. Вызов D-Bus **асинхронный**: интерфейс не ждёт файловый менеджер. Если тот ответил ошибкой (например, `ServiceUnknown`), C-колбэк сам открывает папку через `gtk_show_uri_on_window`. Нет D-Bus-сессии → папка открывается сразу |
 | ClipboardSet / ClipboardText | `nui_clipboard()` = `gtk_clipboard_get(GDK_SELECTION_CLIPBOARD)` (атом 69, без libgdk); `gtk_clipboard_set_text(cb, s, -1)` + `gtk_clipboard_set_can_store(cb, NULL, 0)`; `gtk_clipboard_wait_for_text` → `g_free` | — | Буфер CLIPBOARD, не PRIMARY (выделение мышью). `set_can_store` — при выходе GTK отдаёт текст менеджеру буфера обмена. `wait_for_text` крутит вложенный цикл, пока владелец буфера не ответит |
@@ -501,6 +506,7 @@ int    nui_show_items(const char *uri, const char *dir_uri);
 // link_linux.go
 /*
 #cgo LDFLAGS: -l:libgtk-3.so.0 -l:libgobject-2.0.so.0 -l:libglib-2.0.so.0 -l:libgio-2.0.so.0 -l:libpango-1.0.so.0
+#cgo LDFLAGS: -l:libgdk-3.so.0 -l:libgdk_pixbuf-2.0.so.0 -l:libcairo.so.2
 #include "gtk3_linux.h"
 */
 import "C"
@@ -517,7 +523,7 @@ export CGO_LDFLAGS := -Wl,--gc-sections -Wl,--as-needed
 - Обычный `go build` без Makefile тоже работает, только C-часть не вычищается.
 
 - `-l:имя.so.N` линкует по точному имени файла. Поэтому хватает runtime-пакетов: `libgtk-3-0` (в Debian 13 — `libgtk-3-0t64`), `libglib2.0-0`, `libpango-1.0-0`. Символьные ссылки `libgtk-3.so` из `-dev` не нужны.
-- `--gc-sections` и `-ffunction-sections` выбрасывают неиспользуемые обёртки, а `--as-needed` — неиспользуемые библиотеки. Например, без `ShowInFolder` не нужна libgio.
+- `--gc-sections` и `-ffunction-sections` выбрасывают неиспользуемые обёртки, а `--as-needed` — неиспользуемые библиотеки. Например, без `ShowInFolder` не нужна libgio, а без `Image` — libgdk-3, libgdk_pixbuf-2.0 и libcairo (вторая строка `#cgo LDFLAGS`; все три — зависимости самой GTK, отдельно их ставить не нужно).
 - gc при cgo в стороннем пакете линкует внешним линковщиком (gcc), поэтому флаги работают.
 - TinyGo (ADR-17) линкует встроенным `ld.lld`. Путь `-L/usr/lib/<multiarch>`, `crt*.o`, `-lc` и `--dynamic-linker` задаёт target-файл nui, поэтому `-l:имя.so.N` из `#cgo LDFLAGS` находятся без дополнительных переменных. `CGO_CFLAGS`/`CGO_LDFLAGS` TinyGo не нужны: релизная сборка спайка S3 весит 35 952 байта без них.
 

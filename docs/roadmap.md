@@ -177,15 +177,16 @@ S1 ─► S2 ─┬─(успех)───────────────�
 **Готово вне очереди:** `Chat` — готовый чат, например с ИИ ([api.md](api.md), §18; `examples/chat`). Собран из родных виджетов, работает на GTK и Win32, программы без чата не растут.
 
 **Готово:**
-- буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17).
+- буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
+- `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md).
 
-В порядке пользы ([api.md](api.md), §19):
+В порядке пользы ([api.md](api.md), §20):
 1. Canvas;
 2. меню;
 3. ~~буфер обмена~~ — готово;
 4. `OnKey`;
 5. List;
-6. Image.
+6. ~~Image~~ — готово.
 
 Отдельные проекты, если понадобятся:
 - драйвер GTK4 — новый набор `*_linux.*` под тегом `gtk4`;
