@@ -21,7 +21,7 @@ GOFLAGS_REL := -trimpath -ldflags="-s -w -buildid="
 # Выпущенный TinyGo + target-файл nui: системная glibc вместо musl (ADR-17).
 TINYFLAGS   := -target=targets/linux-glibc-$(ARCH).json -opt=z -no-debug -panic=trap -gc=conservative -scheduler=$(TINYGO_SCHED)
 
-.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots golden clean FORCE
+.PHONY: all dev release-gc small test race selftest deps size abi check-protos vet check ci ci-container docker-ci shots golden win win-selftest win-shots clean FORCE
 
 all: dev
 
@@ -113,6 +113,41 @@ shots: release-gc small
 	LANG=ru_RU.UTF-8 $(GTK_DEBUG_ENV) GDK_SCALE=2 $(XVFB) -s "-screen 0 1100x1100x24" sh -c '\
 		openbox >/dev/null 2>&1 & sleep 1; ./bin/small/form & pid=$$!; sleep 1.5; \
 		rootshot | pnmtopng > $(SHOTS)/form-scale2.png; kill $$pid'
+
+# Windows (docs/driver-win32.md): кросс-сборка mingw-w64 и проверка под Wine — в образе nui-win:
+#   NUI_IMAGE=nui-win tools/docker-run.sh make win win-selftest
+# Флаги размера C-части для mingw свои: -fdata-sections раздувает exe (driver-win32.md, §1).
+WIN_PREFIX ?= x86_64-w64-mingw32-
+WIN_GO     := CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=$(WIN_PREFIX)gcc CGO_CFLAGS="-Os -ffunction-sections" CGO_LDFLAGS=
+WIN_TINY   := GOOS=windows GOARCH=amd64 CGO_CFLAGS= CGO_LDFLAGS= $(TINYGO) build -opt=z -no-debug -panic=trap
+WIN_SHOTS  ?= docs/reports/phase-5
+
+win: $(EXAMPLES:%=bin/win/%.exe) $(EXAMPLES:%=bin/win/%-small.exe)   ## Windows: gc и TinyGo
+# Манифест (app.rc → .syso для gc, rsrc.o для TinyGo: он не подхватывает .syso).
+examples/%/rsrc_windows_amd64.syso: examples/%/app.rc examples/%/app.manifest
+	cd examples/$* && $(WIN_PREFIX)windres app.rc -O coff -o rsrc_windows_amd64.syso && cp rsrc_windows_amd64.syso rsrc.o
+bin/win/%.exe: examples/%/rsrc_windows_amd64.syso FORCE
+	$(WIN_GO) $(GO) build -trimpath -ldflags="-s -w -H windowsgui -buildid=" -o $@ ./examples/$*
+# TinyGo: подсистема GUI — после линковки (ld.lld не понимает -Wl,--subsystem из #cgo).
+bin/win/%-small.exe: examples/%/rsrc_windows_amd64.syso FORCE
+	@mkdir -p bin/win
+	$(WIN_TINY) -o $@.tmp ./examples/$*
+	$(WIN_PREFIX)objcopy --subsystem windows --strip-all $@.tmp $@ && rm -f $@.tmp
+
+win-selftest: $(EXAMPLES:%=examples/%/rsrc_windows_amd64.syso)   ## примеры под Wine: окно, цикл, выход с кодом 0
+	@mkdir -p bin/win/selftest
+	@for e in $(EXAMPLES); do \
+		$(WIN_GO) $(GO) build -tags selftest -ldflags="-H windowsgui" -o bin/win/selftest/$$e.exe ./examples/$$e && \
+		$(WIN_TINY) -tags selftest -o bin/win/selftest/$$e-small.tmp ./examples/$$e && \
+		$(WIN_PREFIX)objcopy --subsystem windows bin/win/selftest/$$e-small.tmp bin/win/selftest/$$e-small.exe || exit 1; \
+	done
+	./tools/wine-run.sh bin/win/selftest/*.exe
+
+win-shots: win                               ## снимки примеров под Wine: 100 % и 150 %
+	@mkdir -p $(WIN_SHOTS)
+	./tools/wine-run.sh -shots $(WIN_SHOTS) bin/win/*.exe
+	@mkdir -p bin/win/dpi144 && for f in bin/win/*.exe; do cp $$f bin/win/dpi144/$$(basename $$f .exe)-150.exe; done
+	./tools/wine-run.sh -dpi 144 -shots $(WIN_SHOTS) bin/win/dpi144/*.exe
 
 clean:
 	rm -rf bin

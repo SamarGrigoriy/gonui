@@ -1,6 +1,7 @@
 #!/bin/sh
 # Сверка собственных прототипов и констант драйвера с настоящими заголовками GTK
-# (docs/driver-gtk3.md, §10). Нужны libgtk-3-dev и pkg-config — только здесь, не для сборки.
+# (docs/driver-gtk3.md, §10). Нужны libgtk-3-dev и pkg-config — только здесь, не для сборки;
+# для Win32 — mingw-w64 (driver-win32.md, §1).
 # Ошибка в прототипе — неопределённое поведение без единого предупреждения компилятора.
 set -eu
 cd "$(dirname "$0")/.."
@@ -19,5 +20,18 @@ CFLAGS="-std=c11 -D_GNU_SOURCE -DNUI_CHECK -DNUI_GUI_TEST -Wall -Werror $(pkg-co
 #    В режиме проверки NUI_FN ничего не объявляет, поэтому всё нужное — через -include.
 cc $CFLAGS -I internal/drv -include gtk/gtk.h -include glib-unix.h -include stdint.h -include string.h \
 	-fsyntax-only internal/drv/wrap_linux.c
+
+# 3. Win32 (driver-win32.md, §1): win32_windows.h и обёртки против заголовков mingw-w64.
+WINCC=${WINCC:-x86_64-w64-mingw32-gcc}
+if command -v "$WINCC" >/dev/null; then
+	WFLAGS="-std=c11 -DNUI_CHECK -DWINVER=0x0A00 -D_WIN32_WINNT=0x0A00 -Wall -Werror"
+	WINC="-include windows.h -include commctrl.h -include shlobj.h -include commdlg.h"
+	"$WINCC" $WFLAGS $WINC -fsyntax-only -x c internal/drv/win32_windows.h
+	"$WINCC" $WFLAGS $WINC -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
+	"$WINCC" -std=c11 -Wall -Werror -I internal/drv -fsyntax-only internal/drv/wrap_windows.c
+	echo "check-protos: Win32 — ok"
+else
+	echo "check-protos: Win32 пропущен — нет $WINCC (apt install gcc-mingw-w64-x86-64)"
+fi
 
 echo "check-protos: ok"

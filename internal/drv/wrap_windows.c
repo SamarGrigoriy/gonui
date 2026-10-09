@@ -1,0 +1,312 @@
+// wrap_windows.c — то, что удобнее написать на C (docs/driver-win32.md): регистрация
+// класса с указателем на трамплин nuiWndProc, цикл сообщений, шрифты под DPI, измерение
+// текста, рамка окна, диалоги, Append у многострочного поля. Логика — в Go.
+#include "win32_windows.h"
+
+#define RES(id) ((LPCWSTR)(UINT_PTR)(WORD)(id))
+
+static HINSTANCE inst;
+static HWND msgWnd;  // служебное окно (HWND_MESSAGE): Do, таймеры, Enter
+static HWND parking; // скрытый родитель контролов, ещё не вставленных в окно
+static nui_TaskDialog_fn taskDialog;
+
+// Запасной путь для exe без манифеста (driver-win32.md, §8): контекст активации из
+// манифеста shell32.dll (ресурс 124, Common Controls v6) — контекст процесса по умолчанию.
+static void actctx_fallback(void) {
+	if (FindResourceW(0, RES(1), RES(24))) // RT_MANIFEST: у exe свой манифест
+		return;
+	WCHAR dir[260];
+	if (!GetSystemDirectoryW(dir, 260))
+		return;
+	ACTCTXW act = {0};
+	act.cbSize = sizeof act;
+	act.dwFlags = NUI_ACTCTX_FLAG_RESOURCE_NAME_VALID | NUI_ACTCTX_FLAG_SET_PROCESS_DEFAULT |
+		NUI_ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID;
+	act.lpSource = L"shell32.dll";
+	act.lpAssemblyDirectory = dir;
+	act.lpResourceName = RES(124);
+	HANDLE h = CreateActCtxW(&act);
+	ULONG_PTR cookie;
+	if (h != (HANDLE)(LONG_PTR)-1)
+		ActivateActCtx(h, &cookie);
+}
+
+// comctl32 только динамически (ADR-16): статический импорт загрузил бы её до контекста
+// активации, и у exe без манифеста осталась бы v5.
+static void comctl_init(void) {
+	HMODULE m = LoadLibraryW(L"comctl32.dll");
+	if (!m)
+		return;
+	nui_InitCommonControlsEx_fn init =
+		(nui_InitCommonControlsEx_fn)(void (*)(void))GetProcAddress(m, "InitCommonControlsEx");
+	if (init) {
+		INITCOMMONCONTROLSEX icc = {sizeof icc,
+			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS};
+		init(&icc);
+	}
+	taskDialog = (nui_TaskDialog_fn)(void (*)(void))GetProcAddress(m, "TaskDialog");
+}
+
+int nui_init(void) {
+	inst = GetModuleHandleW(0);
+	// Per-Monitor v2 (§7). Если режим уже задал манифест, вызов просто вернёт ошибку.
+	SetProcessDpiAwarenessContext((DPI_AWARENESS_CONTEXT)(LONG_PTR)-4);
+	actctx_fallback();
+	comctl_init();
+	CoInitializeEx(0, NUI_COINIT_APARTMENTTHREADED); // SHBrowseForFolderW (§9)
+	WNDCLASSEXW wc = {0};
+	wc.cbSize = sizeof wc;
+	wc.lpfnWndProc = nuiWndProc;
+	wc.hInstance = inst;
+	wc.hCursor = LoadCursorW(0, RES(32512)); // IDC_ARROW
+	wc.hIcon = LoadIconW(inst, RES(1));      // иконка приложения, если она есть в ресурсах
+	wc.hbrBackground = GetSysColorBrush(NUI_COLOR_BTNFACE);
+	wc.lpszClassName = L"nuiWindow";
+	if (!RegisterClassExW(&wc))
+		return 0;
+	msgWnd = CreateWindowExW(0, L"nuiWindow", L"", 0, 0, 0, 0, 0, (HWND)(LONG_PTR)-3, 0, inst, 0);
+	parking = CreateWindowExW(0, L"nuiWindow", L"", NUI_WS_POPUP, 0, 0, 0, 0, 0, 0, inst, 0);
+	if (!msgWnd || !parking)
+		return 0;
+	PostMessageW(msgWnd, NUI_WM_DO, 0, 0); // Do, вызванный до Run, выполнится в начале цикла
+	return 1;
+}
+
+HWND nui_msg_window(void) { return msgWnd; }
+HWND nui_parking(void) { return parking; }
+
+// Цикл (§3): Enter в поле с OnEnter — до IsDialogMessage; клавиатура — IsDialogMessage
+// окна верхнего уровня (Tab, Shift+Tab, Enter = кнопка по умолчанию); остальное — как обычно.
+void nui_loop(void) {
+	MSG m;
+	while (GetMessageW(&m, 0, 0, 0) > 0) {
+		if (m.message >= NUI_WM_KEYFIRST && m.message <= NUI_WM_KEYLAST) {
+			if (m.message == NUI_WM_KEYDOWN && m.wParam == NUI_VK_RETURN && GetPropW(m.hwnd, L"nuiEnter")) {
+				SendMessageW(msgWnd, NUI_WM_ENTER, 0, (LPARAM)m.hwnd);
+				continue;
+			}
+			HWND root = GetAncestor(m.hwnd, NUI_GA_ROOT);
+			if (root && IsDialogMessageW(root, &m))
+				continue;
+		}
+		TranslateMessage(&m);
+		DispatchMessageW(&m);
+	}
+}
+
+HWND nui_window_new(LPCWSTR title, DWORD style, LONG_PTR node) {
+	HWND h = CreateWindowExW(NUI_WS_EX_CONTROLPARENT, L"nuiWindow", title, style, NUI_CW_USEDEFAULT,
+		NUI_CW_USEDEFAULT, NUI_CW_USEDEFAULT, NUI_CW_USEDEFAULT, 0, 0, inst, 0);
+	if (h)
+		SetWindowLongPtrW(h, NUI_GWLP_USERDATA, node);
+	return h;
+}
+
+HWND nui_control(LPCWSTR cls, LPCWSTR text, DWORD style, DWORD exstyle, HWND parent, LONG_PTR node) {
+	HWND h = CreateWindowExW(exstyle, cls, text, NUI_WS_CHILD | style, 0, 0, 0, 0, parent ? parent : parking,
+		0, inst, 0);
+	if (h)
+		SetWindowLongPtrW(h, NUI_GWLP_USERDATA, node);
+	return h;
+}
+
+// Прокрутка — своё дочернее окно того же класса: уведомления её детей идут в nuiWndProc.
+HWND nui_scroll_new(HWND parent, LONG_PTR node) {
+	return nui_control(L"nuiWindow", L"", NUI_WS_VISIBLE | NUI_WS_VSCROLL | NUI_WS_HSCROLL,
+		NUI_WS_EX_CONTROLPARENT, parent, node);
+}
+
+// Шрифты под dpi (§7): обычный и жирный — lfMessageFont (Segoe UI), моноширинный — Consolas
+// того же размера. Если SystemParametersInfoForDpi не сработал — Segoe UI 9 пт.
+void nui_fonts(UINT dpi, HFONT out[3]) {
+	NONCLIENTMETRICSW ncm = {0};
+	ncm.cbSize = sizeof ncm;
+	LOGFONTW lf;
+	if (SystemParametersInfoForDpi(NUI_SPI_GETNONCLIENTMETRICS, sizeof ncm, &ncm, 0, dpi)) {
+		lf = ncm.lfMessageFont;
+	} else {
+		static const WCHAR segoe[] = L"Segoe UI";
+		lf = (LOGFONTW){0};
+		lf.lfHeight = -(LONG)((9 * dpi + 36) / 72);
+		lf.lfWeight = NUI_FW_NORMAL;
+		for (int i = 0; segoe[i]; i++)
+			lf.lfFaceName[i] = segoe[i];
+	}
+	out[0] = CreateFontIndirectW(&lf);
+	LOGFONTW bold = lf;
+	bold.lfWeight = NUI_FW_BOLD;
+	out[1] = CreateFontIndirectW(&bold);
+	static const WCHAR consolas[] = L"Consolas";
+	LOGFONTW mono = lf;
+	for (int i = 0; i < 32; i++)
+		mono.lfFaceName[i] = i < 9 ? consolas[i] : 0;
+	mono.lfPitchAndFamily = 0x31; // FIXED_PITCH | FF_MODERN: без Consolas — другой моноширинный
+	out[2] = CreateFontIndirectW(&mono);
+}
+
+// Средняя ширина символа и высота строки шрифта.
+void nui_metrics(HWND hwnd, HFONT font, int out[2]) {
+	HDC dc = GetDC(hwnd);
+	HGDIOBJ old = SelectObject(dc, font);
+	TEXTMETRICW tm;
+	GetTextMetricsW(dc, &tm);
+	out[0] = tm.tmAveCharWidth;
+	out[1] = tm.tmHeight;
+	SelectObject(dc, old);
+	ReleaseDC(hwnd, dc);
+}
+
+// Размер текста: без переноса — по самой длинной строке (\n переносит), с переносом —
+// высота при ширине wrapWidth. Пустой текст — ширина 0 и высота строки.
+void nui_text_size(HWND hwnd, HFONT font, LPCWSTR text, int len, int wrapWidth, int out[2]) {
+	HDC dc = GetDC(hwnd);
+	HGDIOBJ old = SelectObject(dc, font);
+	if (len == 0) {
+		TEXTMETRICW tm;
+		GetTextMetricsW(dc, &tm);
+		out[0] = 0;
+		out[1] = tm.tmHeight;
+	} else {
+		RECT r = {0, 0, wrapWidth > 0 ? wrapWidth : 0, 0};
+		UINT f = NUI_DT_CALCRECT | NUI_DT_NOPREFIX | NUI_DT_EXPANDTABS | (wrapWidth > 0 ? NUI_DT_WORDBREAK : 0);
+		DrawTextW(dc, text, len, &r, f);
+		out[0] = r.right - r.left;
+		out[1] = r.bottom - r.top;
+	}
+	SelectObject(dc, old);
+	ReleaseDC(hwnd, dc);
+}
+
+// Идеальный размер кнопки и флажка по стилю системы (BCM_GETIDEALSIZE, comctl32 v6).
+void nui_ideal_size(HWND button, int out[2]) {
+	SIZE s = {0, 0};
+	SendMessageW(button, NUI_BCM_GETIDEALSIZE, 0, (LPARAM)&s);
+	out[0] = s.cx;
+	out[1] = s.cy;
+}
+
+// Рамка окна для клиентской области cw × ch при его dpi; center — по центру рабочей
+// области монитора. out: x, y, ширина, высота окна.
+void nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]) {
+	DWORD style = (DWORD)GetWindowLongPtrW(hwnd, NUI_GWL_STYLE);
+	RECT r = {0, 0, cw, ch};
+	AdjustWindowRectExForDpi(&r, style, 0, NUI_WS_EX_CONTROLPARENT, GetDpiForWindow(hwnd));
+	int w = r.right - r.left, h = r.bottom - r.top;
+	RECT wr;
+	GetWindowRect(hwnd, &wr);
+	int x = wr.left, y = wr.top;
+	if (center) {
+		MONITORINFO mi = {0};
+		mi.cbSize = sizeof mi;
+		GetMonitorInfoW(MonitorFromWindow(hwnd, NUI_MONITOR_DEFAULTTONEAREST), &mi);
+		x = mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left - w) / 2;
+		y = mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top - h) / 2;
+		if (y < mi.rcWork.top)
+			y = mi.rcWork.top;
+	}
+	out[0] = x;
+	out[1] = y;
+	out[2] = w;
+	out[3] = h;
+}
+
+void nui_client_size(HWND hwnd, int out[2]) {
+	RECT r = {0, 0, 0, 0};
+	GetClientRect(hwnd, &r);
+	out[0] = r.right - r.left;
+	out[1] = r.bottom - r.top;
+}
+
+// Сообщение (§9): TaskDialog из comctl32 v6, если нашёлся, иначе MessageBoxW.
+// kind: 0 — информация, 1 — ошибка, 2 — вопрос «Да/Нет». 1 — OK или «Да».
+int nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text) {
+	if (taskDialog) {
+		int pressed = 0;
+		int buttons = kind == 2 ? NUI_TDCBF_YES_BUTTON | NUI_TDCBF_NO_BUTTON : NUI_TDCBF_OK_BUTTON;
+		LPCWSTR icon = kind == 0 ? RES(-3) : kind == 1 ? RES(-2) : 0; // TD_INFORMATION_ICON, TD_ERROR_ICON
+		if (taskDialog(parent, inst, app, title, text, buttons, icon, &pressed) >= 0)
+			return pressed == NUI_IDOK || pressed == NUI_IDYES;
+	}
+	UINT t = kind == 2 ? NUI_MB_YESNO | NUI_MB_ICONQUESTION : NUI_MB_OK | (kind == 1 ? NUI_MB_ICONERROR : NUI_MB_ICONINFORMATION);
+	int r = MessageBoxW(parent, text, title, t);
+	return r == NUI_IDOK || r == NUI_IDYES;
+}
+
+// Открыть/сохранить (§9). filter — пары «имя\0шаблоны\0», в конце ещё \0. buf — на входе
+// предлагаемое имя, на выходе путь.
+int nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap) {
+	OPENFILENAMEW o = {0};
+	o.lStructSize = sizeof o;
+	o.hwndOwner = parent;
+	o.lpstrFilter = filter;
+	o.nFilterIndex = 1;
+	o.lpstrFile = buf;
+	o.nMaxFile = (DWORD)cap;
+	o.lpstrTitle = title;
+	o.Flags = NUI_OFN_EXPLORER | NUI_OFN_NOCHANGEDIR | NUI_OFN_HIDEREADONLY | NUI_OFN_PATHMUSTEXIST;
+	if (save) {
+		o.Flags |= NUI_OFN_OVERWRITEPROMPT;
+		return GetSaveFileNameW(&o);
+	}
+	o.Flags |= NUI_OFN_FILEMUSTEXIST;
+	return GetOpenFileNameW(&o);
+}
+
+// Выбор папки (§9). buf — не меньше MAX_PATH (260) символов.
+int nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf) {
+	BROWSEINFOW bi = {0};
+	bi.hwndOwner = parent;
+	bi.pszDisplayName = buf;
+	bi.lpszTitle = title;
+	bi.ulFlags = NUI_BIF_RETURNONLYFSDIRS | NUI_BIF_NEWDIALOGSTYLE;
+	PIDLIST_ABSOLUTE id = SHBrowseForFolderW(&bi);
+	if (!id)
+		return 0;
+	int ok = SHGetPathFromIDListW(id, buf);
+	CoTaskMemFree(id);
+	return ok;
+}
+
+// Строк в поле: последняя пустая строка после завершающего перевода не считается
+// (api.md, §13 — как на GTK).
+static int text_lines(HWND e) {
+	int n = (int)SendMessageW(e, NUI_EM_GETLINECOUNT, 0, 0);
+	if (n > 0 && (int)SendMessageW(e, NUI_EM_LINEINDEX, (WPARAM)(n - 1), 0) == GetWindowTextLengthW(e))
+		n--;
+	return n;
+}
+
+// Append (§5, TextView): дописать в конец, не сбивая выделение и вид пользователя;
+// MaxLines удаляет начало; AutoScroll — прокрутка в конец. s — уже с \r\n.
+void nui_text_append(HWND e, LPCWSTR s, int autoscroll, int maxLines) {
+	DWORD a = 0, b = 0;
+	SendMessageW(e, NUI_EM_GETSEL, (WPARAM)&a, (LPARAM)&b);
+	int first = (int)SendMessageW(e, NUI_EM_GETFIRSTVISIBLELINE, 0, 0);
+	int len = GetWindowTextLengthW(e);
+	SendMessageW(e, NUI_EM_SETSEL, (WPARAM)len, (LPARAM)len);
+	SendMessageW(e, NUI_EM_REPLACESEL, 0, (LPARAM)s);
+	int cut = 0, cutLines = 0;
+	if (maxLines > 0) {
+		int extra = text_lines(e) - maxLines;
+		if (extra > 0) {
+			cut = (int)SendMessageW(e, NUI_EM_LINEINDEX, (WPARAM)extra, 0);
+			cutLines = extra;
+			SendMessageW(e, NUI_EM_SETSEL, 0, (LPARAM)cut);
+			SendMessageW(e, NUI_EM_REPLACESEL, 0, (LPARAM)L"");
+		}
+	}
+	a = (int)a > cut ? a - (DWORD)cut : 0;
+	b = (int)b > cut ? b - (DWORD)cut : 0;
+	SendMessageW(e, NUI_EM_SETSEL, a, b);
+	if (autoscroll) {
+		SendMessageW(e, NUI_WM_VSCROLL, NUI_SB_BOTTOM, 0);
+		return;
+	}
+	// EM_REPLACESEL прокручивает к каретке — возвращаем вид пользователя.
+	int want = first - cutLines;
+	if (want < 0)
+		want = 0;
+	int now = (int)SendMessageW(e, NUI_EM_GETFIRSTVISIBLELINE, 0, 0);
+	if (now != want)
+		SendMessageW(e, NUI_EM_LINESCROLL, 0, (LPARAM)(want - now));
+}

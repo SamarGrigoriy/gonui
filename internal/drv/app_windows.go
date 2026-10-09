@@ -1,0 +1,158 @@
+package drv
+
+/*
+#include "win32_windows.h"
+*/
+import "C"
+
+import (
+	"sync/atomic"
+	"unsafe"
+
+	"nui/internal/core"
+)
+
+var (
+	mainTID  = uint32(C.GetCurrentThreadId()) // init пакета идёт в главном потоке (runtime.main)
+	msgWnd   atomic.Uintptr                   // служебное окно: Do, таймеры, Enter
+	appTitle string                           // заголовок сообщений: SetAppID или имя exe
+	defFonts [3]C.HFONT                       // шрифты ещё не вставленных виджетов
+	defWin   = node{dpi: 96}                  // их dpi — системный
+)
+
+// Init: Per-Monitor DPI v2, Common Controls v6, класс окон, служебное окно (driver-win32.md, §3).
+func Init(appID string) bool {
+	appTitle = appID
+	if C.nui_init() == 0 {
+		return false
+	}
+	msgWnd.Store(uintptr(unsafe.Pointer(C.nui_msg_window())))
+	defWin.dpi = uint32(C.GetDpiForSystem())
+	C.nui_fonts(C.UINT(defWin.dpi), &defFonts[0])
+	if appTitle == "" {
+		appTitle = exeName()
+	}
+	return true
+}
+
+func Main() { C.nui_loop() }
+func Quit() { C.PostQuitMessage(0) }
+
+// Wake — из любого потока: PostMessageW потокобезопасна.
+func Wake() {
+	if w := msgWnd.Load(); w != 0 {
+		C.PostMessageW(hwndOf(w), C.NUI_WM_DO, 0, 0)
+	}
+}
+
+func IsMainThread() bool { return uint32(C.GetCurrentThreadId()) == mainTID }
+
+// TimerAdd: nIDEvent = ud целиком, WM_TIMER сразу даёт ud (driver-win32.md, §3).
+func TimerAdd(ms int, ud uintptr) uint32 {
+	C.SetTimer(msg(), C.UINT_PTR(ud), C.UINT(max(ms, 0)), nil)
+	return uint32(ud)
+}
+
+func SourceRemove(src uint32) { C.KillTimer(msg(), C.UINT_PTR(src)) }
+
+func msg() C.HWND { return hwndOf(msgWnd.Load()) }
+
+// exeName — имя exe без пути и расширения: заголовок сообщений по умолчанию.
+func exeName() string {
+	buf := make([]uint16, 260)
+	n := int(C.GetModuleFileNameW(nil, wptr(buf), C.DWORD(len(buf))))
+	s := buf[:n]
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '\\' || s[i] == '/' {
+			s = s[i+1:]
+			break
+		}
+	}
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == '.' {
+			s = s[:i]
+			break
+		}
+	}
+	return fromUTF16(s)
+}
+
+// wndProc — все сообщения окон nui (nuiWndProc). false — отдать DefWindowProcW.
+func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
+	switch m {
+	case C.NUI_WM_DO:
+		core.Dispatch(core.UD(0, core.KDo), 0)
+		return 0, true
+	case C.NUI_WM_TIMER:
+		if hwnd == msg() {
+			if core.Dispatch(wp, 0) == 0 {
+				C.KillTimer(hwnd, C.UINT_PTR(wp))
+			}
+			return 0, true
+		}
+	case C.NUI_WM_ENTER:
+		if _, n := nodeOf(hwndOf(lp)); n != nil {
+			emit(n, core.EvEnter)
+		}
+		return 0, true
+	}
+	h, n := nodeOf(hwnd)
+	if n == nil {
+		return 0, false
+	}
+	switch m {
+	case C.NUI_WM_COMMAND:
+		if lp != 0 {
+			notify(hwndOf(lp), uint32(wp>>16))
+			return 0, true
+		}
+	case C.NUI_WM_HSCROLL, C.NUI_WM_VSCROLL:
+		if lp != 0 { // от трекбара
+			if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kSlider {
+				if v := int(send(c.hwnd, C.NUI_TBM_GETPOS, 0, 0)); v != c.last {
+					c.last = v
+					emit(c, core.EvChange)
+				}
+			}
+			return 0, true
+		}
+		if n.kind == kScroll { // свои полосы прокрутки
+			scrollBy(h, m == C.NUI_WM_VSCROLL, int(wp&0xFFFF), int(int16(wp>>16)), 0)
+			return 0, true
+		}
+	case C.NUI_WM_MOUSEWHEEL:
+		if n.kind == kScroll {
+			scrollBy(h, true, 0, 0, int(int16(wp>>16)))
+			return 0, true
+		}
+	case C.NUI_WM_CTLCOLORSTATIC:
+		if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kLabel && c.color != noColor {
+			dc := hdcOf(wp)
+			C.SetTextColor(dc, C.COLORREF(c.color>>16&0xFF|c.color&0xFF00|(c.color&0xFF)<<16))
+			C.SetBkColor(dc, C.COLORREF(C.GetSysColor(C.NUI_COLOR_BTNFACE)))
+			return uintptr(unsafe.Pointer(C.GetSysColorBrush(C.NUI_COLOR_BTNFACE))), true
+		}
+	}
+	if n.kind == kWindow {
+		return windowProc(h, n, m, wp, lp)
+	}
+	return 0, false
+}
+
+// notify — WM_COMMAND от контрола (driver-win32.md, §4).
+func notify(ctl C.HWND, code uint32) {
+	_, c := nodeOf(ctl)
+	if c == nil {
+		return
+	}
+	switch {
+	case c.kind == kButton && code == C.NUI_BN_CLICKED:
+		emit(c, core.EvClick)
+	case c.kind == kCheck && code == C.NUI_BN_CLICKED:
+		emit(c, core.EvChange)
+	case (c.kind == kEntry || c.kind == kText) && code == C.NUI_EN_CHANGE:
+		emit(c, core.EvChange)
+	case c.kind == kCombo && (code == C.NUI_CBN_SELCHANGE || code == C.NUI_CBN_EDITCHANGE):
+		emit(c, core.EvChange)
+	}
+}

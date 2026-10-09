@@ -162,13 +162,13 @@ S1 ─► S2 ─┬─(успех)───────────────�
 **Состав:**
 - спайк S4 ([driver-win32.md](driver-win32.md), §11) — **пройден** под Wine ([spike/s4/RESULT.md](../spike/s4/RESULT.md));
 - `internal/layout` + golden-тесты ([layout.md](layout.md), §8) — **готово**: эталон снимает сам драйвер nui на GTK, `libgtk-3-dev` не нужен (ADR-18);
-- драйвер `*_windows.*`;
+- драйвер `*_windows.*` — первая версия: hello и form под Wine обоими тулчейнами ([отчёт](reports/phase-5.md));
 - `examples/*` на Windows.
 
 **DoD:**
 - [x] Golden-тесты проходят на всех случаях: 11 случаев, движок совпадает с GTK до пикселя ([отчёт](reports/phase-5.md)).
 - [ ] `examples/hello`, `form` и `logger` (Windows-вариант с горутиной + `Do`) работают на Windows 10 и 11 при масштабах 100 %, 150 % и 200 %, а также при переносе окна между мониторами с разным DPI.
-- [ ] `check-protos` для `win32_windows.h` проходит против заголовков mingw.
+- [x] `check-protos` для `win32_windows.h` проходит против заголовков mingw.
 
 ## Фаза 6. Расширения (по мере надобности)
 

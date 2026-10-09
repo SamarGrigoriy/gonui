@@ -7,13 +7,6 @@ import "C"
 
 import "nui/internal/core"
 
-// Виды сообщений MessageBox.
-const (
-	MsgInfo  = 0 // информация, кнопка OK
-	MsgAlert = 1 // ошибка или предупреждение, кнопка OK
-	MsgAsk   = 2 // вопрос, кнопки Да/Нет
-)
-
 // MessageBox показывает модальное сообщение. true — нажата OK или «Да»; Esc — false.
 func MessageBox(parent H, kind uint8, title, text string) bool {
 	typ, buttons := C.int(C.NUI_GTK_MESSAGE_INFO), C.int(C.NUI_GTK_BUTTONS_OK)
@@ -25,19 +18,6 @@ func MessageBox(parent H, kind uint8, title, text string) bool {
 	}
 	r := C.nui_message((*C.GtkWindow)(parent), typ, buttons, cstr(title), cstr(text))
 	return r == C.NUI_GTK_RESPONSE_OK || r == C.NUI_GTK_RESPONSE_YES
-}
-
-// Режимы FileDialog.
-const (
-	FileOpen   = 0
-	FileSave   = 1
-	FileFolder = 2
-)
-
-// Filter — фильтр файлового диалога: имя и шаблоны вида "*.log".
-type Filter struct {
-	Name     string
-	Patterns []string
 }
 
 // FileDialog — системный диалог выбора файла (GtkFileChooserNative: в песочнице — портал).

@@ -5,6 +5,7 @@
 *.test
 *.syso
 /spike/s4/rsrc.o
+/examples/*/rsrc.o
 
 # Редакторы
 .vscode/

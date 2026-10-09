@@ -92,7 +92,10 @@ TinyGo использует установленный Go (его стандар
 | `make size` | `tools/sizecheck.sh` — сверка с `size-budget.txt` |
 | `make check-protos` | `tools/check-protos.sh` — прототипы против настоящих заголовков |
 | `make abi` | максимальная версия `GLIBC_` в релизных бинарниках не выше 2.36 (Debian 12) |
-| `make windows` | кросс-сборка gc под Windows через mingw (фаза 5) |
+| `make win` | Windows: gc (`bin/win/<пример>.exe`) и TinyGo (`bin/win/<пример>-small.exe`), кросс-сборка mingw-w64 ([§7](#7-windows)) |
+| `make win-selftest` | примеры под Wine в Xvfb: окно, цикл, выход с кодом 0 — обоими тулчейнами |
+| `make win-shots` | снимки примеров под Wine при 100 % и 150 % |
+| `make golden` | golden-снимки раскладки с GTK ([layout.md](layout.md), §8; только в контейнере) |
 | `make small-upx` | gc + UPX, вне бюджета ([size.md](size.md), §5) |
 | `make check` | `vet deps check-protos` — статические проверки на хосте (нужен `libgtk-3-dev`) |
 | `make ci-container` | `deps test race selftest size abi` — всё, что не требует `libgtk-3-dev` |
@@ -139,3 +142,16 @@ bin/small/%: FORCE
 - Иконка в `/usr/share/icons/hicolor/<размер>/apps/<appid>.png`, `Window.SetIconName("<appid>")`.
 
 Если GTK3 в системе нет, бинарник не запустится и выдаст ошибку загрузчика (ADR-12). Поэтому зависимость в пакете обязательна.
+
+## 7. Windows
+
+Кросс-сборка на Linux, проверка — под Wine ([driver-win32.md](driver-win32.md), §1; [spike/s4](../spike/s4/RESULT.md)). Всё нужное есть в образе `nui-win` (`tools/win.Dockerfile`: mingw-w64, Wine 8.0, Xvfb, openbox):
+
+```sh
+NUI_IMAGE=nui-win tools/docker-run.sh make win win-selftest
+```
+
+- **Манифест** (Common Controls v6, Per-Monitor DPI v2) лежит в каталоге приложения: `app.manifest` и `app.rc` (шаблон — в `examples/hello`). `make win` собирает из `app.rc` `rsrc_windows_amd64.syso`, его gc подхватывает сам. TinyGo `.syso` не видит, поэтому тот же объект как `rsrc.o` подключает файл приложения с тегом `tinygo && windows`: `#cgo LDFLAGS: -L. -l:rsrc.o`.
+- **gc:** `CGO_ENABLED=1 GOOS=windows GOARCH=amd64 CC=x86_64-w64-mingw32-gcc`, `-ldflags "-s -w -H windowsgui"`. Флаги C-части свои: `CGO_CFLAGS=-Os -ffunction-sections`, без `-fdata-sections` (§1 driver-win32.md).
+- **TinyGo:** `GOOS=windows GOARCH=amd64 tinygo build -opt=z -no-debug -panic=trap`, затем `x86_64-w64-mingw32-objcopy --subsystem windows --strip-all`: подсистема GUI ставится после линковки. Под Windows TinyGo 0.42 линкует только планировщик `tasks`, поэтому программам с горутинами нужна сборка gc.
+- **Wine 8.0** не запускает программы на Go ≥ 1.22: нет `bcryptprimitives.dll`. `tools/wine-run.sh` кладёт в префикс заглушку (`tools/wine`), на настоящей Windows она не нужна.

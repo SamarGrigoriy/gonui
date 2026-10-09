@@ -21,7 +21,7 @@ printf 'root:x:0:\nnui:x:%s:\n' "$gid" >"$CACHE/group"
 IMAGE=${NUI_IMAGE:-nui-bookworm}
 docker build -q -t "$IMAGE" -f "$root/tools/${IMAGE#nui-}.Dockerfile" "$root/tools" >/dev/null
 
-set -- --rm --user "$(id -u):$(id -g)" \
+set -- --rm --init --user "$(id -u):$(id -g)" \
 	-v "$root":/src -w /src \
 	-v "$GOROOT_HOST":"$GOROOT_HOST":ro -v "$GOSHARE":"$GOSHARE":ro \
 	-v "$CACHE":/cache \

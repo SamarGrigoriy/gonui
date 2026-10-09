@@ -9,7 +9,10 @@ allowed=" unsafe sync sync/atomic errors runtime unicode/utf8 C "
 bad=""
 
 # 1. Импорты. .Imports — без тестовых (.TestImports не смотрим): тестам можно всё.
-list=$(GOOS=linux CGO_ENABLED=1 go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' . ./internal/...)
+#    Обе ОС драйвера: у каждой свои файлы *_linux.go и *_windows.go.
+list=$(for os in linux windows; do
+	GOOS=$os CGO_ENABLED=1 go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' . ./internal/...
+done)
 while read -r pkg imports; do
 	[ "$pkg" = nui/internal/layout/golden ] && continue
 	for imp in $imports; do
