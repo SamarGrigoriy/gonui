@@ -68,6 +68,9 @@ func (b *Box) Background(c Color) *Box {
 	return b
 }
 
+// SetBackground — то же, что Background, без цепочки: одно имя с окном и виджетами.
+func (b *Box) SetBackground(c Color) { b.Background(c) }
+
 type boxEv Box
 
 func (b *boxEv) Event(k core.Kind, _ uintptr) uintptr {

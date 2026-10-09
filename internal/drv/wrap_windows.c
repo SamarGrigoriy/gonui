@@ -200,6 +200,12 @@ void nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]) {
 		MONITORINFO mi = {0};
 		mi.cbSize = sizeof mi;
 		GetMonitorInfoW(MonitorFromWindow(hwnd, NUI_MONITOR_DEFAULTTONEAREST), &mi);
+		// Начальный размер — не больше рабочей области монитора (на Linux это делает
+		// оконный менеджер); меньше минимума окно не станет — его держит WM_GETMINMAXINFO.
+		if (w > mi.rcWork.right - mi.rcWork.left)
+			w = mi.rcWork.right - mi.rcWork.left;
+		if (h > mi.rcWork.bottom - mi.rcWork.top)
+			h = mi.rcWork.bottom - mi.rcWork.top;
 		x = mi.rcWork.left + (mi.rcWork.right - mi.rcWork.left - w) / 2;
 		y = mi.rcWork.top + (mi.rcWork.bottom - mi.rcWork.top - h) / 2;
 		if (y < mi.rcWork.top)

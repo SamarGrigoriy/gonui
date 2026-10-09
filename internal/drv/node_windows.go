@@ -497,6 +497,10 @@ func setFont(n *node) {
 		n.font = C.nui_font_scaled(fontsFor(n)[fontNormal], C.int(n.fontPct), b2i(n.bold))
 	}
 	send(n.hwnd, C.NUI_WM_SETFONT, uintptr(unsafe.Pointer(fontOf(n))), 1)
+	if n.kind == kText { // поля внутри текста, как у TextView в GTK; WM_SETFONT их сбрасывает
+		m := uintptr(dpiOf(n).px(6))
+		send(n.hwnd, C.NUI_EM_SETMARGINS, C.NUI_EC_LEFTMARGIN|C.NUI_EC_RIGHTMARGIN, m|m<<16)
+	}
 	if old != nil {
 		C.DeleteObject(C.HGDIOBJ(old))
 	}

@@ -106,6 +106,9 @@ func (g *Grid) Background(c Color) *Grid {
 	return g
 }
 
+// SetBackground — то же, что Background, без цепочки: одно имя с окном и виджетами.
+func (g *Grid) SetBackground(c Color) { g.Background(c) }
+
 // Padding — отступ вокруг, по умолчанию 0.
 func (g *Grid) Padding(px int) *Grid {
 	if !g.dead() {

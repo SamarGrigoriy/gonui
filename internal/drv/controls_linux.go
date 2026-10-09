@@ -184,6 +184,12 @@ func TextNew(id uint32) (outer, view H) {
 	sw := C.gtk_scrolled_window_new(nil, nil)
 	C.gtk_scrolled_window_set_policy((*C.GtkScrolledWindow)(sw), C.NUI_GTK_POLICY_AUTOMATIC, C.NUI_GTK_POLICY_AUTOMATIC)
 	v := C.gtk_text_view_new()
+	// Поля внутри текста: без них строки прижаты к рамке (так же на Windows — EM_SETMARGINS).
+	tv := (*C.GtkTextView)(v)
+	C.gtk_text_view_set_left_margin(tv, 6)
+	C.gtk_text_view_set_right_margin(tv, 6)
+	C.gtk_text_view_set_top_margin(tv, 4)
+	C.gtk_text_view_set_bottom_margin(tv, 4)
 	C.gtk_container_add((*C.GtkContainer)(sw), v)
 	C.gtk_widget_show(v)
 	outer = adopt(sw, id, true)

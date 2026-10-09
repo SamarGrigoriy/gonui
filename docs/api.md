@@ -145,7 +145,7 @@ const (
 | Виджет | Методы |
 |---|---|
 | `Window` | `SetBackground(c Color)` |
-| `Box`, `Grid` | `Background(c Color)` — цепочкой, как `Spacing` и `Padding`. Фон закрашивает и отступ `Padding`; подписи, флажки, ползунки и рамки внутри получают тот же фон, поля ввода остаются белыми |
+| `Box`, `Grid` | `Background(c Color)` — цепочкой, как `Spacing` и `Padding`; `SetBackground(c)` — то же без цепочки. Фон закрашивает и отступ `Padding`; подписи, флажки, ползунки и рамки внутри получают тот же фон, поля ввода остаются белыми |
 | `Label` | `SetColor`, `SetBackground`, `SetBold`, `SetFontScale(f float64)` — размер шрифта относительно обычного: `1.5` — заголовок |
 | `Button`, `Entry`, `TextView`, `Chat` | `SetColor(c Color)` — цвет текста, `SetBackground(c Color)` — фон |
 

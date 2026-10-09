@@ -285,6 +285,10 @@ NUI_FN(void, gtk_text_view_set_editable, (GtkTextView *text_view, gboolean setti
 NUI_FN(void, gtk_text_view_set_cursor_visible, (GtkTextView *text_view, gboolean setting))
 NUI_FN(void, gtk_text_view_set_monospace, (GtkTextView *text_view, gboolean monospace))
 NUI_FN(void, gtk_text_view_set_wrap_mode, (GtkTextView *text_view, GtkWrapMode wrap_mode))
+NUI_FN(void, gtk_text_view_set_left_margin, (GtkTextView *text_view, gint left_margin))
+NUI_FN(void, gtk_text_view_set_right_margin, (GtkTextView *text_view, gint right_margin))
+NUI_FN(void, gtk_text_view_set_top_margin, (GtkTextView *text_view, gint top_margin))
+NUI_FN(void, gtk_text_view_set_bottom_margin, (GtkTextView *text_view, gint bottom_margin))
 NUI_FN(void, gtk_text_buffer_get_start_iter, (GtkTextBuffer *buffer, GtkTextIter *iter))           /* (w) */
 NUI_FN(void, gtk_text_buffer_get_end_iter, (GtkTextBuffer *buffer, GtkTextIter *iter))             /* (w) */
 NUI_FN(void, gtk_text_buffer_get_iter_at_line, (GtkTextBuffer *buffer, GtkTextIter *iter, gint line_number)) /* (w) */
