@@ -425,6 +425,30 @@ func TestWindowSize(t *testing.T) {
 	ui(func() { w.Close() })
 }
 
+// SetMaximized и SetFullscreen до и после показа. Разворачивает окно оконный менеджер:
+// в make test (Xvfb без него) проверяется только, что вызовы не ломают окно; результат
+// виден на снимках (docs/reports/window-states.md).
+func TestWindowStates(t *testing.T) {
+	var w *Window
+	ui(func() {
+		w = NewWindow("состояния окна", NewLabel("развёрнуто"))
+		w.SetSize(300, 200)
+		w.SetMaximized(true)
+		w.Show()
+	})
+	waitUntil(t, 2000, func() bool { _, _, ww, _ := drv.Allocation(w.h); return ww >= 300 })
+	ui(func() {
+		w.SetMaximized(false)
+		w.SetFullscreen(true)
+		w.SetFullscreen(false)
+		w.SetFullscreen(false) // повторный — ничего не делает
+		if !w.Alive() || !drv.Visible(w.h) {
+			t.Error("окно пропало после смены состояний")
+		}
+		w.Close()
+	})
+}
+
 func TestPhase2WidgetsDestroyed(t *testing.T) {
 	var w *Window
 	var e *Entry

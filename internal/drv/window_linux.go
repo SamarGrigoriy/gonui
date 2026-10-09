@@ -81,6 +81,25 @@ func WindowSetDefault(h, btn H) {
 
 func WindowSetIconName(h H, name string) { C.gtk_window_set_icon_name((*C.GtkWindow)(h), cstr(name)) }
 
+// WindowSetMaximized: просьбу GTK запоминает и до показа — окно откроется развёрнутым.
+// Разворачивает окно оконный менеджер (композитор): без него просьба не действует.
+func WindowSetMaximized(h H, on bool) {
+	if on {
+		C.gtk_window_maximize((*C.GtkWindow)(h))
+	} else {
+		C.gtk_window_unmaximize((*C.GtkWindow)(h))
+	}
+}
+
+// WindowSetFullscreen — полноэкранный режим: без рамки, поверх панелей; тоже можно до показа.
+func WindowSetFullscreen(h H, on bool) {
+	if on {
+		C.gtk_window_fullscreen((*C.GtkWindow)(h))
+	} else {
+		C.gtk_window_unfullscreen((*C.GtkWindow)(h))
+	}
+}
+
 // ContainerSetChild — Frame, Scroll: удалить старого ребёнка (он уничтожится), добавить нового.
 // Прокрутка сама оборачивает ребёнка без собственной прокрутки в GtkViewport.
 func ContainerSetChild(h, child H) { WindowSetChild(h, child) }

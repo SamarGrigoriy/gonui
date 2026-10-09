@@ -88,12 +88,70 @@ func WindowSetIconName(h H, name string) {
 // размер по SetSize или по содержимому, по центру экрана.
 func WindowShow(h H) {
 	n := nodes[h]
+	show := C.int(C.NUI_SW_SHOW)
 	if !n.sized {
 		n.sized = true
-		resize(h, true)
+		resize(h, true) // размер «восстановленного» окна — и для развёрнутого
+		if n.fullscreen {
+			enterFullscreen(n)
+		} else if n.maximized {
+			show = C.NUI_SW_SHOWMAXIMIZED
+		}
 	}
-	C.ShowWindow(n.hwnd, C.NUI_SW_SHOW)
+	C.ShowWindow(n.hwnd, show)
 	C.SetForegroundWindow(n.hwnd)
+}
+
+// WindowSetMaximized — развернуть (SW_MAXIMIZE) или восстановить; до показа — окно
+// откроется развёрнутым.
+func WindowSetMaximized(h H, on bool) {
+	n := nodes[h]
+	n.maximized = on
+	if !n.sized || n.fullscreen {
+		return
+	}
+	cmd := C.int(C.NUI_SW_RESTORE)
+	if on {
+		cmd = C.NUI_SW_MAXIMIZE
+	}
+	C.ShowWindow(n.hwnd, cmd)
+}
+
+// WindowSetFullscreen — без рамки и заголовка, на весь монитор окна; false — прежние
+// рамка и место. До показа — окно откроется полноэкранным.
+func WindowSetFullscreen(h H, on bool) {
+	n := nodes[h]
+	if n.fullscreen == on {
+		return
+	}
+	n.fullscreen = on
+	if !n.sized {
+		return
+	}
+	if on {
+		enterFullscreen(n)
+		return
+	}
+	C.SetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE, C.LONG_PTR(n.savedStyle))
+	r := n.savedRect
+	C.SetWindowPos(n.hwnd, nil, C.int(r.left), C.int(r.top), C.int(r.right-r.left), C.int(r.bottom-r.top),
+		C.NUI_SWP_NOZORDER|C.NUI_SWP_NOACTIVATE|C.NUI_SWP_FRAMECHANGED)
+	if n.maximized {
+		C.ShowWindow(n.hwnd, C.NUI_SW_MAXIMIZE)
+	}
+}
+
+func enterFullscreen(n *node) {
+	if C.IsWindowVisible(n.hwnd) != 0 {
+		C.ShowWindow(n.hwnd, C.NUI_SW_RESTORE) // из развёрнутого — к обычному: запомнить его место
+	}
+	n.savedStyle = uintptr(C.GetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE))
+	C.GetWindowRect(n.hwnd, &n.savedRect)
+	style := n.savedStyle&^uintptr(C.NUI_WS_OVERLAPPEDWINDOW) | uintptr(C.NUI_WS_POPUP)
+	C.SetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE, C.LONG_PTR(style))
+	var m [4]C.int
+	C.nui_monitor_rect(n.hwnd, &m[0])
+	C.SetWindowPos(n.hwnd, nil, m[0], m[1], m[2], m[3], C.NUI_SWP_NOACTIVATE|C.NUI_SWP_FRAMECHANGED)
 }
 
 // resize ставит окну размер по правилам SetSize; center — по центру рабочей области.
@@ -141,7 +199,7 @@ func windowProc(h H, n *node, m uint32, wp, lp uintptr) (uintptr, bool) {
 		C.nui_window_frame(n.hwnd, C.int(n.minClient[0]), C.int(n.minClient[1]), 0, &r[0])
 		mmi := minmaxOf(lp)
 		mmi.ptMinTrackSize.x, mmi.ptMinTrackSize.y = C.LONG(r[2]), C.LONG(r[3])
-		if n.fixed && n.sized {
+		if n.fixed && n.sized && !n.fullscreen {
 			var wr C.RECT
 			C.GetWindowRect(n.hwnd, &wr)
 			mmi.ptMaxTrackSize.x, mmi.ptMaxTrackSize.y = wr.right-wr.left, wr.bottom-wr.top

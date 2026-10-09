@@ -109,6 +109,23 @@ func (w *Window) SetResizable(on bool) {
 	}
 }
 
+// SetMaximized разворачивает окно на весь экран — с рамкой и заголовком, пользователь
+// может его восстановить; false — восстановить. Можно вызывать до Show: окно сразу
+// откроется развёрнутым, а SetSize задаст его размер после восстановления.
+func (w *Window) SetMaximized(on bool) {
+	if !w.dead() {
+		drv.WindowSetMaximized(w.h, on)
+	}
+}
+
+// SetFullscreen — полноэкранный режим: без рамки и заголовка, поверх панелей; false —
+// вернуть обычный. Можно вызывать до Show.
+func (w *Window) SetFullscreen(on bool) {
+	if !w.dead() {
+		drv.WindowSetFullscreen(w.h, on)
+	}
+}
+
 // SetPadding — отступ между краем окна и содержимым, по умолчанию 12.
 func (w *Window) SetPadding(px int) {
 	if !w.dead() {

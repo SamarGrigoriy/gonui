@@ -100,6 +100,10 @@ type node struct {
 	reqW, reqH int  // последний SetSize, логические пиксели; 0 — не задан
 	defBtn     H
 	tip        C.HWND // окно подсказок (tooltips_class32), создаётся при первой подсказке
+	maximized  bool   // SetMaximized: развернуть при первом показе
+	fullscreen bool   // SetFullscreen
+	savedStyle uintptr
+	savedRect  C.RECT // окно до полноэкранного режима
 }
 
 const noColor = 1 << 24

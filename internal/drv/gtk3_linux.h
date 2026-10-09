@@ -198,6 +198,10 @@ NUI_FN(gboolean, gtk_window_get_resizable, (GtkWindow *window))
 NUI_FN(void, gtk_window_get_default_size, (GtkWindow *window, gint *width, gint *height))
 NUI_FN(void, gtk_window_set_default, (GtkWindow *window, GtkWidget *default_widget))
 NUI_FN(void, gtk_window_set_icon_name, (GtkWindow *window, const gchar *name))
+NUI_FN(void, gtk_window_maximize, (GtkWindow *window))
+NUI_FN(void, gtk_window_unmaximize, (GtkWindow *window))
+NUI_FN(void, gtk_window_fullscreen, (GtkWindow *window))
+NUI_FN(void, gtk_window_unfullscreen, (GtkWindow *window))
 NUI_FN(void, gtk_widget_set_can_default, (GtkWidget *widget, gboolean can_default))
 NUI_FN(gboolean, gtk_widget_activate, (GtkWidget *widget)) /* тесты: SimEnter */
 NUI_FN(void, gtk_window_close, (GtkWindow *window)) /* тесты: SimClose */

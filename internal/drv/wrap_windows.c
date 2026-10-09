@@ -211,6 +211,17 @@ void nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]) {
 	out[3] = h;
 }
 
+// Прямоугольник монитора окна целиком (для полноэкранного режима): x, y, ширина, высота.
+void nui_monitor_rect(HWND hwnd, int out[4]) {
+	MONITORINFO mi = {0};
+	mi.cbSize = sizeof mi;
+	GetMonitorInfoW(MonitorFromWindow(hwnd, NUI_MONITOR_DEFAULTTONEAREST), &mi);
+	out[0] = mi.rcMonitor.left;
+	out[1] = mi.rcMonitor.top;
+	out[2] = mi.rcMonitor.right - mi.rcMonitor.left;
+	out[3] = mi.rcMonitor.bottom - mi.rcMonitor.top;
+}
+
 void nui_client_size(HWND hwnd, int out[2]) {
 	RECT r = {0, 0, 0, 0};
 	GetClientRect(hwnd, &r);

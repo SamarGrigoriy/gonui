@@ -59,6 +59,8 @@ func WindowSetResizable(h H, on bool)
 func WindowSetDefault(h, btn H)
 func WindowSetIconName(h H, name string)
 func WindowShow(h H)                    // gtk_widget_show + gtk_window_present
+func WindowSetMaximized(h H, on bool)   // gtk_window_maximize / unmaximize (можно до показа)
+func WindowSetFullscreen(h H, on bool)  // gtk_window_fullscreen / unfullscreen
 
 // Label
 func LabelNew(id uint32, text string) H

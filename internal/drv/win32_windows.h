@@ -249,6 +249,9 @@ NUI_CONST(SW_HIDE, 0)
 NUI_CONST(SW_SHOWNORMAL, 1)
 NUI_CONST(SW_SHOW, 5)
 NUI_CONST(SW_SHOWNA, 8)
+NUI_CONST(SW_MAXIMIZE, 3)
+NUI_CONST(SW_SHOWMAXIMIZED, 3)
+NUI_CONST(SW_RESTORE, 9)
 NUI_CONST(SWP_NOSIZE, 0x0001)
 NUI_CONST(SWP_NOMOVE, 0x0002)
 NUI_CONST(SWP_NOZORDER, 0x0004)
@@ -513,6 +516,7 @@ void  nui_text_size(HWND hwnd, HFONT font, LPCWSTR text, int len, int wrapWidth,
 void  nui_ideal_size(HWND button, int out[2]);
 void  nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]);
 void  nui_client_size(HWND hwnd, int out[2]);
+void  nui_monitor_rect(HWND hwnd, int out[4]);
 int   nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR text);
 int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);
