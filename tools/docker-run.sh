@@ -3,6 +3,7 @@
 # rootshot; без libgtk-3-dev) с Go и TinyGo хоста. Команда идёт от текущего пользователя,
 # кэши сборки лежат в $NUI_DOCKER_CACHE (по умолчанию ~/.cache/nui/docker).
 #   tools/docker-run.sh make test
+#   NUI_IMAGE=nui-win tools/docker-run.sh … — образ для Windows: mingw-w64 и Wine (tools/win.Dockerfile)
 #   TINYGOROOT=… — распакованный выпуск TinyGo (по умолчанию ~/.cache/nui/tinygo-0.42.0/x/tinygo)
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -17,7 +18,8 @@ mkdir -p "$CACHE/home" "$CACHE/go" "$CACHE/xdg"
 uid=$(id -u) gid=$(id -g)
 printf 'root:x:0:0:root:/root:/bin/sh\nnui:x:%s:%s:nui:/cache/home:/bin/sh\n' "$uid" "$gid" >"$CACHE/passwd"
 printf 'root:x:0:\nnui:x:%s:\n' "$gid" >"$CACHE/group"
-docker build -q -t nui-bookworm -f "$root/tools/bookworm.Dockerfile" "$root/tools" >/dev/null
+IMAGE=${NUI_IMAGE:-nui-bookworm}
+docker build -q -t "$IMAGE" -f "$root/tools/${IMAGE#nui-}.Dockerfile" "$root/tools" >/dev/null
 
 set -- --rm --user "$(id -u):$(id -g)" \
 	-v "$root":/src -w /src \
@@ -27,7 +29,7 @@ set -- --rm --user "$(id -u):$(id -g)" \
 	-e HOME=/cache/home -e GOCACHE=/cache/go -e XDG_CACHE_HOME=/cache/xdg \
 	-e GOTOOLCHAIN=local -e GOFLAGS=-buildvcs=false \
 	-e PATH="/opt/tinygo/bin:$GOROOT_HOST/bin:/usr/local/bin:/usr/bin:/bin" \
-	nui-bookworm "$@"
+	"$IMAGE" "$@"
 # TinyGo монтируем, только если он есть: иначе docker создал бы пустой каталог от root.
 if [ -d "$TINYGOROOT" ]; then
 	set -- -v "$TINYGOROOT":/opt/tinygo:ro "$@"

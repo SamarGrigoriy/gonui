@@ -160,8 +160,8 @@ S1 ─► S2 ─┬─(успех)───────────────�
 ## Фаза 5. Windows (2–3 недели)
 
 **Состав:**
-- спайк S4 ([driver-win32.md](driver-win32.md), §11);
-- `internal/layout` + golden-тесты ([layout.md](layout.md), §8). Можно начинать параллельно с фазами 2–4: это чистый Go (генератору golden-файлов нужен `libgtk-3-dev`);
+- спайк S4 ([driver-win32.md](driver-win32.md), §11) — **пройден** под Wine ([spike/s4/RESULT.md](../spike/s4/RESULT.md));
+- `internal/layout` + golden-тесты ([layout.md](layout.md), §8) — **готово**: эталон снимает сам драйвер nui на GTK, `libgtk-3-dev` не нужен (ADR-18);
 - драйвер `*_windows.*`;
 - `examples/*` на Windows.
 

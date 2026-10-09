@@ -9,10 +9,13 @@
 - FFI тот же: cgo с собственными прототипами в `win32_windows.h` и обёртки в `wrap_windows.c` (ADR-3).
   - Заголовки mingw входят в тулчейн, поэтому прототипы сверяются с `<windows.h>` тем же приёмом `NUI_CHECK` ([driver-gtk3.md](driver-gtk3.md), §10).
 - Сборка gc на Debian: `CC=x86_64-w64-mingw32-gcc CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -H windowsgui"`. Пакет `gcc-mingw-w64-x86-64`.
-- TinyGo под Windows (target на mingw-w64) проверяется спайком **S4** в начале фазы. Нужно убедиться, что работают:
-  - cgo без заголовков и `//export`;
-  - подключение `.syso`;
-  - подсистема GUI (без консоли).
+- TinyGo под Windows (встроенная цель на mingw-w64) проверен спайком **S4** ([spike/s4/RESULT.md](../spike/s4/RESULT.md)): hello — 46 КБ против 1,37 МБ у gc.
+  - cgo без заголовков и `//export`-WndProc работают.
+  - `.syso` TinyGo не подхватывает. Тот же объект ресурсов уходит линковщику из файла с тегом `tinygo`: `#cgo LDFLAGS: -L. -l:rsrc.o` (`${SRCDIR}` TinyGo не раскрывает, относительный `-L` отсчитывает от каталога пакета).
+  - Подсистема GUI — после линковки: `x86_64-w64-mingw32-objcopy --subsystem windows --strip-all` (`-Wl,--subsystem` ld.lld получает как есть и не понимает).
+  - TinyGo несёт библиотеки импорта только для kernel32, advapi32 и UCRT; `user32`, `gdi32` и прочие — из mingw-w64: `-L/usr/x86_64-w64-mingw32/lib`.
+  - Под Windows в TinyGo 0.42 линкуется только планировщик `tasks`: горутины кооперативные и не выполняются, пока главная ждёт в `GetMessageW`. Программам с горутинами (рабочий поток + `Do`) на Windows нужна сборка gc.
+- Под Wine 8.0 (Debian 12) программы на Go ≥ 1.22 не стартуют: нет `bcryptprimitives.dll` (`ProcessPrng`), которая есть в Windows 10+. Для тестов под Wine в префикс кладётся заглушка (`spike/s4/wine`).
 - **Не используйте `-fdata-sections` в CFLAGS для mingw** (логгер, `build.ps1`): MinGW с этим флагом кладёт нулевые статические буферы не в `.bss`, а в `.data$имя`, то есть прямо в файл, и код вырастает в разы. `-ffunction-sections` безопасен.
 - Флаги C-части передаются через `CGO_CFLAGS`/`CGO_LDFLAGS`, а не через `#cgo`: gc не пропускает их в `#cgo` ([driver-gtk3.md](driver-gtk3.md), §9). Для mingw: `CGO_CFLAGS=-Os -ffunction-sections`.
 
@@ -131,8 +134,9 @@ type node struct {
 ## 8. Манифест и ресурсы
 
 - Обязательно: зависимость от **Common Controls v6** (визуальные стили, `TaskDialog`, `EM_SETCUEBANNER`), `dpiAwareness = PerMonitorV2`. Исходник для старта — `tools/serial_logger/app.manifest` и `app.rc` эталонного логгера.
-- gc: `x86_64-w64-mingw32-windres app.rc -O coff -o rsrc_windows_amd64.syso` в каталоге **приложения**; Go подхватывает `.syso` автоматически. Манифест — свойство приложения, а не библиотеки. В `examples/*` лежит готовый `.rc`, а nui даёт шаблон.
-- Если у приложения нет манифеста (или TinyGo не подхватит `.syso`), есть запасной путь в `Init`: `CreateActCtxW` с манифестом из ресурса 124 `shell32.dll` + `ActivateActCtx`. Это известный приём, но в спайке S4 его **нужно проверить**. Он действует только на то, что загружается **после** `Init`, а статические импорты разрешаются раньше. Поэтому функции, которых нет в comctl32 v5, импортировать статически нельзя: exe без манифеста просто не запустится. Сейчас такая функция одна — `TaskDialog`, и она ищется через `GetProcAddress` (ADR-16).
+- gc: `x86_64-w64-mingw32-windres app.rc -O coff -o rsrc_windows_amd64.syso` в каталоге **приложения**; Go подхватывает `.syso` автоматически. TinyGo — тот же объект как `rsrc.o` через `#cgo LDFLAGS: -L. -l:rsrc.o` в файле приложения с тегом `tinygo` (§1). Манифест — свойство приложения, а не библиотеки. В `examples/*` лежит готовый `.rc`, а nui даёт шаблон.
+- Если у приложения нет манифеста, есть запасной путь в `Init`: `CreateActCtxW` с манифестом из ресурса 124 `shell32.dll` + `ActivateActCtx`. Под Wine 8.0 контекст создаётся, но comctl32 v6 не включает (S4). На настоящей Windows его ещё нужно проверить вручную, поэтому основной путь — манифест в exe.
+- Контекст действует только на то, что загружается **после** `Init`, а статические импорты разрешаются раньше. Поэтому comctl32 не импортируется вовсе: `InitCommonControlsEx` и `TaskDialog` драйвер ищет через `LoadLibraryW` + `GetProcAddress` (ADR-16). Иначе без манифеста загрузилась бы v5, а exe со статическим импортом `TaskDialog` и вовсе не запустился бы.
 
 ## 9. Диалоги и оболочка
 
@@ -157,7 +161,7 @@ type node struct {
 
 ## 11. Порядок работ в фазе 5
 
-1. **S4** (1–2 дня): hello на Win32 под gc и TinyGo. Проверяем: `.syso`, подсистему GUI, `//export`-WndProc, размер.
+1. **S4** (1–2 дня): hello на Win32 под gc и TinyGo. Проверяем: `.syso`, подсистему GUI, `//export`-WndProc, размер. **Пройден** ([spike/s4/RESULT.md](../spike/s4/RESULT.md)): под Wine — оба тулчейна; настоящая Windows — вручную.
 2. `internal/layout` и golden-тесты (они уже могут быть готовы: движок — чистый Go, его можно писать параллельно).
 3. Окно, цикл, `Do`, таймеры, Label/Button/Box.
 4. Остальные контролы, DPI, диалоги.
