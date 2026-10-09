@@ -53,6 +53,8 @@ typedef struct _GCancellable GCancellable; typedef struct _GAsyncResult GAsyncRe
 typedef struct _GdkWindow GdkWindow;
 typedef struct _GtkCssProvider GtkCssProvider; typedef struct _GtkStyleContext GtkStyleContext;
 typedef struct _GtkStyleProvider GtkStyleProvider;
+typedef struct _GtkClipboard GtkClipboard; typedef struct _GdkAtom *GdkAtom;
+typedef struct _GtkTargetEntry GtkTargetEntry;
 typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
 typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
@@ -190,6 +192,10 @@ NUI_FN(void, gtk_container_remove, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_set_border_width, (GtkContainer *container, guint border_width))
 NUI_FN(guint, gtk_container_get_border_width, (GtkContainer *container))                     /* (w) */
 NUI_FN(GtkStyleContext *, gtk_widget_get_style_context, (GtkWidget *widget))                  /* (w) */
+NUI_FN(GtkClipboard *, gtk_clipboard_get, (GdkAtom selection))                              /* (w) */
+NUI_FN(void, gtk_clipboard_set_text, (GtkClipboard *clipboard, const gchar *text, gint len))
+NUI_FN(void, gtk_clipboard_set_can_store, (GtkClipboard *clipboard, const GtkTargetEntry *targets, gint n_targets))
+NUI_FN(gchar *, gtk_clipboard_wait_for_text, (GtkClipboard *clipboard)) /* g_free */
 NUI_FN(void, gtk_style_context_add_provider, (GtkStyleContext *context, GtkStyleProvider *provider, guint priority)) /* (w) */
 NUI_FN(GtkCssProvider *, gtk_css_provider_new, (void))                                       /* (w) */
 NUI_FN(gboolean, gtk_css_provider_load_from_data, (GtkCssProvider *css_provider, const gchar *data, gssize length,
@@ -361,6 +367,7 @@ void   nui_label_style(GtkLabel *l, int set_bold, int bold, int set_color, unsig
 void   nui_css(GtkWidget *w, int what, unsigned value);
 void   nui_css_background(GtkWidget *w, unsigned color, int panel);
 void   nui_set_padding(GtkWidget *w, unsigned px);
+GtkClipboard *nui_clipboard(void);
 char  *nui_text_get(GtkTextBuffer *b);
 void   nui_text_append(GtkTextView *v, const gchar *s, int len, int autoscroll, int max_lines);
 int    nui_message(GtkWindow *parent, int type, int buttons, const gchar *title, const gchar *text);

@@ -161,6 +161,16 @@ void nui_set_padding(GtkWidget *w, unsigned px) {
 		gtk_container_set_border_width((GtkContainer *)w, px);
 }
 
+/* Буфер обмена (CLIPBOARD, не PRIMARY). GDK_SELECTION_CLIPBOARD = _GDK_MAKE_ATOM (69),
+   gdkselection.h; в режиме проверки берётся настоящий макрос. */
+GtkClipboard *nui_clipboard(void) {
+#ifdef NUI_CHECK
+	return gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+#else
+	return gtk_clipboard_get((GdkAtom)(uintptr_t)69);
+#endif
+}
+
 /* Весь текст буфера. Строку освобождает вызывающий (g_free). GtkTextIter — только на стеке C. */
 char *nui_text_get(GtkTextBuffer *b) {
 	NuiTextIter s, e;

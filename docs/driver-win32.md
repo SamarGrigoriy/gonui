@@ -147,6 +147,7 @@ type node struct {
 | ChooseFolder | `SHBrowseForFolderW` (`BIF_NEWDIALOGSTYLE \| BIF_RETURNONLYFSDIRS`) → `SHGetPathFromIDListW` → `CoTaskMemFree`. Для этого `Init` вызывает `CoInitializeEx(NULL, COINIT_APARTMENTTHREADED)` |
 | OpenURI | `ShellExecuteW(NULL, L"open", uri, …)`; результат > 32 — успех |
 | ShowInFolder | `ShellExecuteW(…, L"explorer.exe", L"/select,\"путь\"", …)` (логгер, `open_folder`) |
+| SetClipboard / Clipboard | `nui_clip_set` / `nui_clip_get`: `OpenClipboard(msgWnd)` (до 10 попыток через 10 мс: буфер может держать другая программа) → `EmptyClipboard` + `SetClipboardData(CF_UNICODETEXT, GlobalAlloc(GMEM_MOVEABLE))` / `GetClipboardData` + `GlobalLock` → `CloseClipboard`. После успешного `SetClipboardData` память принадлежит системе. `\n` ↔ `\r\n` переводит Go-часть |
 
 ## 10. Отличия от Linux (документированные расхождения)
 

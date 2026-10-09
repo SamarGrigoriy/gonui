@@ -131,6 +131,8 @@ func MessageBox(parent H, kind uint8, title, text string) bool // kind: MsgInfo,
 func FileDialog(parent H, mode uint8, title, name string, f []Filter) (string, bool) // FileOpen, FileSave, FileFolder
 func OpenURI(parent H, uri string) bool
 func ShowInFolder(path string) bool     // асинхронно, см. §7
+func ClipboardSet(s string)
+func ClipboardText() string             // "" — пусто или не текст
 ```
 
 Каждая функция, которая создаёт виджет (`XxxNew`), обязана:
@@ -449,6 +451,7 @@ void g_variant_unref(GVariant*)                                                 
 | OpenFile/SaveFile/ChooseFolder | `gtk_file_chooser_native_new` | — | `accept_label` и `cancel_label` = `NULL`: подписи по умолчанию GTK переведёт на язык системы сам. Save → `do_overwrite_confirmation(TRUE)`, `set_current_name`. Ответ `ACCEPT` → `get_filename` → `gostrFree`; затем `g_object_unref(native)` |
 | OpenURI | `gtk_show_uri_on_window(parent, uri, 0, NULL)` | — | — |
 | ShowInFolder | `g_filename_to_uri(path)` и `g_filename_to_uri(dir(path))` → `nui_show_items(uri, dir_uri)` | — | URI строит GLib (`%20`, не-UTF-8 байты имени); путь передаётся через `cpath`, без замены байтов. Вызов D-Bus **асинхронный**: интерфейс не ждёт файловый менеджер. Если тот ответил ошибкой (например, `ServiceUnknown`), C-колбэк сам открывает папку через `gtk_show_uri_on_window`. Нет D-Bus-сессии → папка открывается сразу |
+| ClipboardSet / ClipboardText | `nui_clipboard()` = `gtk_clipboard_get(GDK_SELECTION_CLIPBOARD)` (атом 69, без libgdk); `gtk_clipboard_set_text(cb, s, -1)` + `gtk_clipboard_set_can_store(cb, NULL, 0)`; `gtk_clipboard_wait_for_text` → `g_free` | — | Буфер CLIPBOARD, не PRIMARY (выделение мышью). `set_can_store` — при выходе GTK отдаёт текст менеджеру буфера обмена. `wait_for_text` крутит вложенный цикл, пока владелец буфера не ответит |
 
 ## 8. C-обёртки (`wrap_linux.c`)
 

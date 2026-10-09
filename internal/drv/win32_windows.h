@@ -19,7 +19,7 @@ typedef unsigned short WORD, ATOM, USHORT, LANGID;
 typedef unsigned long DWORD, ULONG, COLORREF;
 typedef long LONG, HRESULT;
 typedef long long LONG_PTR, INT_PTR;
-typedef unsigned long long UINT_PTR, ULONG_PTR;
+typedef unsigned long long UINT_PTR, ULONG_PTR, SIZE_T;
 typedef UINT_PTR WPARAM;
 typedef LONG_PTR LPARAM, LRESULT;
 typedef void *LPVOID, *PVOID, *HANDLE, *HGDIOBJ;
@@ -427,6 +427,8 @@ NUI_CONST(OFN_EXPLORER, 0x00080000)
 NUI_CONST(BIF_RETURNONLYFSDIRS, 0x00000001)
 NUI_CONST(BIF_NEWDIALOGSTYLE, 0x00000040)
 NUI_CONST(COINIT_APARTMENTTHREADED, 0x2)
+NUI_CONST(CF_UNICODETEXT, 13)
+NUI_CONST(GMEM_MOVEABLE, 0x0002)
 
 /* ---------- 4. Функции ---------- */
 /* kernel32 */
@@ -440,6 +442,11 @@ NUI_FN(UINT, GetSystemDirectoryW, (LPWSTR lpBuffer, UINT uSize))
 NUI_FN(HANDLE, CreateActCtxW, (const ACTCTXW *pActCtx))
 NUI_FN(BOOL, ActivateActCtx, (HANDLE hActCtx, ULONG_PTR *lpCookie))
 NUI_FN(HRSRC, FindResourceW, (HMODULE hModule, LPCWSTR lpName, LPCWSTR lpType))
+NUI_FN(HANDLE, GlobalAlloc, (UINT uFlags, SIZE_T dwBytes))
+NUI_FN(LPVOID, GlobalLock, (HANDLE hMem))
+NUI_FN(BOOL, GlobalUnlock, (HANDLE hMem))
+NUI_FN(HANDLE, GlobalFree, (HANDLE hMem))
+NUI_FN(void, Sleep, (DWORD dwMilliseconds))
 
 /* user32: окна и сообщения */
 NUI_FN(ATOM, RegisterClassExW, (const WNDCLASSEXW *wc))
@@ -484,6 +491,11 @@ NUI_FN(BOOL, GetMonitorInfoW, (HMONITOR hMonitor, MONITORINFO *lpmi))
 NUI_FN(int, MessageBoxW, (HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType))
 NUI_FN(int, SetScrollInfo, (HWND hwnd, int nBar, const SCROLLINFO *lpsi, BOOL redraw))
 NUI_FN(BOOL, GetScrollInfo, (HWND hwnd, int nBar, SCROLLINFO *lpsi))
+NUI_FN(BOOL, OpenClipboard, (HWND hWndNewOwner))
+NUI_FN(BOOL, CloseClipboard, (void))
+NUI_FN(BOOL, EmptyClipboard, (void))
+NUI_FN(HANDLE, SetClipboardData, (UINT uFormat, HANDLE hMem))
+NUI_FN(HANDLE, GetClipboardData, (UINT uFormat))
 NUI_FN(HWND, GetWindow, (HWND hWnd, UINT uCmd))
 NUI_FN(HWND, GetParent, (HWND hWnd))
 NUI_FN(HWND, GetDlgItem, (HWND hDlg, int nIDDlgItem))
@@ -557,6 +569,8 @@ int   nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR tex
 int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);
 void  nui_text_append(HWND edit, LPCWSTR s, int autoscroll, int maxLines);
+int   nui_clip_set(LPCWSTR s, int len);
+int   nui_clip_get(LPWSTR buf, int cap); /* длина текста в буфере; buf == 0 — только длина */
 HWND  nui_tooltip_new(HWND owner);
 void  nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text); /* text == 0 — убрать */
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */

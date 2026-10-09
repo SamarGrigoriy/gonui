@@ -33,7 +33,10 @@ func main() {
 		})
 		chat.OnStop(func() { typing.Stop() }) // сообщение «Стоп» уже закончил сам
 
-		w := nui.NewWindow("nui · чат", chat)
+		copyBtn := nui.NewButton("Скопировать ответ", func() { nui.SetClipboard(chat.LastMessage()) })
+		copyBtn.SetTooltip("Последнее сообщение — в буфер обмена")
+
+		w := nui.NewWindow("nui · чат", nui.VBox(nui.HBox(nui.Stretch(), copyBtn), nui.Expand(chat)))
 		w.SetSize(460, 420)
 		w.Show()
 		chat.Focus()

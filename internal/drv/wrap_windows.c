@@ -438,6 +438,56 @@ void nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text) {
 	}
 }
 
+// Буфер обмена (CF_UNICODETEXT). Его может держать открытым другая программа —
+// несколько попыток с паузой.
+static int clip_open(void) {
+	for (int i = 0; i < 10; i++) {
+		if (OpenClipboard(msgWnd))
+			return 1;
+		Sleep(10);
+	}
+	return 0;
+}
+
+int nui_clip_set(LPCWSTR s, int len) {
+	HANDLE m = GlobalAlloc(NUI_GMEM_MOVEABLE, (SIZE_T)(len + 1) * sizeof(WCHAR));
+	if (!m)
+		return 0;
+	WCHAR *p = GlobalLock(m);
+	for (int i = 0; i < len; i++)
+		p[i] = s[i];
+	p[len] = 0;
+	GlobalUnlock(m);
+	if (!clip_open()) {
+		GlobalFree(m);
+		return 0;
+	}
+	EmptyClipboard();
+	int ok = SetClipboardData(NUI_CF_UNICODETEXT, m) != 0; // память теперь принадлежит системе
+	if (!ok)
+		GlobalFree(m);
+	CloseClipboard();
+	return ok;
+}
+
+int nui_clip_get(LPWSTR buf, int cap) {
+	if (!clip_open())
+		return 0;
+	int n = 0;
+	HANDLE m = GetClipboardData(NUI_CF_UNICODETEXT);
+	const WCHAR *p = m ? GlobalLock(m) : 0;
+	if (p) {
+		while (p[n])
+			n++;
+		if (buf)
+			for (int i = 0; i < n && i < cap; i++)
+				buf[i] = p[i];
+		GlobalUnlock(m);
+	}
+	CloseClipboard();
+	return n;
+}
+
 #ifdef NUI_GUI_TEST
 // Помощники интеграционных тестов (sim_windows.go): открытый модальный диалог потока.
 int nui_dialog_kind(void) { return dlgKind; }

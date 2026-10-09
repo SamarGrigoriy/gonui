@@ -31,6 +31,7 @@ type Chat struct {
 	cur         *ChatStream // сообщение, которое сейчас дописывается
 	tick        *Timer      // переносит текст cur в ленту
 	lastNewline bool        // лента кончается переводом строки
+	last        string      // текст последнего сообщения — для «Скопировать ответ»
 }
 
 // NewChat создаёт чат. Лента растягивается: задайте окну размер (SetSize) или вставьте
@@ -75,6 +76,7 @@ func (c *Chat) Add(who, text string) {
 	c.finish()
 	c.appendLog(header(who) + text)
 	c.endMessage()
+	c.last = text
 }
 
 // Stream начинает сообщение, которое приходит частями, и делает чат занятым. Писать
@@ -88,6 +90,7 @@ func (c *Chat) Stream(who string) *ChatStream {
 	}
 	c.finish()
 	c.appendLog(header(who))
+	c.last = ""
 	c.cur = s
 	c.setBusy(true)
 	c.tick = Every(40, c.flush)
@@ -113,6 +116,16 @@ func (c *Chat) Clear() {
 	c.finish()
 	c.log.Clear()
 	c.lastNewline = true
+	c.last = ""
+}
+
+// LastMessage — текст последнего сообщения без подписи (у незаконченного — то, что уже
+// в ленте). Например, для кнопки «Скопировать ответ»: nui.SetClipboard(chat.LastMessage()).
+func (c *Chat) LastMessage() string {
+	if c.dead() {
+		return ""
+	}
+	return c.last
 }
 
 // Text — вся лента.
@@ -211,6 +224,7 @@ func (c *Chat) flush() {
 	}
 	text, done := s.take(false)
 	c.appendLog(text)
+	c.last += text
 	if done {
 		c.cur = nil
 		c.stopTick()
@@ -228,6 +242,7 @@ func (c *Chat) finish() {
 	s.Close()
 	text, _ := s.take(true)
 	c.appendLog(text)
+	c.last += text
 	c.cur = nil
 	c.stopTick()
 	c.endMessage()

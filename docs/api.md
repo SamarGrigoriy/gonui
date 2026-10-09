@@ -410,7 +410,7 @@ func ChooseFolder(parent *Window, title string) (path string, ok bool)
 
 ---
 
-## 17. Оболочка
+## 17. Оболочка и буфер обмена
 
 ```go
 func OpenURI(uri string) bool      // открыть "https://…" или "file:///…" программой по умолчанию
@@ -419,6 +419,20 @@ func ShowInFolder(path string) bool // открыть файловый мене�
 - `ShowInFolder` просит файловый менеджер выделить файл (D-Bus `org.freedesktop.FileManager1` на Linux, `explorer /select` на Windows). Запрос асинхронный: функция не ждёт файловый менеджер, и интерфейс не замирает. Если файловый менеджер ответил ошибкой (например, такой службы нет), nui сам открывает папку.
 - `true` — запрос отправлен или папка открыта. `false` — не удалось ни то, ни другое (например, нет D-Bus-сессии и нет программы для `file://`).
 - `path` — абсолютный путь в файловой системе (не URI).
+
+```go
+func SetClipboard(text string) // положить текст в буфер обмена (Ctrl+V в любой программе)
+func Clipboard() string        // текст из буфера; "" — пусто или там не текст
+```
+- Только текст. Переводы строк в nui — `\n`; на Windows в буфере они `\r\n`, nui переводит в обе стороны.
+- `Clipboard` синхронный: на Linux он ждёт ответа программы, которая владеет буфером, и всё это время крутит вложенный цикл событий (как модальный диалог, §16). Обычно ответ приходит за миллисекунды.
+- На Linux (X11 и Wayland) текст в буфере хранит сама программа. После её выхода он остаётся, только если в системе есть менеджер буфера обмена (в GNOME, KDE и Xfce он есть): nui разрешает GTK передать ему текст. На Windows текст хранит система.
+
+Кнопка «Скопировать ответ» для чата (§18):
+
+```go
+copyBtn := nui.NewButton("Скопировать ответ", func() { nui.SetClipboard(chat.LastMessage()) })
+```
 
 ---
 
@@ -434,6 +448,7 @@ func (c *Chat) Stream(who string) *ChatStream // сообщение, котор�
 func (c *Chat) OnStop(fn func())              // «Стоп» во время ответа
 func (c *Chat) SetBusy(on bool); Busy() bool
 func (c *Chat) Clear(); Text() string
+func (c *Chat) LastMessage() string            // текст последнего сообщения без подписи
 func (c *Chat) SetPlaceholder(s string)
 func (c *Chat) SetLabels(you, send, stop string) // по умолчанию «Вы», «Отправить», «Стоп»
 func (c *Chat) Focus()
@@ -452,6 +467,7 @@ var ErrChatClosed error
 | `Close()` | ответ закончен: остаток уходит в ленту, чат перестаёт быть занятым. Повторный `Close` ничего не делает; запись после него — `ErrChatClosed` |
 | `OnStop(fn)` | «Стоп» сначала заканчивает текущий ответ (дальше `Write` вернёт `ErrChatClosed`, и `io.Copy` остановится сам), потом вызывает `fn` — в нём отменяют запрос (`context.CancelFunc`) |
 | `Add`, `Stream`, `Clear` посреди ответа | текущий ответ сначала заканчивается: в ленте сообщения не перемешиваются |
+| `LastMessage()` | текст последнего сообщения (`Add`, `Stream` или отправленного пользователем) без «who:». У незаконченного `Stream` — то, что уже в ленте; после `Clear` — `""`. Для «Скопировать ответ»: `nui.SetClipboard(chat.LastMessage())` (§17) |
 | Уничтожение | вместе с окном, как любой виджет; поток уничтоженного чата молча отбрасывает текст |
 
 **Потоки.** `ChatStream.Write`, `WriteString` и `Close` — **исключение** из правила §0: их можно вызывать из любой горутины. Все остальные методы `Chat` — только в UI-потоке.
@@ -498,10 +514,6 @@ func (w *Window) SetMenu(menus ...*Menu)
 func NewMenu(title string, items ...MenuItem) *Menu
 func Item(text string, fn func()) MenuItem
 func Sep() MenuItem
-
-// Буфер обмена (синхронно)
-func SetClipboard(text string)
-func Clipboard() string
 
 // Клавиши окна
 func (w *Window) OnKey(fn func(k Key, m Mod) bool) // true — событие обработано

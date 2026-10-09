@@ -439,6 +439,14 @@ func helper(name string) int {
 			code = 0
 		case "nodisplay":
 			code = 4 // setup не должен вызываться
+		case "clipboard": // текст, который положил в буфер родительский процесс
+			if got := Clipboard(); got == os.Getenv("NUI_CLIP") {
+				code = 0
+			} else {
+				code = 6
+				println("в буфере:", got)
+			}
+			Quit()
 		case "openuri", "showinfolder": // подставная программа пишет в $NUI_REC, что открыли
 			ok := false
 			if name == "openuri" {
