@@ -439,6 +439,14 @@ func helper(name string) int {
 			code = 0
 		case "nodisplay":
 			code = 4 // setup не должен вызываться
+		case "args": // последний аргумент командной строки — тот, что передал родитель
+			if a := Args(); len(a) > 1 && a[len(a)-1] == os.Getenv("NUI_ARG") {
+				code = 0
+			} else {
+				code = 7
+				println("Args:", len(a))
+			}
+			Quit()
 		case "clipboard": // текст, который положил в буфер родительский процесс
 			if got := Clipboard(); got == os.Getenv("NUI_CLIP") {
 				code = 0

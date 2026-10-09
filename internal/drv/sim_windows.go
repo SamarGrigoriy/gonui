@@ -271,3 +271,13 @@ func SimKeyPosted(win H, key uint32) {
 	}
 	C.PostMessageW(C.GetFocus(), C.NUI_WM_KEYDOWN, C.WPARAM(vk), 0)
 }
+
+// SimDropFiles — на окно бросили файлы: HDROP, как у оболочки, и WM_DROPFILES в очередь.
+func SimDropFiles(win H, id uint32, paths []string) {
+	var b []uint16
+	for _, p := range paths {
+		b = append(b, utf16z(p)...)
+	}
+	b = append(b, 0)
+	C.nui_sim_drop(nodes[win].hwnd, wptr(b), C.int(len(b)))
+}

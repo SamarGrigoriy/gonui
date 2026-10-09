@@ -179,6 +179,9 @@ typedef struct _browseinfoW {
 	int iImage;
 } BROWSEINFOW;
 typedef struct HBITMAP__ *HBITMAP;
+typedef struct HDROP__ *HDROP;
+typedef struct tagCHANGEFILTERSTRUCT CHANGEFILTERSTRUCT;
+typedef struct _DROPFILES { DWORD pFiles; POINT pt; BOOL fNC, fWide; } DROPFILES;
 /* ListView (List) */
 typedef struct tagNMHDR { HWND hwndFrom; UINT_PTR idFrom; UINT code; } NMHDR;
 typedef struct tagLVITEMW {
@@ -261,6 +264,7 @@ _Static_assert(sizeof(TOOLINFOW) == 72, "TOOLINFOW");
 _Static_assert(sizeof(DRAWITEMSTRUCT) == 64, "DRAWITEMSTRUCT");
 _Static_assert(sizeof(BITMAPINFO) == 44, "BITMAPINFO");
 _Static_assert(sizeof(NMHDR) == 24, "NMHDR");
+_Static_assert(sizeof(DROPFILES) == 20, "DROPFILES");
 _Static_assert(sizeof(LVITEMW) == 88, "LVITEMW");
 _Static_assert(sizeof(LVCOLUMNW) == 56, "LVCOLUMNW");
 _Static_assert(sizeof(NMLVDISPINFOW) == 112, "NMLVDISPINFOW");
@@ -394,6 +398,9 @@ NUI_CONST(ICC_STANDARD_CLASSES, 0x00004000)
 NUI_CONST(ICC_BAR_CLASSES, 0x00000004)
 NUI_CONST(ICC_LISTVIEW_CLASSES, 0x00000001)
 NUI_CONST(WM_NOTIFY, 0x004E)
+NUI_CONST(WM_DROPFILES, 0x0233)
+NUI_CONST(WM_COPYDATA, 0x004A)
+NUI_CONST(MSGFLT_ALLOW, 1)
 NUI_CONST(LVS_REPORT, 0x0001)
 NUI_CONST(LVS_SINGLESEL, 0x0004)
 NUI_CONST(LVS_SHOWSELALWAYS, 0x0008)
@@ -616,6 +623,7 @@ NUI_FN(BOOL, SetPropW, (HWND hWnd, LPCWSTR lpString, HANDLE hData))
 NUI_FN(HANDLE, GetPropW, (HWND hWnd, LPCWSTR lpString))
 NUI_FN(LRESULT, CallWindowProcW, (WNDPROC lpPrevWndFunc, HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam))
 NUI_FN(SHORT, GetKeyState, (int nVirtKey))
+NUI_FN(BOOL, ChangeWindowMessageFilterEx, (HWND hwnd, UINT message, DWORD action, CHANGEFILTERSTRUCT *pChangeFilterStruct))
 NUI_FN(HWND, GetFocus, (void))
 NUI_FN(HANDLE, RemovePropW, (HWND hWnd, LPCWSTR lpString))
 NUI_FN(HWND, GetAncestor, (HWND hwnd, UINT gaFlags))
@@ -691,6 +699,12 @@ NUI_FN(HRESULT, CoInitializeEx, (LPVOID pvReserved, DWORD dwCoInit))
 NUI_FN(void, CoTaskMemFree, (LPVOID pv))
 NUI_FN(LPVOID, CoTaskMemAlloc, (SIZE_T cb))
 NUI_FN(HRESULT, CreateStreamOnHGlobal, (HGLOBAL hGlobal, BOOL fDeleteOnRelease, IStream **ppstm))
+NUI_FN(void, DragAcceptFiles, (HWND hWnd, BOOL fAccept))
+NUI_FN(UINT, DragQueryFileW, (HDROP hDrop, UINT iFile, LPWSTR lpszFile, UINT cch))
+NUI_FN(void, DragFinish, (HDROP hDrop))
+NUI_FN(LPWSTR, GetCommandLineW, (void))
+NUI_FN(LPWSTR *, CommandLineToArgvW, (LPCWSTR lpCmdLine, int *pNumArgs))
+NUI_FN(HANDLE, LocalFree, (HANDLE hMem))
 NUI_FN(BOOL, GetOpenFileNameW, (OPENFILENAMEW *lpofn))
 NUI_FN(BOOL, GetSaveFileNameW, (OPENFILENAMEW *lpofn))
 
@@ -754,6 +768,7 @@ void  nui_list_column(HWND lv, int index, LPCWSTR title);
 void  nui_edit_hint(HWND edit, LPCWSTR hint); /* подсказка в пустом многострочном поле; 0 — убрать */
 void  nui_list_select(HWND lv, int row);
 int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */
+void  nui_sim_drop(HWND w, LPCWSTR files, int len); /* только с NUI_GUI_TEST: files — «путь\0путь\0\0» */
 HWND  nui_tooltip_new(HWND owner);
 void  nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text); /* text == 0 — убрать */
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */

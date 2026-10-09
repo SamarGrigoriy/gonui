@@ -11,6 +11,7 @@ type Window struct {
 	id      uint32
 	onClose func() bool
 	onKey   func(k Key, m Mod) bool
+	onDrop  func(paths []string)
 }
 
 // NewWindow создаёт окно — скрытым, с отступом 12, по центру экрана (на Wayland
@@ -188,6 +189,18 @@ func (w *Window) OnKey(fn func(k Key, m Mod) bool) {
 	}
 }
 
+// OnDropFiles: на окно перетащили файлы или папки из файлового менеджера; paths —
+// абсолютные пути (на Linux — байты имён как есть). Бросить можно на любое место окна,
+// кроме полей ввода: туда, как и везде, перетаскивается текст. nil снимает обработчик.
+func (w *Window) OnDropFiles(fn func(paths []string)) {
+	core.CheckThread()
+	dropDecode = drv.DropPaths
+	w.onDrop = fn
+	if w.id != 0 {
+		drv.WindowSetDrop(w.h, w.id, fn != nil)
+	}
+}
+
 // Focus передаёт фокус окну.
 func (w *Window) Focus() {
 	if !w.dead() {
@@ -195,9 +208,13 @@ func (w *Window) Focus() {
 	}
 }
 
-// keyDecode — drv.KeyDecode, но только после первого OnKey: прямой вызов из Event держал
-// бы разбор клавиш (и libgdk на Linux) в каждой программе, даже без OnKey.
-var keyDecode func(arg uintptr) (key uint32, mods uint8)
+// keyDecode и dropDecode — drv.KeyDecode и drv.DropPaths, но только после первого OnKey
+// и OnDropFiles: прямой вызов из Event держал бы их (и libgdk на Linux) в каждой
+// программе.
+var (
+	keyDecode  func(arg uintptr) (key uint32, mods uint8)
+	dropDecode func(arg uintptr) []string
+)
 
 type windowEv Window
 
@@ -206,6 +223,12 @@ func (w *windowEv) Event(k core.Kind, arg uintptr) uintptr {
 	case core.EvClose:
 		if w.onClose != nil && !w.onClose() {
 			return 1 // окно остаётся
+		}
+	case core.EvDrop:
+		if w.onDrop != nil {
+			if paths := dropDecode(arg); len(paths) > 0 {
+				w.onDrop(paths)
+			}
 		}
 	case core.EvKey:
 		if w.onKey != nil {

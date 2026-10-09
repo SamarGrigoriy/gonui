@@ -549,6 +549,54 @@ void nui_text_placeholder(GtkTextView *v, const gchar *s) {
 	gtk_widget_queue_draw((GtkWidget *)v);
 }
 
+/* ---------- OnDropFiles ---------- */
+
+/* URI → локальные пути одной строкой «путь\0путь\0\0» (байты ФС как есть) — arg события
+   EvDrop. Не локальные URI (http://…) пропускаются; не осталось путей — события нет. */
+void nui_drop_uris(GtkWidget *w, gchar **uris, uintptr_t ud) {
+	gsize n = 1;
+	gchar *paths[256];
+	int k = 0;
+	for (int i = 0; uris && uris[i] && k < 256; i++)
+		if ((paths[k] = g_filename_from_uri(uris[i], 0, 0)))
+			n += strlen(paths[k++]) + 1;
+	if (k == 0)
+		return;
+	gchar *buf = g_malloc(n), *p = buf;
+	for (int i = 0; i < k; i++) {
+		gsize l = strlen(paths[i]) + 1;
+		memcpy(p, paths[i], l);
+		p += l;
+		g_free(paths[i]);
+	}
+	*p = 0;
+	nuiSignalRet(w, buf, ud);
+	g_free(buf);
+}
+
+/* drag-data-received: GTK_DEST_DEFAULT_ALL сам запрашивает данные и сам вызывает
+   gtk_drag_finish. */
+static void drop_received(GtkWidget *w, GdkDragContext *ctx, gint x, gint y, GtkSelectionData *sd, guint info,
+	guint time, gpointer ud) {
+	(void)ctx;
+	(void)x;
+	(void)y;
+	(void)info;
+	(void)time;
+	gchar **uris = gtk_selection_data_get_uris(sd);
+	nui_drop_uris(w, uris, (uintptr_t)ud);
+	g_strfreev(uris);
+}
+
+void nui_drop_enable(GtkWidget *w, uintptr_t ud) {
+	static GtkTargetEntry uriList = {"text/uri-list", 0, 0};
+	if (g_object_get_data((GObject *)w, "nui-drop"))
+		return;
+	g_object_set_data_full((GObject *)w, "nui-drop", (gpointer)1, 0);
+	gtk_drag_dest_set(w, NUI_GTK_DEST_DEFAULT_ALL, &uriList, 1, NUI_GDK_ACTION_COPY);
+	g_signal_connect_data(w, "drag-data-received", (GCallback)drop_received, (gpointer)ud, 0, 0);
+}
+
 /* ---------- OnKey ---------- */
 /* Латинская буква или цифра той же клавиши в любой раскладке: в русской раскладке
    keyval у Ctrl+S — «ы», а программе нужно 'S'. 0 — такой нет. */

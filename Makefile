@@ -9,7 +9,7 @@ GO           ?= go
 TINYGO       ?= tinygo
 TINYGO_SCHED ?= none
 ARCH         ?= amd64
-EXAMPLES     := hello form chat
+EXAMPLES     := hello form chat viewer
 GTK_DEBUG_ENV := NO_AT_BRIDGE=1 G_DEBUG=fatal-criticals
 XVFB         ?= xvfb-run -a
 

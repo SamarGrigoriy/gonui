@@ -13,6 +13,12 @@ package drv
 */
 import "C"
 
+import (
+	"unsafe"
+
+	"nui/internal/core"
+)
+
 // SimClick — как нажатие кнопки мышью.
 func SimClick(h H) { C.gtk_button_clicked((*C.GtkButton)(h)) }
 
@@ -171,3 +177,17 @@ func SimKeyval(win H, keyval, codeOf uint32, mods uint8) {
 
 // SimKeyPosted — на GTK то же, что SimKey без модификаторов (на Windows — через цикл).
 func SimKeyPosted(win H, key uint32) { SimKey(win, key, 0) }
+
+// SimDropFiles — на окно бросили файлы: то же, что делает drag-data-received с URI
+// (сам протокол перетаскивания X11/Wayland в тестах не участвует).
+func SimDropFiles(win H, id uint32, paths []string) {
+	uris := make([]*C.gchar, 0, len(paths)+1)
+	for _, p := range paths {
+		uris = append(uris, C.g_filename_to_uri(cpath(p), nil, nil))
+	}
+	uris = append(uris, nil)
+	carr := (**C.gchar)(C.g_malloc(C.gsize(len(uris)) * C.gsize(unsafe.Sizeof(uintptr(0)))))
+	copy(unsafe.Slice(carr, len(uris)), uris)
+	C.nui_drop_uris(widget(win), carr, ud(id, core.EvDrop))
+	C.g_strfreev(carr)
+}

@@ -122,6 +122,8 @@ C-хелперы для тестов лежат в `wrap_linux.c` под `#ifdef
 | `Do` | из горутины; из UI-потока (асинхронно: выполняется после возврата); порядок |
 | Модальный диалог | пока открыт `Message`, `Every` продолжает тикать; ответы «Да», «Нет», Esc, OK (`drv.SimAnswer`, `SimEsc`, `SimOK`); родитель уничтожен, пока открыт `Ask` → `false` без падения |
 | Файловые диалоги | `OpenFile` с фильтром, отмена, `SaveFile` с предложенным именем, `ChooseFolder` (`drv.SimChooserSet`, `SimChooserDone`); `OpenFiles`: два файла (`drv.SimChooserAdd` — как Ctrl+щелчок), один файл, отмена |
+| Перетаскивание | `OnDropFiles`: пути с кириллицей, пробелом и эмодзи доходят как есть; `OnDropFiles(nil)` — приём выключен. На Linux `drv.SimDropFiles` вызывает то же, что `drag-data-received`, с URI от `g_filename_to_uri` (сам протокол XDND не участвует); на Windows — `HDROP`, как его собирает оболочка, и `WM_DROPFILES` в очередь |
+| `Args` | совпадает с `os.Args`; дочерний процесс получает русский путь с пробелами целым (на Windows — через `GetCommandLineW`) |
 | Клавиши | `OnKey`: Ctrl+S и F5 окно забирает — до поля не доходят, `X` отдаёт — буква в поле, Ctrl+Enter забран — `OnEnter` поля не вызван; клавиша через настоящий цикл сообщений (`drv.SimKeyPosted`: на Windows — `WM_KEYDOWN` в очередь); `OnKey(nil)` — всё полю. Только Linux: русская раскладка — keyval «ы» на клавише S даёт `'S'`. `TextView.OnEnter`: Enter — обработчик без перевода строки, Shift+Enter — перевод строки, после `SetWrap` (на Windows поле пересоздаётся) Enter по-прежнему обработчику. Чат: многострочное сообщение |
 | List | `SetRows` + текст ячеек так, как его получает виджет (`drv.ListCellText`: GtkTreeModel / `LVN_GETDISPINFOW`); `Select` молчит, выбор пользователем (`drv.SimListSelect`) — `OnSelect`; `drv.SimListActivate` — `OnActivate`; `Update`; миллион строк: `cell` вызвана меньше 10 000 раз; `SetRows(0, nil)`; уничтоженный список. Только Linux: размер 46×71, на который опирается Win32 |
 | Image | PNG 120×80 → место 120×80; `SetFit(60, 0)` → 60×40; мусор и пустые данные → `ErrImage`, прежняя картинка остаётся; JPEG с EXIF Orientation = 6 → повёрнут; `SetFile` и ошибка чтения; `Clear`; методы уничтоженной картинки ничего не делают |
@@ -217,6 +219,11 @@ Selftest логгера, кроме того, создаёт псевдотер�
 **Оболочка:**
 - `OpenURI` для `https://` и `file://`;
 - `ShowInFolder` в Nautilus, Dolphin и Thunar; запасной путь без `FileManager1`; при «холодном» запуске файлового менеджера открывается одно окно, а интерфейс не замирает.
+
+**Перетаскивание:**
+- файлы и папки из Nautilus, Dolphin, Thunar (X11 и Wayland) и из Проводника Windows 10 и 11; несколько файлов сразу; имена с русскими буквами;
+- программа, запущенная от администратора, принимает файлы из Проводника;
+- «Открыть с помощью…» в Проводнике для `examples/viewer` в сборке TinyGo: русское имя файла доходит (`nui.Args`).
 
 **Клавиши:**
 - `OnKey` в русской и английской раскладке на Windows 10 и 11 и в GNOME (X11 и Wayland): Ctrl+S, Ctrl+Shift+S, F5, Esc, стрелки, цифры цифрового блока;

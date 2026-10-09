@@ -2,7 +2,12 @@
 
 package nui
 
-import "testing"
+import (
+	"os"
+	"os/exec"
+	"slices"
+	"testing"
+)
 
 // Другая программа (дочерний процесс) видит то, что положили в буфер мы.
 func TestClipboardOtherProcess(t *testing.T) {
@@ -45,4 +50,18 @@ func TestClipboard(t *testing.T) {
 		}
 		w.Close()
 	})
+}
+
+// Args: аргументы командной строки — как os.Args (в gc), и русский путь с пробелами
+// доходит без потерь (в TinyGo на Windows os.Args его портит — Args берёт GetCommandLineW).
+func TestArgs(t *testing.T) {
+	if a := Args(); !slices.Equal(a, os.Args) {
+		t.Errorf("Args() = %q, os.Args = %q", a, os.Args)
+	}
+	const arg = `C:\Мои документы\фото с телефона.jpg`
+	cmd := exec.Command(os.Args[0], "-test.run=^$", arg)
+	cmd.Env = append(os.Environ(), "NUI_HELPER=args", "NUI_ARG="+arg)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("дочерний процесс: %v\n%s", err, out)
+	}
 }

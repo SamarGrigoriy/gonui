@@ -216,6 +216,10 @@ func windowProc(h H, n *node, m uint32, wp, lp uintptr) (uintptr, bool) {
 			mmi.ptMaxTrackSize.x, mmi.ptMaxTrackSize.y = wr.right-wr.left, wr.bottom-wr.top
 		}
 		return 0, true
+	case C.NUI_WM_DROPFILES: // OnDropFiles: arg события — HDROP, пути читает DropPaths
+		core.Dispatch(core.UD(n.id, core.EvDrop), wp)
+		C.DragFinish(hdropOf(wp))
+		return 0, true
 	case C.NUI_WM_DPICHANGED:
 		// Окно переехало на монитор с другим масштабом (driver-win32.md, §7): шрифты под
 		// новый dpi, всем — WM_SETFONT, листья перемерить, окно — в предложенный прямоугольник.

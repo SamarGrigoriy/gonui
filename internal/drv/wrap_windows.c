@@ -750,6 +750,22 @@ void nui_list_select(HWND lv, int row) {
 }
 
 #ifdef NUI_GUI_TEST
+// На окно бросили файлы: HDROP, как его собирает оболочка (DROPFILES + пути UTF-16),
+// в очередь окну — дальше обычный WM_DROPFILES и DragQueryFileW.
+void nui_sim_drop(HWND w, LPCWSTR files, int len) {
+	HGLOBAL m = GlobalAlloc(NUI_GMEM_MOVEABLE, sizeof(DROPFILES) + (SIZE_T)len * sizeof(WCHAR));
+	DROPFILES *d = GlobalLock(m);
+	d->pFiles = sizeof(DROPFILES);
+	d->pt.x = d->pt.y = 10;
+	d->fNC = 0;
+	d->fWide = 1;
+	WCHAR *p = (WCHAR *)(d + 1);
+	for (int i = 0; i < len; i++)
+		p[i] = files[i];
+	GlobalUnlock(m);
+	PostMessageW(w, NUI_WM_DROPFILES, (WPARAM)m, 0);
+}
+
 // Текст ячейки так, как его видит ListView: LVM_GETITEMTEXTW → LVN_GETDISPINFOW родителю.
 int nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap) {
 	LVITEMW it = {0};

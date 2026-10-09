@@ -21,7 +21,7 @@ typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnect
             GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight,
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
             GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags,
-            GtkStateFlags, GtkTextWindowType, PangoWrapMode;
+            GtkStateFlags, GtkTextWindowType, PangoWrapMode, GtkDestDefaults, GdkDragAction;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -79,7 +79,8 @@ typedef struct _GdkEventKey {
 typedef struct _GtkCssProvider GtkCssProvider; typedef struct _GtkStyleContext GtkStyleContext;
 typedef struct _GtkStyleProvider GtkStyleProvider;
 typedef struct _GtkClipboard GtkClipboard; typedef struct _GdkAtom *GdkAtom;
-typedef struct _GtkTargetEntry GtkTargetEntry;
+typedef struct _GtkTargetEntry { gchar *target; guint flags, info; } GtkTargetEntry;
+typedef struct _GdkDragContext GdkDragContext; typedef struct _GtkSelectionData GtkSelectionData;
 typedef struct _GtkImage GtkImage;         typedef struct _GdkPixbuf GdkPixbuf;
 typedef struct _GdkPixbufLoader GdkPixbufLoader; typedef struct _cairo_surface cairo_surface_t;
 typedef void (*GAsyncReadyCallback)(GObject *, GAsyncResult *, gpointer);
@@ -200,6 +201,8 @@ NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
 NUI_CONST(G_BUS_TYPE_SESSION, 2)
 NUI_CONST(G_DBUS_CALL_FLAGS_NONE, 0)
 NUI_CONST(GDK_KEY_PRESS, 8)
+NUI_CONST(GTK_DEST_DEFAULT_ALL, 7)
+NUI_CONST(GDK_ACTION_COPY, 2)
 NUI_CONST(GTK_TEXT_WINDOW_WIDGET, 1)
 NUI_CONST(PANGO_WRAP_WORD_CHAR, 2)
 NUI_CONST(PANGO_SCALE, 1024)
@@ -230,6 +233,7 @@ _Static_assert(sizeof(GdkEventKey) == 56, "GdkEventKey");
 _Static_assert(__builtin_offsetof(GdkEventKey, keyval) == 28, "GdkEventKey.keyval");
 _Static_assert(__builtin_offsetof(GdkEventKey, hardware_keycode) == 48, "GdkEventKey.hardware_keycode");
 _Static_assert(sizeof(GdkKeymapKey) == 12, "GdkKeymapKey");
+_Static_assert(sizeof(GtkTargetEntry) == 16, "GtkTargetEntry");
 
 /* ---------- 4. Прототипы ---------- */
 /* GLib, GObject, цикл событий. (w) — только из обёрток. */
@@ -374,6 +378,12 @@ NUI_FN(void, gdk_event_set_device, (GdkEvent *event, GdkDevice *device))        
 NUI_FN(GdkSeat *, gdk_display_get_default_seat, (GdkDisplay *display))                       /* тесты */
 NUI_FN(GdkDevice *, gdk_seat_get_keyboard, (GdkSeat *seat))                                  /* тесты */
 NUI_FN(gboolean, gtk_widget_event, (GtkWidget *widget, GdkEvent *event))                     /* тесты */
+/* OnDropFiles: окно принимает text/uri-list */
+NUI_FN(void, gtk_drag_dest_set, (GtkWidget *widget, GtkDestDefaults flags, const GtkTargetEntry *targets,
+       gint n_targets, GdkDragAction actions))                                               /* (w) */
+NUI_FN(gchar **, gtk_selection_data_get_uris, (const GtkSelectionData *selection_data))      /* (w) */
+NUI_FN(void, g_strfreev, (gchar **str_array))                                                 /* (w) */
+NUI_FN(gchar *, g_filename_from_uri, (const gchar *uri, gchar **hostname, GError **error))    /* (w) */
 /* TextView: OnEnter и подсказка в пустом поле */
 NUI_FN(gboolean, gtk_text_view_im_context_filter_keypress, (GtkTextView *text_view, GdkEventKey *event)) /* (w) */
 NUI_FN(gint, gtk_text_buffer_get_char_count, (GtkTextBuffer *buffer))                          /* (w) */
@@ -582,6 +592,8 @@ void   nui_list_select(GtkTreeView *view, int row);
 guint  nui_key_by_code(GdkEventKey *e);
 void   nui_text_enter(GtkTextView *view, int on, uintptr_t ud);
 void   nui_text_placeholder(GtkTextView *view, const gchar *s);
+void   nui_drop_enable(GtkWidget *w, uintptr_t ud);
+void   nui_drop_uris(GtkWidget *w, gchar **uris, uintptr_t ud);
 int    nui_sim_key(GtkWidget *w, guint keyval, guint code_of, guint state); /* только с NUI_GUI_TEST */
 char  *nui_list_cell_text(GtkTreeView *view, int row, int col); /* только с NUI_GUI_TEST; g_free */
 void   nui_sim_list_activate(GtkTreeView *view, int row);       /* только с NUI_GUI_TEST */

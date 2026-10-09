@@ -13,7 +13,8 @@ const (
 	EvClose   Kind = 4 // delete-event — с ответом: 1 = не закрывать
 	EvDestroy Kind = 5 // destroy
 	EvKey     Kind = 6 // нажатие клавиши в окне (OnKey) — с ответом: 1 = обработано
-	// 7–15 — для фазы 6: EvDraw, EvMouse …
+	EvDrop    Kind = 7 // на окно перетащили файлы (OnDropFiles); arg — список путей драйвера
+	// 8–15 — для фазы 6: EvDraw, EvMouse …
 	KTimer Kind = 16 // источник GLib: таймер
 	KWatch Kind = 17 // источник GLib: fd
 	KDo    Kind = 18 // источник GLib: idle для очереди Do (id всегда 0)

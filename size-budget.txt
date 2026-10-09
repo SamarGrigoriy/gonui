@@ -8,3 +8,5 @@ examples/form        tinygo   45988     # фаза 2: 41 808 после strip + 
 examples/form        gc       1536066   # фаза 2: 1 396 424 + 10 %
 examples/chat        tinygo   46270     # 42 064 + 10 %: к 36 848 чата — кнопка «Скопировать ответ» (буфер обмена), многострочный ввод (TextView.OnEnter, подсказка через pango-cairo)
 examples/chat        gc       1509033   # 1 371 848 + 10 % (чат с буфером обмена и многострочным вводом)
+examples/viewer      tinygo   59576     # просмотрщик картинок: 54 160 после strip + 10 % (os нет: пути из nui.Args)
+examples/viewer      gc       1855612   # 1 686 920 + 10 %

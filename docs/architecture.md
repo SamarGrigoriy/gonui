@@ -69,6 +69,7 @@ nui/
 ├── shell.go                 OpenURI, ShowInFolder
 ├── clipboard.go             SetClipboard, Clipboard
 ├── key.go                   Key, Mod — для Window.OnKey
+├── args.go                  Args — аргументы командной строки
 ├── nui_gui_test.go          интеграционные тесты            //go:build gui
 │
 ├── internal/core/
@@ -97,6 +98,8 @@ nui/
 │   ├── list_linux.go        ListNew, ListSetRows … — модель GtkTreeModel в wrap_linux.c
 │   ├── clipboard_linux.go   ClipboardSet, ClipboardText
 │   ├── key_linux.go         KeyDecode, WindowSetKeys (OnKey)
+│   ├── drop_linux.go        WindowSetDrop, DropPaths (OnDropFiles)
+│   ├── args_linux.go        Args (/proc/self/cmdline)
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)
 │   ├── win32_windows.h      собственные прототипы Win32
@@ -104,7 +107,7 @@ nui/
 │   ├── export_windows.go    трамплин nuiWndProc //export
 │   ├── node_windows.go      узлы (Box, Grid — без HWND), раскладка, DPI, прокрутка
 │   ├── *_windows.go         остальное — как у Linux: app, window, widget, controls, layout, dialog,
-│   │                        image (GDI+), list (ListView), key, clipboard, sim
+│   │                        image (GDI+), list (ListView), key, drop, args, clipboard, sim
 │   └── link_tinygo_windows.go  путь к библиотекам импорта mingw для TinyGo
 │
 ├── internal/layout/         движок раскладки для Win32: Measure, Arrange (layout.md, §7)
@@ -114,7 +117,9 @@ nui/
 ├── examples/
 │   ├── hello/               минимальный пример (≤ 15 строк)
 │   ├── form/                все виджеты MVP, Grid, диалоги
-│   └── logger/              приёмочное приложение (acceptance.md)
+│   ├── chat/                Chat с эхо-ботом, «Скопировать ответ»
+│   ├── viewer/              просмотр картинок: List, Image, OpenFiles, перетаскивание, OnKey
+│   └── logger/              приёмочное приложение (acceptance.md; фаза 4 отложена)
 │
 ├── targets/
 │   └── linux-glibc-amd64.json   цель TinyGo: системная glibc вместо musl (ADR-17)
