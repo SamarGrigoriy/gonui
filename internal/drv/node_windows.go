@@ -266,6 +266,16 @@ func destroyTree(h H, hwndToo bool) {
 	for _, k := range kids {
 		destroyTree(k, hwndToo)
 	}
+	// Окно не должно ссылаться на уничтоженный узел: хендлы переиспользуются, и новая
+	// кнопка с тем же H стала бы кнопкой по умолчанию.
+	if w := get(n.win); w != nil && w != n {
+		if w.defBtn == h {
+			w.defBtn = Nil
+		}
+		if hwndToo && w.tip != nil && n.hwnd != nil && n.tooltip != "" {
+			C.nui_tooltip_set(w.tip, n.hwnd, nil)
+		}
+	}
 	if n.hwnd != nil {
 		C.SetWindowLongPtrW(n.hwnd, C.NUI_GWLP_USERDATA, 0)
 		if hwndToo {

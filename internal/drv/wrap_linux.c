@@ -171,6 +171,15 @@ GtkClipboard *nui_clipboard(void) {
 #endif
 }
 
+/* Box.Clear, Grid.Clear: уничтожить всех детей (destroy → EvDestroy каждому). Список —
+   копия, поэтому уничтожать по ходу обхода безопасно. */
+void nui_container_clear(GtkContainer *c) {
+	GList *kids = gtk_container_get_children(c);
+	for (GList *it = kids; it; it = it->next)
+		gtk_widget_destroy(it->data);
+	g_list_free(kids);
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная

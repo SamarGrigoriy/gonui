@@ -191,3 +191,6 @@ func SimDropFiles(win H, id uint32, paths []string) {
 	C.nui_drop_uris(widget(win), carr, ud(id, core.EvDrop))
 	C.g_strfreev(carr)
 }
+
+// DefaultButton — кнопка по умолчанию окна; Nil — нет.
+func DefaultButton(win H) H { return H(C.gtk_window_get_default_widget((*C.GtkWindow)(win))) }

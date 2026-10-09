@@ -281,3 +281,6 @@ func SimDropFiles(win H, id uint32, paths []string) {
 	b = append(b, 0)
 	C.nui_sim_drop(nodes[win].hwnd, wptr(b), C.int(len(b)))
 }
+
+// DefaultButton — кнопка по умолчанию окна; Nil — нет.
+func DefaultButton(win H) H { return nodes[win].defBtn }

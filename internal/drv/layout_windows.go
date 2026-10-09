@@ -28,6 +28,16 @@ func BoxSetSpacing(h H, px int) {
 }
 
 // BoxPack: ребёнок забирает свободное место, только если помечен Expand (layout.md, §3).
+// Parent — контейнер, в который вставлен виджет; Nil — никуда.
+func Parent(h H) H { return nodes[h].parent }
+
+// ContainerClear уничтожает всех детей Box или Grid.
+func ContainerClear(h H) {
+	for _, k := range append([]H(nil), nodes[h].kids...) {
+		Destroy(k)
+	}
+}
+
 func BoxPack(h, child H, expand bool) {
 	nodes[child].lay.Expand = expand
 	attach(h, child)

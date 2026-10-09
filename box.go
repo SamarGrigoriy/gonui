@@ -43,6 +43,42 @@ func (b *Box) Add(items ...Widget) *Box {
 	return b
 }
 
+// Remove убирает виджеты из ряда и уничтожает их — так же, как SetChild уничтожает
+// прежнего ребёнка: методы удалённого виджета больше ничего не делают, Alive() — false,
+// вставить его снова нельзя. Спрятать на время, не уничтожая, — SetVisible(false).
+// Виджет не из этого ряда — паника; уже уничтоженный пропускается.
+func (b *Box) Remove(items ...Widget) *Box {
+	if !b.dead() {
+		removeChildren(&b.widget, items)
+	}
+	return b
+}
+
+// Clear убирает и уничтожает всех детей ряда; потом можно добавить новых (Add).
+func (b *Box) Clear() *Box {
+	if !b.dead() {
+		drv.ContainerClear(b.h)
+	}
+	return b
+}
+
+// removeChildren — общее для Box и Grid: проверить, что виджет — ребёнок parent, и уничтожить.
+func removeChildren(parent *widget, items []Widget) {
+	for _, it := range items {
+		if it == nil {
+			panic("nui: Remove(nil)")
+		}
+		w := it.base()
+		if w.id == 0 {
+			continue // уже уничтожен
+		}
+		if drv.Parent(w.h) != parent.h {
+			panic("nui: Remove: виджет не в этом контейнере")
+		}
+		drv.Destroy(w.h)
+	}
+}
+
 // Spacing — расстояние между детьми, по умолчанию 6.
 func (b *Box) Spacing(px int) *Box {
 	if !b.dead() {

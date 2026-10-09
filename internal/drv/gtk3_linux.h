@@ -259,7 +259,7 @@ NUI_FN(gchar *, g_strdup, (const gchar *str))                                   
 NUI_FN(void, g_error_free, (GError *error))
 NUI_FN(gchar *, g_filename_to_uri, (const gchar *filename, const gchar *hostname, GError **error)) /* g_free */
 NUI_FN(gboolean, g_type_check_instance_is_a, (GTypeInstance *instance, GType iface_type))  /* тесты */
-NUI_FN(void, g_list_free, (GList *list))                                                   /* тесты */
+NUI_FN(void, g_list_free, (GList *list))
 NUI_FN(void, g_slist_free, (GSList *list))
 NUI_FN(size_t, strlen, (const char *s))
 NUI_FN(int, gettid, (void)) /* pid_t; glibc ≥ 2.30 — ниже фактического минимума 2.34 */
@@ -535,6 +535,9 @@ NUI_FN(void, gtk_dialog_response, (GtkDialog *dialog, gint response_id))        
 NUI_FN_CONST(GType, gtk_dialog_get_type)                                                                  /* тесты */
 NUI_FN_CONST(GType, gtk_file_chooser_get_type)                                                            /* тесты */
 NUI_FN(GList *, gtk_window_list_toplevels, (void))                                                        /* тесты */
+NUI_FN(GtkWidget *, gtk_widget_get_parent, (GtkWidget *widget))
+NUI_FN(GtkWidget *, gtk_window_get_default_widget, (GtkWindow *window))                                   /* тесты */
+NUI_FN(GList *, gtk_container_get_children, (GtkContainer *container))                                    /* (w) */
 NUI_FN(GtkFileChooserNative *, gtk_file_chooser_native_new, (const gchar *title, GtkWindow *parent,
        GtkFileChooserAction action, const gchar *accept_label, const gchar *cancel_label))
 NUI_FN(gint, gtk_native_dialog_run, (GtkNativeDialog *self))
@@ -583,6 +586,7 @@ void   nui_css(GtkWidget *w, int what, unsigned value);
 void   nui_css_background(GtkWidget *w, unsigned color, int panel);
 void   nui_set_padding(GtkWidget *w, unsigned px);
 GtkClipboard *nui_clipboard(void);
+void   nui_container_clear(GtkContainer *c);
 GtkWidget *nui_image_new(void);
 GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud);
 void   nui_list_column(GtkTreeView *view, const gchar *title, int index);

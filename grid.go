@@ -72,6 +72,38 @@ func (g *Grid) AddSpan(col, row, cols, rows int, w Widget) *Grid {
 	return g
 }
 
+// Remove убирает виджеты из сетки и уничтожает их (как Box.Remove); ячейки освобождаются.
+// Виджет не из этой сетки — паника; уже уничтоженный пропускается.
+func (g *Grid) Remove(items ...Widget) *Grid {
+	if g.dead() {
+		return g
+	}
+	removeChildren(&g.widget, items)
+	g.dropDead()
+	return g
+}
+
+// Clear убирает и уничтожает всех детей сетки. Растягиваемые колонки и строки (ExpandCol,
+// ExpandRow) остаются.
+func (g *Grid) Clear() *Grid {
+	if !g.dead() {
+		drv.ContainerClear(g.h)
+		g.cells = nil
+	}
+	return g
+}
+
+// dropDead забывает ячейки уничтоженных виджетов.
+func (g *Grid) dropDead() {
+	live := g.cells[:0]
+	for _, c := range g.cells {
+		if c.w.id != 0 {
+			live = append(live, c)
+		}
+	}
+	g.cells = live
+}
+
 // ExpandCol: колонка забирает свободное место по ширине. Можно вызывать до и после Add.
 func (g *Grid) ExpandCol(col int) *Grid {
 	if col >= 0 && !g.dead() {

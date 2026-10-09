@@ -23,6 +23,12 @@ func BoxSetSpacing(h H, px int) {
 
 // BoxPack: ребёнок занимает свою ячейку целиком (fill = TRUE) и забирает свободное
 // место, только если помечен Expand (layout.md, §6).
+// Parent — контейнер, в который вставлен виджет; Nil — никуда.
+func Parent(h H) H { return H(C.gtk_widget_get_parent(widget(h))) }
+
+// ContainerClear уничтожает всех детей Box или Grid.
+func ContainerClear(h H) { C.nui_container_clear((*C.GtkContainer)(h)) }
+
 func BoxPack(h, child H, expand bool) {
 	C.gtk_box_pack_start((*C.GtkBox)(h), widget(child), b2i(expand), 1, 0)
 }
