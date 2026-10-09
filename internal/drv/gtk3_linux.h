@@ -393,7 +393,9 @@ NUI_FN(void, gtk_text_view_buffer_to_window_coords, (GtkTextView *text_view, Gtk
        gint buffer_x, gint buffer_y, gint *window_x, gint *window_y))                       /* (w) */
 NUI_FN(GtkStateFlags, gtk_widget_get_state_flags, (GtkWidget *widget))                        /* (w) */
 NUI_FN(void, gtk_style_context_get_color, (GtkStyleContext *context, GtkStateFlags state, GdkRGBA *color)) /* (w) */
-NUI_FN(int, gtk_widget_get_allocated_width, (GtkWidget *widget))                              /* (w) */
+NUI_FN(int, gtk_widget_get_allocated_width, (GtkWidget *widget))
+NUI_FN(int, gtk_widget_get_allocated_height, (GtkWidget *widget))
+NUI_FN(void, gtk_window_get_size, (GtkWindow *window, gint *width, gint *height))
 NUI_FN(void, pango_layout_set_width, (PangoLayout *layout, int width))                       /* (w) */
 NUI_FN(void, pango_layout_set_wrap, (PangoLayout *layout, PangoWrapMode wrap))               /* (w) */
 NUI_FN(void, cairo_move_to, (cairo_t *cr, double x, double y))                                /* (w) */
@@ -549,7 +551,7 @@ NUI_FN_CONST(GType, gtk_tree_view_get_type)                                     
 NUI_FN_CONST(GType, gtk_text_view_get_type)                                                               /* тесты */
 NUI_FN_CONST(GType, gtk_container_get_type)                                                               /* тесты */
 NUI_FN(void, gtk_container_forall, (GtkContainer *container, GtkCallback callback, gpointer callback_data)) /* тесты */
-NUI_FN(gboolean, gtk_widget_get_mapped, (GtkWidget *widget))                                              /* тесты */
+NUI_FN(gboolean, gtk_widget_get_mapped, (GtkWidget *widget))
 NUI_FN(GtkTreeSelection *, gtk_tree_view_get_selection, (GtkTreeView *tree_view))                         /* тесты */
 NUI_FN(GList *, gtk_tree_selection_get_selected_rows, (GtkTreeSelection *selection, GtkTreeModel **model)) /* тесты */
 NUI_FN(void, gtk_tree_selection_select_path, (GtkTreeSelection *selection, GtkTreePath *path))            /* тесты */

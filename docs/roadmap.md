@@ -180,6 +180,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
 - `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- `Size()` у виджетов и окна; описано, как прокручивать растущий ряд (`Scroll`, [api.md](api.md), §4, §5, §14);
 - `Box.Remove`, `Box.Clear`, `Grid.Remove`, `Grid.Clear` — удаление виджетов из контейнеров ([api.md](api.md), §15);
 - `Window.OnDropFiles` — перетаскивание файлов на окно, `nui.Args` — аргументы командной строки без потерь на Windows, пример `examples/viewer` ([api.md](api.md), §1, §5), [отчёт](reports/drop.md);
 - `Window.OnKey` — клавиши окна, `TextView.OnEnter` и `SetPlaceholder`, многострочное поле ввода в `Chat` ([api.md](api.md), §5, §13, §18), [отчёт](reports/keys.md).

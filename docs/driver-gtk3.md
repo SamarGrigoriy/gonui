@@ -57,6 +57,8 @@ func WindowSetKeys(h H, on bool)          // OnKey: на GTK окно подпи
 func KeyDecode(arg uintptr) (key uint32, mods uint8) // arg события EvKey; key 0 — о клавише не сообщаем
 func WindowSetDrop(h H, id uint32, on bool)            // окно — приёмник файлов (OnDropFiles)
 func Parent(h H) H                                     // контейнер виджета (Box.Remove проверяет)
+func Size(h H) (w, ht int)                             // allocation, логические пиксели; не mapped — 0, 0
+func WindowSize(h H) (w, ht int)                       // gtk_window_get_size
 func ContainerClear(h H)                               // уничтожить всех детей Box или Grid
 func DropPaths(arg uintptr) []string                   // пути из arg события EvDrop
 func Args() []string                                   // аргументы командной строки

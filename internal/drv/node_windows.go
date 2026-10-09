@@ -342,6 +342,9 @@ func remeasure(h H) { invalidate(h) }
 // px — логические пиксели в физические при dpi окна.
 func (w *node) px(v int) int { return (v*int(w.dpi) + 48) / 96 }
 
+// unpx — физические пиксели в логические при dpi окна.
+func (w *node) unpx(v int) int { return (v*96 + int(w.dpi)/2) / int(w.dpi) }
+
 // relayout считает раскладку окна и расставляет HWND (layout.md, §7).
 func relayout(wh H) {
 	w := get(wh)

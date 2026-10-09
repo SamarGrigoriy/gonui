@@ -22,6 +22,15 @@ func adopt(w *C.GtkWidget, id uint32, show bool) H {
 	return h
 }
 
+// Size — размер виджета после последней раскладки, логические пиксели; не показан
+// на экране (скрыт сам, скрыт родитель, окно не показано) — 0, 0.
+func Size(h H) (w, ht int) {
+	if C.gtk_widget_get_mapped(widget(h)) == 0 {
+		return 0, 0
+	}
+	return int(C.gtk_widget_get_allocated_width(widget(h))), int(C.gtk_widget_get_allocated_height(widget(h)))
+}
+
 func Show(h H)    { C.gtk_widget_show(widget(h)) }
 func Hide(h H)    { C.gtk_widget_hide(widget(h)) }
 func Destroy(h H) { C.gtk_widget_destroy(widget(h)) }

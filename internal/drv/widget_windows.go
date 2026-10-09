@@ -11,6 +11,22 @@ func Hide(h H) { C.ShowWindow(nodes[h].hwnd, C.NUI_SW_HIDE) }
 
 // Destroy уничтожает виджет и его поддерево (EvDestroy каждому узлу); окно — DestroyWindow,
 // и тогда EvDestroy приходят из WM_DESTROY.
+// Size — размер узла после последней раскладки, логические пиксели; не показан на
+// экране (скрыт сам, скрыт родитель, окно не показано) — 0, 0.
+func Size(h H) (w, ht int) {
+	n := nodes[h]
+	for m := n; m != nil; m = get(m.parent) {
+		if m.hidden {
+			return 0, 0
+		}
+	}
+	win := get(n.win)
+	if win == nil || C.IsWindowVisible(win.hwnd) == 0 {
+		return 0, 0
+	}
+	return win.unpx(n.lay.Out.W), win.unpx(n.lay.Out.H)
+}
+
 func Destroy(h H) {
 	n := get(h)
 	if n == nil {

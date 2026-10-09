@@ -46,6 +46,13 @@ func WindowShow(h H) {
 // default size, после — resize), пользователь может его менять; нерастягиваемое —
 // фиксированный размер через size request: окно = max(запрос, размер содержимого).
 // Последний SetSize хранится в default size самого окна — у nui.Window нет лишних полей.
+// WindowSize — размер окна без рамки и заголовка, логические пиксели.
+func WindowSize(h H) (w, ht int) {
+	var cw, ch C.gint
+	C.gtk_window_get_size((*C.GtkWindow)(h), &cw, &ch)
+	return int(cw), int(ch)
+}
+
 func WindowSetSize(h H, w, ht int) {
 	win := (*C.GtkWindow)(h)
 	C.gtk_window_set_default_size(win, C.gint(w), C.gint(ht))

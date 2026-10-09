@@ -30,6 +30,14 @@ func WindowSetChild(h, child H) { replaceChild(h, child) }
 
 // WindowSetSize (api.md, §5): растягиваемое — начальный размер (после показа — сразу
 // новый), нерастягиваемое — фиксированный, но не меньше естественного размера содержимого.
+// WindowSize — клиентская область окна, логические пиксели.
+func WindowSize(h H) (w, ht int) {
+	n := nodes[h]
+	var cs [2]C.int
+	C.nui_client_size(n.hwnd, &cs[0])
+	return n.unpx(int(cs[0])), n.unpx(int(cs[1]))
+}
+
 func WindowSetSize(h H, w, ht int) {
 	n := nodes[h]
 	n.reqW, n.reqH = max(w, 0), max(ht, 0)
