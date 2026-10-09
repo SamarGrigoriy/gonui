@@ -63,12 +63,14 @@ type node struct {
 	rowGap     int
 
 	text     string   // исходный текст: Label, Button, Check, Frame
+	tooltip  string   // SetTooltip
 	items    []string // пункты Combo — для измерения
 	measured bool     // размеры листа посчитаны текущим шрифтом окна
 
 	// Label
 	ellipsis, textAlign uint8
 	wrap, bold          bool
+	selectable          bool   // read-only EDIT вместо STATIC
 	color               uint32 // 0xRRGGBB; noColor — цвет темы
 	// Entry
 	widthChars int
@@ -97,6 +99,7 @@ type node struct {
 	sized      bool // окно уже получило начальный размер
 	reqW, reqH int  // последний SetSize, логические пиксели; 0 — не задан
 	defBtn     H
+	tip        C.HWND // окно подсказок (tooltips_class32), создаётся при первой подсказке
 }
 
 const noColor = 1 << 24
@@ -186,6 +189,7 @@ func adoptTree(h H, host C.HWND, win H, disabled bool) {
 		C.SetParent(n.hwnd, host)
 		setFont(n)
 		C.EnableWindow(n.hwnd, b2i(!disabled))
+		applyTooltip(h)
 		if n.kind == kScroll {
 			host = n.hwnd
 		}
@@ -508,6 +512,10 @@ func measureLeaf(w *node, n *node) {
 		default:
 			set(tw, tw, th)
 		}
+		if n.selectable { // поля EDIT по бокам
+			l.Min.W += w.px(4)
+			l.Nat.W += w.px(4)
+		}
 	case kButton, kCheck:
 		var out [2]C.int
 		C.nui_ideal_size(n.hwnd, &out[0])
@@ -654,3 +662,64 @@ func effectiveHidden(h H) bool {
 }
 
 func clamp(v, lo, hi int) int { return max(lo, min(v, hi)) }
+
+// --- подсказки ---
+
+// tooltipOf — подсказка узла или ближайшего предка: как в GTK, подсказка контейнера
+// видна над его детьми, у которых своей нет.
+func tooltipOf(h H) string {
+	for ; h != Nil; h = nodes[h].parent {
+		if t := nodes[h].tooltip; t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
+// applyTooltip регистрирует подсказку контрола в окне подсказок его окна. Не вставленный
+// в окно виджет регистрируется при вставке (adoptTree).
+func applyTooltip(h H) {
+	n := nodes[h]
+	w := get(n.win)
+	if n.hwnd == nil || w == nil {
+		return
+	}
+	t := tooltipOf(h)
+	if t == "" && w.tip == nil {
+		return
+	}
+	if w.tip == nil {
+		w.tip = C.nui_tooltip_new(w.hwnd)
+	}
+	if t == "" {
+		C.nui_tooltip_set(w.tip, n.hwnd, nil)
+		return
+	}
+	C.nui_tooltip_set(w.tip, n.hwnd, wstr(t))
+}
+
+func applyTooltipTree(h H) {
+	applyTooltip(h)
+	for _, k := range nodes[h].kids {
+		applyTooltipTree(k)
+	}
+}
+
+// recreate пересоздаёт HWND узла с другим классом или стилем (стиль ES_MULTILINE и
+// замена STATIC на EDIT на лету не меняются): шрифт, доступность, подсказка, место в
+// Z-порядке и раскладке — как были.
+func recreate(h H, cls, text string, style, exstyle uint32) {
+	n := nodes[h]
+	if w := get(n.win); w != nil && w.tip != nil {
+		C.nui_tooltip_set(w.tip, n.hwnd, nil)
+	}
+	C.SetWindowLongPtrW(n.hwnd, C.NUI_GWLP_USERDATA, 0)
+	C.DestroyWindow(n.hwnd)
+	control(h, cls, text, style, exstyle)
+	C.EnableWindow(n.hwnd, b2i(!effectiveDisabled(h)))
+	applyTooltip(h)
+	if w := get(n.win); w != nil {
+		w.reorder = true
+	}
+	invalidate(h)
+}

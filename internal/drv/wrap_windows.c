@@ -335,6 +335,30 @@ void nui_text_append(HWND e, LPCWSTR s, int autoscroll, int maxLines) {
 		SendMessageW(e, NUI_EM_LINESCROLL, 0, (LPARAM)(want - now));
 }
 
+// Подсказки (SetTooltip): один tooltips_class32 на окно, контрол — «инструмент» по своему
+// HWND (TTF_IDISHWND | TTF_SUBCLASS: наведение мыши отслеживает сам tooltip).
+HWND nui_tooltip_new(HWND owner) {
+	HWND t = CreateWindowExW(NUI_WS_EX_TOPMOST, L"tooltips_class32", 0,
+		NUI_WS_POPUP | NUI_TTS_ALWAYSTIP | NUI_TTS_NOPREFIX, NUI_CW_USEDEFAULT, NUI_CW_USEDEFAULT,
+		NUI_CW_USEDEFAULT, NUI_CW_USEDEFAULT, owner, 0, inst, 0);
+	if (t)
+		SendMessageW(t, NUI_TTM_SETMAXTIPWIDTH, 0, 400); // длинный текст переносится
+	return t;
+}
+
+void nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text) {
+	TOOLINFOW ti = {0};
+	ti.cbSize = 64; // TTTOOLINFOW_V2_SIZE: годится и для comctl32 v5 (без манифеста)
+	ti.uFlags = NUI_TTF_IDISHWND | NUI_TTF_SUBCLASS;
+	ti.hwnd = GetParent(ctl);
+	ti.uId = (UINT_PTR)ctl;
+	SendMessageW(tip, NUI_TTM_DELTOOLW, 0, (LPARAM)&ti);
+	if (text) {
+		ti.lpszText = (LPWSTR)text;
+		SendMessageW(tip, NUI_TTM_ADDTOOLW, 0, (LPARAM)&ti);
+	}
+}
+
 #ifdef NUI_GUI_TEST
 // Помощники интеграционных тестов (sim_windows.go): открытый модальный диалог потока.
 int nui_dialog_kind(void) { return dlgKind; }

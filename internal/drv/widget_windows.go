@@ -70,9 +70,12 @@ func Visible(h H) bool {
 	return !n.hidden
 }
 
-// SetTooltip — подсказки пока не реализованы на Windows (фаза 5, шаг 4): текст хранится,
-// но не показывается.
-func SetTooltip(h H, s string) {}
+// SetTooltip — всплывающая подсказка (tooltips_class32); "" убирает её. У Box и Grid
+// подсказка видна над детьми без своей.
+func SetTooltip(h H, s string) {
+	nodes[h].tooltip = osText(s)
+	applyTooltipTree(h)
+}
 
 func SetAlign(h H, hz, v uint8) {
 	n := nodes[h]

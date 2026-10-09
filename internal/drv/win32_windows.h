@@ -150,6 +150,16 @@ typedef struct _TASKDIALOGCONFIG {
 	UINT cxWidth;
 } TASKDIALOGCONFIG;
 #pragma pack(pop)
+typedef struct tagTOOLINFOW {
+	UINT cbSize, uFlags;
+	HWND hwnd;
+	UINT_PTR uId;
+	RECT rect;
+	HINSTANCE hinst;
+	LPWSTR lpszText;
+	LPARAM lParam;
+	void *lpReserved;
+} TOOLINFOW;
 typedef struct _browseinfoW {
 	HWND hwndOwner;
 	PCIDLIST_ABSOLUTE pidlRoot;
@@ -175,6 +185,7 @@ _Static_assert(sizeof(ACTCTXW) == 56, "ACTCTXW");
 _Static_assert(sizeof(OPENFILENAMEW) == 152, "OPENFILENAMEW");
 _Static_assert(sizeof(BROWSEINFOW) == 64, "BROWSEINFOW");
 _Static_assert(sizeof(TASKDIALOGCONFIG) == 160, "TASKDIALOGCONFIG");
+_Static_assert(sizeof(TOOLINFOW) == 72, "TOOLINFOW");
 
 /* ---------- 2. Макросы сверки ---------- */
 #ifdef NUI_CHECK
@@ -310,6 +321,17 @@ NUI_CONST(EM_SETPASSWORDCHAR, 0x00CC)
 NUI_CONST(EM_GETFIRSTVISIBLELINE, 0x00CE)
 NUI_CONST(EM_SETREADONLY, 0x00CF)
 NUI_CONST(EM_SETCUEBANNER, 0x1501)
+NUI_CONST(ES_CENTER, 0x0001)
+NUI_CONST(ES_RIGHT, 0x0002)
+NUI_CONST(TTM_SETMAXTIPWIDTH, 0x0418)
+NUI_CONST(TTM_ADDTOOLW, 0x0432)
+NUI_CONST(TTM_DELTOOLW, 0x0433)
+NUI_CONST(TTM_UPDATETIPTEXTW, 0x0439)
+NUI_CONST(TTF_IDISHWND, 0x0001)
+NUI_CONST(TTF_SUBCLASS, 0x0010)
+NUI_CONST(TTS_ALWAYSTIP, 0x01)
+NUI_CONST(TTS_NOPREFIX, 0x02)
+NUI_CONST(WS_EX_TOPMOST, 0x00000008)
 NUI_CONST(CBS_DROPDOWN, 0x0002)
 NUI_CONST(CBS_DROPDOWNLIST, 0x0003)
 NUI_CONST(CBS_AUTOHSCROLL, 0x0040)
@@ -495,6 +517,8 @@ int   nui_message(HWND parent, int kind, LPCWSTR app, LPCWSTR title, LPCWSTR tex
 int   nui_file_dialog(HWND parent, int save, LPCWSTR title, LPCWSTR filter, LPWSTR buf, int cap);
 int   nui_folder_dialog(HWND parent, LPCWSTR title, LPWSTR buf);
 void  nui_text_append(HWND edit, LPCWSTR s, int autoscroll, int maxLines);
+HWND  nui_tooltip_new(HWND owner);
+void  nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text); /* text == 0 — убрать */
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */
 /* Только с NUI_GUI_TEST (sim_windows.go): открытый диалог и ответ за пользователя. */
 int   nui_dialog_kind(void); /* 0 — нет; 1 — сообщение, 2 — вопрос, 3 — файл, 4 — папка */

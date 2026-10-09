@@ -46,6 +46,32 @@ func labelStyle(n *node) uint32 {
 	return s
 }
 
+// labelEditStyle — выделяемая подпись: read-only EDIT без рамки, с тем же выравниванием;
+// многострочная — при переносе или переводах строк.
+func labelEditStyle(n *node) uint32 {
+	s := uint32(C.NUI_ES_READONLY | C.NUI_ES_AUTOHSCROLL | C.NUI_WS_TABSTOP)
+	if n.wrap || hasNewline(n.text) {
+		s |= C.NUI_ES_MULTILINE
+	}
+	switch n.textAlign {
+	case 2:
+		s |= C.NUI_ES_CENTER
+	case 3:
+		s |= C.NUI_ES_RIGHT
+	}
+	return s
+}
+
+// labelRestyle применяет стиль подписи: STATIC меняется на лету, EDIT — пересоздаётся.
+func labelRestyle(h H) {
+	n := nodes[h]
+	if n.selectable {
+		recreate(h, "EDIT", crlf(n.text), labelEditStyle(n), 0)
+		return
+	}
+	restyle(n, labelStyle(n))
+}
+
 func restyle(n *node, style uint32) {
 	old := uintptr(C.GetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE))
 	keep := old & 0xFFFF0000 // WS_*: видимость, WS_CHILD, WS_TABSTOP…
@@ -55,9 +81,18 @@ func restyle(n *node, style uint32) {
 
 func LabelSetText(h H, s string) {
 	n := nodes[h]
+	multi := hasNewline(n.text)
 	n.text = osText(s)
-	restyle(n, labelStyle(n))
-	C.SetWindowTextW(n.hwnd, wstr(s))
+	if n.selectable && multi != hasNewline(n.text) {
+		labelRestyle(h) // EDIT стал или перестал быть многострочным
+	} else if !n.selectable {
+		restyle(n, labelStyle(n))
+	}
+	if n.selectable {
+		C.SetWindowTextW(n.hwnd, wstr(crlf(n.text)))
+	} else {
+		C.SetWindowTextW(n.hwnd, wstr(n.text))
+	}
 	remeasure(h)
 }
 
@@ -73,21 +108,36 @@ func hasNewline(s string) bool {
 func LabelText(h H) string { return nodes[h].text }
 
 func LabelSetEllipsis(h H, e uint8) {
-	n := nodes[h]
-	n.ellipsis = e
-	restyle(n, labelStyle(n))
+	nodes[h].ellipsis = e
+	labelRestyle(h)
 	remeasure(h)
 }
-func LabelSetWrap(h H, on bool) { n := nodes[h]; n.wrap = on; restyle(n, labelStyle(n)); remeasure(h) }
-func LabelSetTextAlign(h H, a uint8) {
-	n := nodes[h]
-	n.textAlign = a
-	restyle(n, labelStyle(n))
+
+func LabelSetWrap(h H, on bool) {
+	nodes[h].wrap = on
+	labelRestyle(h)
+	remeasure(h)
 }
 
-// LabelSetSelectable — выделяемый текст (read-only EDIT без рамки) пока не реализован
-// на Windows (фаза 5, шаг 4).
-func LabelSetSelectable(h H, on bool) {}
+func LabelSetTextAlign(h H, a uint8) {
+	nodes[h].textAlign = a
+	labelRestyle(h)
+}
+
+// LabelSetSelectable: текст можно выделить и скопировать — read-only EDIT без рамки
+// (driver-win32.md, §5). Многоточие EDIT не рисует.
+func LabelSetSelectable(h H, on bool) {
+	n := nodes[h]
+	if n.selectable == on {
+		return
+	}
+	n.selectable = on
+	if on {
+		recreate(h, "EDIT", crlf(n.text), labelEditStyle(n), 0)
+	} else {
+		recreate(h, "STATIC", n.text, labelStyle(n), 0)
+	}
+}
 
 func LabelSetBold(h H, on bool) {
 	n := nodes[h]
@@ -282,13 +332,17 @@ func TextNew(id uint32) (outer, view H) {
 // Стиль переноса на лету не меняется — SetWrap пересоздаёт контрол.
 func textControl(h H, text string) {
 	n := nodes[h]
+	control(h, "EDIT", crlf(text), textStyle(n), C.NUI_WS_EX_CLIENTEDGE)
+	send(n.hwnd, C.NUI_EM_SETLIMITTEXT, 0x7FFFFFFE, 0)
+}
+
+func textStyle(n *node) uint32 {
 	style := uint32(C.NUI_ES_MULTILINE | C.NUI_ES_AUTOVSCROLL | C.NUI_ES_WANTRETURN | C.NUI_ES_NOHIDESEL |
 		C.NUI_WS_VSCROLL | C.NUI_WS_TABSTOP)
 	if !n.wrapText {
 		style |= C.NUI_WS_HSCROLL | C.NUI_ES_AUTOHSCROLL
 	}
-	control(h, "EDIT", crlf(text), style, C.NUI_WS_EX_CLIENTEDGE)
-	send(n.hwnd, C.NUI_EM_SETLIMITTEXT, 0x7FFFFFFE, 0)
+	return style
 }
 
 func TextSetText(view H, s string) { C.SetWindowTextW(nodes[view].hwnd, wstr(crlf(s))) }
@@ -314,16 +368,9 @@ func TextSetWrap(view H, on bool) {
 		return
 	}
 	n.wrapText = on
-	old := n.hwnd
-	text := windowText(old)
-	readOnly := uintptr(C.GetWindowLongPtrW(old, C.NUI_GWL_STYLE))&C.NUI_ES_READONLY != 0
-	C.SetWindowLongPtrW(old, C.NUI_GWLP_USERDATA, 0)
-	C.DestroyWindow(old)
-	textControl(view, text)
+	text := windowText(n.hwnd)
+	readOnly := uintptr(C.GetWindowLongPtrW(n.hwnd, C.NUI_GWL_STYLE))&C.NUI_ES_READONLY != 0
+	recreate(view, "EDIT", text, textStyle(n), C.NUI_WS_EX_CLIENTEDGE)
+	send(n.hwnd, C.NUI_EM_SETLIMITTEXT, 0x7FFFFFFE, 0)
 	TextSetReadOnly(view, readOnly)
-	C.EnableWindow(n.hwnd, b2i(!effectiveDisabled(view)))
-	if w := get(n.win); w != nil {
-		w.reorder = true
-	}
-	invalidate(view)
 }
