@@ -16,7 +16,7 @@
 | `gtk3_linux.h` | типы, константы, прототипы GTK/GLib/Pango/GIO, прототипы обёрток `nui_*` и трамплинов. **Только объявления** |
 | `wrap_linux.c` | определения `nui_*` |
 | `link_linux.go` | `#cgo LDFLAGS` (только библиотеки, §9), `type H`, `Nil`, `cstr`, `cpath`, `gostr`, `gostrFree`, `b2i` |
-| `export_linux.go` | 4 трамплина `//export` ([runtime.md](runtime.md), §5) |
+| `export_linux.go` | 4 трамплина `//export` и 2 экспорта модели List ([runtime.md](runtime.md), §5) |
 | `app_linux.go`, `widget_linux.go`, `controls_linux.go`, `layout_linux.go`, `dialog_linux.go` | функции контракта |
 | `sim_linux.go` (тег `gui`) | `Sim*` и `Allocation` для тестов ([testing.md](testing.md), §3) |
 
@@ -114,6 +114,12 @@ func TextNew(id uint32) (outer, view H)
 func TextSetText(view H, s string); TextText(view H) string
 func TextAppend(view H, s string, autoscroll bool, maxLines int)
 func TextSetReadOnly(view H, on bool); TextSetMonospace(view H, on bool); TextSetWrap(view H, on bool)
+
+// List: outer — прокрутка, view — сам список; строки — по требованию через cell
+func ListNew(id uint32, columns []string) (outer, view H)
+func ListSetRows(view H, n int, cell func(row, col int) string) // выделение снимается, прокрутка — в начало
+func ListUpdate(view H)
+func ListSelected(view H) int; ListSelect(view H, row int) // -1 — нет / снять
 
 // Контейнеры
 func BoxNew(id uint32, vertical bool) H
@@ -444,6 +450,7 @@ void g_variant_unref(GVariant*)                                                 
 | Combo | `gtk_combo_box_text_new` / `_new_with_entry` | `changed` → EvChange | У ComboEntry текст поля: `gtk_bin_get_child` → `GtkEntry`; его `changed` уже приходит в `changed` комбобокса, отдельно подписываться не нужно. Полю ComboEntry ставится `gtk_entry_set_activates_default(TRUE)`: Enter в нём нажимает кнопку окна по умолчанию, как в Entry без `OnEnter`. `Clear` (`remove_all`) тоже присылает `changed` — гасится `quiet` |
 | Slider | `gtk_scale_new_with_range(HORIZONTAL, min, max, 1)`, `set_digits(0)` | `value-changed` → EvChange | Значение округляется до целого на стороне Go. При `min >= max` GTK вернул бы `NULL`, поэтому nui проверяет это до вызова и паникует |
 | Progress | `gtk_progress_bar_new` | — | `SetText("")` → `set_show_text(FALSE)` |
+| List | `nui_list_new`: прокрутка + `gtk_tree_view_new` (`fixed-height-mode`, без поиска, выбор SINGLE); колонка — `nui_list_column`: `GtkCellRendererText` с многоточием, `FIXED`, `resizable`, `expand` у последней | `changed` **у GtkTreeSelection** → EvChange; `row-activated` (свой C-обработчик: у сигнала лишние аргументы) → EvEnter | Своя модель `NuiListModel` (GObject + интерфейс `GtkTreeModel`, раскладки сверяет check-protos): строка — номер в `iter->user_data`, `get_value` спрашивает текст у Go (`nuiListCell`). `SetRows` — новая модель; старую отпускает GtkTreeView, её `finalize` вызывает `nuiListDrop`. Ширина колонок — по заголовку и первым 100 строкам (`PangoLayout`), не больше 400. После `SetRows` курсор ставится на первую строку и выделение снимается: иначе в режиме SINGLE GtkTreeView сам выделит строку при получении фокуса. Повторы `changed` (движение курсора) отбрасывает nui |
 | TextView | `gtk_scrolled_window_new(NULL, NULL)` + `set_policy(AUTOMATIC, AUTOMATIC)` + `gtk_text_view_new` внутри | `changed` **у буфера** → EvChange (тот же ud) | Хендлов два: outer — для раскладки, view — для текста. `SetWrap` → `WORD_CHAR`/`NONE`. `SetReadOnly` → `editable` и `cursor_visible`. `Append`, `Clear` и `SetText` присылают `changed` синхронно — гасится `quiet`. `SetText` на непустом буфере и вставка поверх выделения присылают **два** `changed` (удаление и вставка) |
 | Separator | `gtk_separator_new(orientation)` | — | — |
 | Frame | `gtk_frame_new(title)` | — | Ребёнок — `gtk_container_add` |

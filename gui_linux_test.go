@@ -3,7 +3,8 @@
 package nui
 
 // Интеграционные тесты, которые есть только на Linux: Watch (unix), нет дисплея,
-// OpenURI и ShowInFolder с подставной программой по умолчанию (XDG, D-Bus).
+// OpenURI и ShowInFolder с подставной программой по умолчанию (XDG, D-Bus), размеры GTK,
+// на которые опирается драйвер Win32.
 
 import (
 	"os"
@@ -13,6 +14,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"nui/internal/drv"
 )
 
 func TestWatchPipe(t *testing.T) {
@@ -111,4 +114,23 @@ func TestOpenURIAndShowInFolder(t *testing.T) {
 	}
 	defer exec.Command("kill", lines[1]).Run()
 	check("showinfolder", []string{"DBUS_SESSION_BUS_ADDRESS=" + lines[0]}, nil, filepath.Dir(file))
+}
+
+// Размер List в GTK с Adwaita — 46×71 при любых данных и заголовках (TextView — 46×46):
+// эти числа берёт драйвер Win32 (driver-win32.md, §6).
+func TestListSize(t *testing.T) {
+	ui(func() {
+		plain, l := NewList(), NewList("Имя", "Размер")
+		l.SetRows(50, func(row, col int) string { return "довольно длинная строка списка" })
+		// Без места GTK ругается на две полосы прокрутки в 46 точках: даём место.
+		w := NewWindow("размеры", VBox(Expand(plain), Expand(l)))
+		w.SetSize(300, 400)
+		w.Show()
+		for _, x := range []*List{plain, l} {
+			if a, b, c, d := drv.Preferred(x.h); a != 46 || b != 46 || c != 71 || d != 71 {
+				t.Errorf("List %d/%d × %d/%d, ожидалось 46×71", a, b, c, d)
+			}
+		}
+		w.Close()
+	})
 }

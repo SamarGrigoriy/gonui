@@ -6,6 +6,7 @@
 > - **Готовый чат** `nui.NewChat()` — например, для общения с ИИ: ответ пишется частями из горутины ([api.md, §18](docs/api.md), [отчёт](docs/reports/chat.md), `examples/chat`).
 > - **Оформление** ([отчёт](docs/reports/styles.md)): фон у окна, Box и Grid, цвет и фон у подписей, кнопок, полей и чата, размер шрифта подписей (ADR-19). **Окно на весь экран:** `SetMaximized`, `SetFullscreen`.
 > - **Буфер обмена:** `nui.SetClipboard`, `nui.Clipboard`; `Chat.LastMessage` — для кнопки «Скопировать ответ» ([api.md, §17](docs/api.md), [отчёт](docs/reports/clipboard.md)).
+> - **Список и таблица** `nui.NewList` — строки по требованию, миллион строк открывается сразу ([api.md, §20](docs/api.md), [отчёт](docs/reports/list.md)).
 > - **Картинки и выбор нескольких файлов:** `nui.NewImage` — PNG, JPEG, GIF, BMP, чёткие на HiDPI; `nui.OpenFiles` ([api.md, §19 и §16](docs/api.md), [отчёт](docs/reports/image.md)).
 > - Фаза 4 (приёмочное приложение) отложена. Реализация ведётся на Debian.
 

@@ -95,6 +95,11 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			emit(n, core.EvEnter)
 		}
 		return 0, true
+	case C.NUI_WM_LISTSEL: // выделение в списке снято — сообщить, если новое не появилось
+		if _, n := nodeOf(hwndOf(lp)); n != nil {
+			emit(n, core.EvChange)
+		}
+		return 0, true
 	}
 	// Уведомления контролов приходят их родителю — окну, прокрутке или парковочному окну
 	// (у него нет узла): разбираются по HWND контрола в lParam.
@@ -119,6 +124,10 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			if r, ok := ctlColor(c, hdcOf(wp), m); ok {
 				return r, true
 			}
+		}
+	case C.NUI_WM_NOTIFY:
+		if _, c := nodeOf(nmhdrOf(lp).hwndFrom); c != nil && c.kind == kList {
+			return listNotify(c, lp), true
 		}
 	case C.NUI_WM_DRAWITEM: // цветная кнопка (BS_OWNERDRAW) и картинка (SS_OWNERDRAW)
 		d := drawItemOf(lp)

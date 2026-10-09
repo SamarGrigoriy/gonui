@@ -129,6 +129,8 @@ func nuiWatch(fd C.int, cond C.uint, ud C.uintptr_t) C.int {
 }
 ```
 
+Ещё два экспорта — не события, а вопросы модели `List` к данным (driver-gtk3.md, §7): `gchar *nuiListCell(uintptr_t key, int row, int col)` — текст ячейки (копия в `g_malloc`, её забирает `GValue`) и `void nuiListDrop(uintptr_t key)` — модель уничтожена. `key` — номер модели; функции ячеек лежат в Go в `map[uintptr]func(row, col int) string`, в C — только число, как требует ADR-6.
+
 Go-код указатели на трамплины не получает. Их подставляют C-обёртки `nui_connect`, `nui_connect_ret`, `nui_timeout`, `nui_idle` и `nui_watch` из `wrap_linux.c` ([driver-gtk3.md](driver-gtk3.md)). Это работает одинаково в gc и TinyGo.
 
 > Правило cgo для gc: если в файле есть `//export`, в его преамбуле могут быть только **объявления**. Поэтому определения обёрток лежат в отдельном `wrap_linux.c`, а `gtk3_linux.h` содержит только `typedef` и прототипы.

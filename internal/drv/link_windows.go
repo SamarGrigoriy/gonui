@@ -173,3 +173,4 @@ func handleOf(v uintptr) C.HANDLE            { return *(*C.HANDLE)(unsafe.Pointe
 func minmaxOf(v uintptr) *C.MINMAXINFO       { return *(**C.MINMAXINFO)(unsafe.Pointer(&v)) }
 func rectOf(v uintptr) *C.RECT               { return *(**C.RECT)(unsafe.Pointer(&v)) }
 func drawItemOf(v uintptr) *C.DRAWITEMSTRUCT { return *(**C.DRAWITEMSTRUCT)(unsafe.Pointer(&v)) }
+func nmhdrOf(v uintptr) *C.NMHDR             { return *(**C.NMHDR)(unsafe.Pointer(&v)) }

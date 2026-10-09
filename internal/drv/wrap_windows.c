@@ -42,7 +42,7 @@ static void comctl_init(void) {
 		(nui_InitCommonControlsEx_fn)(void (*)(void))GetProcAddress(m, "InitCommonControlsEx");
 	if (init) {
 		INITCOMMONCONTROLSEX icc = {sizeof icc,
-			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS};
+			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS | NUI_ICC_LISTVIEW_CLASSES};
 		init(&icc);
 	}
 	taskDialog = (nui_TaskDialogIndirect_fn)(void (*)(void))GetProcAddress(m, "TaskDialogIndirect");
@@ -645,6 +645,41 @@ void nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH b
 	SelectObject(m, old);
 	DeleteDC(m);
 }
+
+// --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---
+
+void nui_list_column(HWND lv, int index, LPCWSTR title) {
+	LVCOLUMNW c = {0};
+	c.mask = NUI_LVCF_TEXT | NUI_LVCF_WIDTH | NUI_LVCF_SUBITEM;
+	c.cx = 100;
+	c.pszText = (LPWSTR)title;
+	c.iSubItem = index;
+	SendMessageW(lv, NUI_LVM_INSERTCOLUMNW, (WPARAM)index, (LPARAM)&c);
+}
+
+// Выбрать строку, как щелчком: снять выделение со всех (-1), выделить и сделать текущей
+// строку row и прокрутить к ней. row < 0 — только снять.
+void nui_list_select(HWND lv, int row) {
+	LVITEMW it = {0};
+	it.stateMask = NUI_LVIS_SELECTED;
+	SendMessageW(lv, NUI_LVM_SETITEMSTATE, (WPARAM)-1, (LPARAM)&it);
+	if (row < 0)
+		return;
+	it.stateMask = it.state = NUI_LVIS_SELECTED | NUI_LVIS_FOCUSED;
+	SendMessageW(lv, NUI_LVM_SETITEMSTATE, (WPARAM)row, (LPARAM)&it);
+	SendMessageW(lv, NUI_LVM_ENSUREVISIBLE, (WPARAM)row, 0);
+}
+
+#ifdef NUI_GUI_TEST
+// Текст ячейки так, как его видит ListView: LVM_GETITEMTEXTW → LVN_GETDISPINFOW родителю.
+int nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap) {
+	LVITEMW it = {0};
+	it.iSubItem = col;
+	it.pszText = buf;
+	it.cchTextMax = cap;
+	return (int)SendMessageW(lv, NUI_LVM_GETITEMTEXTW, (WPARAM)row, (LPARAM)&it);
+}
+#endif
 
 #ifdef NUI_GUI_TEST
 // Помощники интеграционных тестов (sim_windows.go): открытый модальный диалог потока.

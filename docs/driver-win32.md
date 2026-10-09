@@ -92,6 +92,7 @@ type node struct {
 | Separator | `STATIC`, `SS_ETCHEDHORZ` / `SS_ETCHEDVERT` | — |
 | Frame | `BUTTON`, `BS_GROUPBOX`. Это **не** родитель: дети — соседние окна внутри её прямоугольника. Рамка создаётся первой (ниже по Z-порядку) | — |
 | Scroll | Своё дочернее окно класса `nuiScroll` со `WS_VSCROLL`/`WS_HSCROLL`, дети — его дочерние окна; `WM_COMMAND` от них доставляется тем же `nuiWndProc` | `SetScrollInfo`, `ScrollWindowEx` |
+| List | `SysListView32`, `LVS_REPORT \| LVS_SINGLESEL \| LVS_SHOWSELALWAYS \| LVS_OWNERDATA \| WS_TABSTOP`, `WS_EX_CLIENTEDGE`; без заголовков — `LVS_NOCOLUMNHEADER`; `LVS_EX_FULLROWSELECT \| LVS_EX_LABELTIP \| LVS_EX_DOUBLEBUFFER` | Строки не хранятся (`LVS_OWNERDATA`): `LVM_SETITEMCOUNT`, текст — `WM_NOTIFY`/`LVN_GETDISPINFOW` → функция ячеек узла, копия в буфер ListView (обрезка не режет суррогатную пару). Выбор — `LVN_ITEMCHANGED`: выбор строки → EvChange сразу; снятие приходит раньше нового выбора, поэтому о нём — позже, сообщением `NUI_WM_LISTSEL` служебному окну (повтор nui отбрасывает). Двойной щелчок — `LVN_ITEMACTIVATE` → EvEnter; Enter — метка `nuiEnter` (цикл, как у Entry с `OnEnter`). Ширина колонок — `LVM_GETSTRINGWIDTHW` по заголовку и первым 100 строкам, пересчёт при смене dpi; последняя колонка дотягивается до правого края при каждой раскладке. `ICC_LISTVIEW_CLASSES` в `InitCommonControlsEx` |
 | Image | `STATIC`, `SS_OWNERDRAW`; рисует `WM_DRAWITEM` хоста | Декодирует GDI+: `gdiplus.dll` грузится через `LoadLibraryW` при первой картинке (программы без `Image` её не трогают), функции — через `GetProcAddress` (`NUI_FNPTR`, сверяются с `gdiplus.h`). Байты → `GlobalAlloc` → `CreateStreamOnHGlobal` → `GdipCreateBitmapFromStream` (поток живёт вместе с картинкой: GDI+ читает его лениво). Поворот по EXIF: тег читает Go (`core.Orientation` — GDI+ сам не поворачивает, а Wine и тега не отдаёт) → `GdipImageRotateFlip`. Показ: DIB-секция 32 бита (альфа умножена) нужного размера в физических пикселях, в неё `GdipDrawImageRectRectI` с `HighQualityBicubic` и `WrapModeTileFlipXY` (без полупрозрачной каймы по краям). `WM_DRAWITEM`: `FillRect` фоном панели или окна, картинка по центру — `GdiAlphaBlend`. Узел хранит байты файла и DIB; при смене dpi (`setFont`) картинка перерисовывается из байтов |
 
 Всем контролам: `WM_SETFONT` с текущим шрифтом окна (логгер, `ctl()`), `GWLP_USERDATA = id`.
@@ -109,6 +110,7 @@ type node struct {
 | TextView | 46 × 46 — как у GTK с Adwaita (по полосам прокрутки) | то же: размер задают `SetMinSize` или `Expand` |
 | Separator | 1 px толщины | 1 px толщины |
 | Image | размер DIB (логический размер показа × dpi / 96) | то же |
+| List | 46 × 71 — как GtkTreeView в прокрутке с Adwaita, с заголовками и без | то же: размер задают `SetMinSize` или `Expand` |
 
 Средняя ширина символа берётся из `GetTextMetricsW` (`tmAveCharWidth`), как в диалоговых единицах Windows.
 

@@ -543,7 +543,48 @@ open := nui.NewButton("Открыть картинку…", func() {
 
 ---
 
-## 20. Не в MVP (наброски для фазы 6)
+## 20. List — список и таблица
+
+```go
+func NewList(columns ...string) *List                         // заголовки; без них — простой список
+func (l *List) SetRows(n int, cell func(row, col int) string) // данные по требованию
+func (l *List) Update()                                        // текст строк поменялся
+func (l *List) Rows() int
+func (l *List) Selected() int                                  // -1 — ничего
+func (l *List) Select(row int)                                 // -1 — снять
+func (l *List) OnSelect(fn func())
+func (l *List) OnActivate(fn func(row int))                    // двойной щелчок или Enter
+```
+
+| Что | Семантика |
+|---|---|
+| Данные | строки не хранятся: `cell(row, col)` вызывается в UI-потоке, когда строка видна. Список на миллион строк открывается сразу. `cell` должна быть быстрой и не менять данные |
+| `SetRows` | новые данные: выделение снимается, прокрутка — в начало, `OnSelect` не вызывается. Данные поменялись, а число строк то же, — `Update`: видимые строки перерисуются |
+| Колонки | ширина — по заголовку и первым 100 строкам (не больше 400 пикселей), пользователь меняет её мышью; последняя колонка забирает свободное место. Длинный текст — с многоточием. Заголовки видны, если хоть один не пуст |
+| Выбор | одна строка. `OnSelect` — пользователь выбрал другую строку или снял выбор; `Select` и `SetRows` его не вызывают (ADR-8). Список с фокусом сам строку не выбирает |
+| `OnActivate` | двойной щелчок по строке или Enter на ней; `row` — эта строка. Enter в списке не нажимает кнопку по умолчанию |
+| Размер | как у `TextView`: свои полосы прокрутки, минимальный размер мал (46×71) — задайте `Expand` или `SetMinSize` |
+
+Список файлов:
+
+```go
+files, _ := os.ReadDir(dir)
+l := nui.NewList("Имя", "Размер")
+l.SetRows(len(files), func(row, col int) string {
+	if col == 0 {
+		return files[row].Name()
+	}
+	info, _ := files[row].Info()
+	return strconv.FormatInt(info.Size(), 10)
+})
+l.OnActivate(func(row int) { nui.OpenURI("file://" + filepath.Join(dir, files[row].Name())) })
+```
+
+Нет пока: сортировки по щелчку на заголовке, выбора нескольких строк, значков и флажков в строках, редактирования ячеек.
+
+---
+
+## 21. Не в MVP (наброски для фазы 6)
 
 Сигнатуры ориентировочные и закрепляются при реализации. Порядок — по пользе.
 
@@ -563,18 +604,13 @@ func Sep() MenuItem
 // Клавиши окна
 func (w *Window) OnKey(fn func(k Key, m Mod) bool) // true — событие обработано
 
-// Виртуальный список/таблица: строки запрашиваются по требованию
-func NewList(columns ...string) *List
-func (l *List) SetRows(n int, cell func(row, col int) string)
-func (l *List) Selected() int
-func (l *List) OnSelect(fn func())
 ```
 
 Не планируется: иконка в трее (в GTK3 устарела, AppIndicator — отдельная библиотека), веб-содержимое, свои темы.
 
 ---
 
-## 21. Пример целиком
+## 22. Пример целиком
 
 ```go
 package main

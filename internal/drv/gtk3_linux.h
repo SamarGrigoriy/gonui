@@ -20,7 +20,7 @@ typedef void *gpointer;
 typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnectFlags, GIOCondition,
             GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight,
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
-            GdkInterpType;
+            GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -68,6 +68,42 @@ typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
 typedef struct _GtkTreeView GtkTreeView;   typedef struct _GtkTreeSelection GtkTreeSelection;
 typedef struct _GtkTreePath GtkTreePath;   typedef struct _GtkTreeModel GtkTreeModel;
 typedef void (*GtkCallback)(GtkWidget *, gpointer);
+/* List: своя модель GtkTreeModel — нужны раскладки GObject, класса и интерфейса.
+   Размеры и смещения сверяются с настоящими (раздел 3). */
+typedef struct _GtkTreeViewColumn GtkTreeViewColumn; typedef struct _GtkCellRenderer GtkCellRenderer;
+typedef struct _GValue GValue;             typedef struct _PangoLayout PangoLayout;
+struct _GObject { gpointer g_type_instance; guint ref_count; gpointer qdata; };
+typedef struct _GObjectClass {
+	GType g_type; /* GTypeClass */
+	gpointer construct_properties, constructor, set_property, get_property, dispose;
+	void (*finalize)(GObject *object);
+	gpointer rest[10]; /* dispatch_properties_changed … pdummy */
+} GObjectClass;
+typedef struct _GtkTreeIter { gint stamp; gpointer user_data, user_data2, user_data3; } GtkTreeIter;
+typedef struct { GType g_type, g_instance_type; } GTypeInterface;
+typedef struct _GtkTreeModelIface {
+	GTypeInterface g_iface;
+	gpointer row_changed, row_inserted, row_has_child_toggled, row_deleted, rows_reordered; /* сигналы */
+	GtkTreeModelFlags (*get_flags)(GtkTreeModel *tree_model);
+	gint (*get_n_columns)(GtkTreeModel *tree_model);
+	GType (*get_column_type)(GtkTreeModel *tree_model, gint index_);
+	gboolean (*get_iter)(GtkTreeModel *tree_model, GtkTreeIter *iter, GtkTreePath *path);
+	GtkTreePath *(*get_path)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	void (*get_value)(GtkTreeModel *tree_model, GtkTreeIter *iter, gint column, GValue *value);
+	gboolean (*iter_next)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	gboolean (*iter_previous)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	gboolean (*iter_children)(GtkTreeModel *tree_model, GtkTreeIter *iter, GtkTreeIter *parent);
+	gboolean (*iter_has_child)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	gint (*iter_n_children)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	gboolean (*iter_nth_child)(GtkTreeModel *tree_model, GtkTreeIter *iter, GtkTreeIter *parent, gint n);
+	gboolean (*iter_parent)(GtkTreeModel *tree_model, GtkTreeIter *iter, GtkTreeIter *child);
+	void (*ref_node)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+	void (*unref_node)(GtkTreeModel *tree_model, GtkTreeIter *iter);
+} GtkTreeModelIface;
+typedef void (*GClassInitFunc)(gpointer g_class, gpointer class_data);
+typedef void (*GInstanceInitFunc)(GTypeInstance *instance, gpointer g_class);
+typedef void (*GInterfaceInitFunc)(gpointer g_iface, gpointer iface_data);
+typedef struct { GInterfaceInitFunc interface_init; GDestroyNotify interface_finalize; gpointer interface_data; } GInterfaceInfo;
 /* GtkAllocation (= GdkRectangle) — только для тестового помощника nui_allocation */
 typedef struct { int x, y, width, height; } GtkAllocation;
 #endif
@@ -141,10 +177,24 @@ NUI_CONST(GTK_FILE_CHOOSER_ACTION_SAVE, 1)
 NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
 NUI_CONST(G_BUS_TYPE_SESSION, 2)
 NUI_CONST(G_DBUS_CALL_FLAGS_NONE, 0)
+NUI_CONST(G_TYPE_STRING, 64)
+NUI_CONST(G_TYPE_OBJECT, 80)
+NUI_CONST(GTK_TREE_MODEL_ITERS_PERSIST, 1)
+NUI_CONST(GTK_TREE_MODEL_LIST_ONLY, 2)
+NUI_CONST(GTK_TREE_VIEW_COLUMN_FIXED, 2)
+NUI_CONST(GTK_SELECTION_SINGLE, 1)
 #ifdef NUI_CHECK
 _Static_assert(sizeof(NuiTextIter) >= sizeof(GtkTextIter), "NuiTextIter меньше GtkTextIter");
 _Static_assert(sizeof(GType) == sizeof(unsigned long), "GType");
 #endif
+/* Раскладки для модели List: те же числа в обоих режимах (x86-64, arm64). */
+_Static_assert(sizeof(GObject) == 24, "GObject");
+_Static_assert(sizeof(GObjectClass) == 136, "GObjectClass");
+_Static_assert(__builtin_offsetof(GObjectClass, finalize) == 48, "GObjectClass.finalize");
+_Static_assert(sizeof(GtkTreeIter) == 32, "GtkTreeIter");
+_Static_assert(__builtin_offsetof(GtkTreeModelIface, get_flags) == 56, "GtkTreeModelIface.get_flags");
+_Static_assert(sizeof(GtkTreeModelIface) == 176, "GtkTreeModelIface");
+_Static_assert(sizeof(GInterfaceInfo) == 24, "GInterfaceInfo");
 
 /* ---------- 4. Прототипы ---------- */
 /* GLib, GObject, цикл событий. (w) — только из обёрток. */
@@ -229,6 +279,53 @@ NUI_FN(gpointer, g_malloc, (gsize n_bytes))                                     
 NUI_FN(gpointer, g_malloc0, (gsize n_bytes))                                                 /* (w) */
 NUI_FN(void *, memcpy, (void *dest, const void *src, size_t n))                              /* (w) */
 NUI_FN(gboolean, g_file_get_contents, (const gchar *filename, gchar **contents, gsize *length, GError **error))
+/* List: GtkTreeView со своей моделью (строки спрашиваются у Go) */
+NUI_FN(GType, g_type_register_static_simple, (GType parent_type, const gchar *type_name, guint class_size,
+       GClassInitFunc class_init, guint instance_size, GInstanceInitFunc instance_init, GTypeFlags flags)) /* (w) */
+NUI_FN(void, g_type_add_interface_static, (GType instance_type, GType interface_type, const GInterfaceInfo *info)) /* (w) */
+NUI_FN(gpointer, g_type_class_peek_parent, (gpointer g_class))                              /* (w) */
+NUI_FN(gpointer, g_object_new, (GType object_type, const gchar *first_property_name, ...))    /* (w) */
+NUI_FN(void, g_object_set, (gpointer object, const gchar *first_property_name, ...))         /* (w) */
+NUI_FN(GValue *, g_value_init, (GValue *value, GType g_type))                                 /* (w) */
+NUI_FN(void, g_value_take_string, (GValue *value, gchar *v_string))                           /* (w) */
+NUI_FN(gchar *, g_strndup, (const gchar *str, gsize n))                                       /* (w) */
+NUI_FN_CONST(GType, gtk_tree_model_get_type)                                                  /* (w) */
+NUI_FN(gint, gtk_tree_path_get_depth, (GtkTreePath *path))                                    /* (w) */
+NUI_FN(gint *, gtk_tree_path_get_indices, (GtkTreePath *path))                                /* (w) */
+NUI_FN(GtkTreePath *, gtk_tree_path_new_from_indices, (gint first_index, ...))                /* (w) */
+NUI_FN(gboolean, gtk_tree_model_iter_nth_child, (GtkTreeModel *tree_model, GtkTreeIter *iter,
+       GtkTreeIter *parent, gint n))                                                          /* (w) */
+NUI_FN(void, gtk_tree_model_get, (GtkTreeModel *tree_model, GtkTreeIter *iter, ...))          /* тесты */
+NUI_FN(GtkWidget *, gtk_tree_view_new, (void))                                                /* (w) */
+NUI_FN(void, gtk_tree_view_set_model, (GtkTreeView *tree_view, GtkTreeModel *model))          /* (w) */
+NUI_FN(GtkTreeModel *, gtk_tree_view_get_model, (GtkTreeView *tree_view))                     /* (w) */
+NUI_FN(void, gtk_tree_view_set_fixed_height_mode, (GtkTreeView *tree_view, gboolean enable))  /* (w) */
+NUI_FN(void, gtk_tree_view_set_enable_search, (GtkTreeView *tree_view, gboolean enable_search)) /* (w) */
+NUI_FN(void, gtk_tree_view_set_headers_visible, (GtkTreeView *tree_view, gboolean headers_visible)) /* (w) */
+NUI_FN(gint, gtk_tree_view_append_column, (GtkTreeView *tree_view, GtkTreeViewColumn *column)) /* (w) */
+NUI_FN(guint, gtk_tree_view_get_n_columns, (GtkTreeView *tree_view))                          /* (w) */
+NUI_FN(GtkTreeViewColumn *, gtk_tree_view_get_column, (GtkTreeView *tree_view, gint n))       /* (w) */
+NUI_FN(void, gtk_tree_view_set_cursor, (GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColumn *focus_column,
+       gboolean start_editing))                                                               /* (w) */
+NUI_FN(void, gtk_tree_view_row_activated, (GtkTreeView *tree_view, GtkTreePath *path, GtkTreeViewColumn *column)) /* тесты */
+NUI_FN(GtkTreeViewColumn *, gtk_tree_view_column_new, (void))                                 /* (w) */
+NUI_FN(void, gtk_tree_view_column_set_title, (GtkTreeViewColumn *tree_column, const gchar *title)) /* (w) */
+NUI_FN(const gchar *, gtk_tree_view_column_get_title, (GtkTreeViewColumn *tree_column))        /* (w) */
+NUI_FN(void, gtk_tree_view_column_pack_start, (GtkTreeViewColumn *tree_column, GtkCellRenderer *cell, gboolean expand)) /* (w) */
+NUI_FN(void, gtk_tree_view_column_add_attribute, (GtkTreeViewColumn *tree_column, GtkCellRenderer *cell_renderer,
+       const gchar *attribute, gint column))                                                  /* (w) */
+NUI_FN(void, gtk_tree_view_column_set_sizing, (GtkTreeViewColumn *tree_column, GtkTreeViewColumnSizing type)) /* (w) */
+NUI_FN(void, gtk_tree_view_column_set_fixed_width, (GtkTreeViewColumn *tree_column, gint fixed_width)) /* (w) */
+NUI_FN(void, gtk_tree_view_column_set_resizable, (GtkTreeViewColumn *tree_column, gboolean resizable)) /* (w) */
+NUI_FN(void, gtk_tree_view_column_set_expand, (GtkTreeViewColumn *tree_column, gboolean expand)) /* (w) */
+NUI_FN(GtkCellRenderer *, gtk_cell_renderer_text_new, (void))                                 /* (w) */
+NUI_FN(void, gtk_tree_selection_set_mode, (GtkTreeSelection *selection, GtkSelectionMode type)) /* (w) */
+NUI_FN(gboolean, gtk_tree_selection_get_selected, (GtkTreeSelection *selection, GtkTreeModel **model, GtkTreeIter *iter)) /* (w) */
+NUI_FN(void, gtk_tree_selection_unselect_all, (GtkTreeSelection *selection))                 /* (w) */
+NUI_FN(PangoLayout *, gtk_widget_create_pango_layout, (GtkWidget *widget, const gchar *text)) /* (w) */
+NUI_FN(void, pango_layout_set_text, (PangoLayout *layout, const char *text, int length))     /* (w) */
+NUI_FN(void, pango_layout_get_pixel_size, (PangoLayout *layout, int *width, int *height))    /* (w) */
+NUI_FN(void, gtk_widget_queue_draw, (GtkWidget *widget))
 NUI_FN(void, gtk_style_context_add_provider, (GtkStyleContext *context, GtkStyleProvider *provider, guint priority)) /* (w) */
 NUI_FN(GtkCssProvider *, gtk_css_provider_new, (void))                                       /* (w) */
 NUI_FN(gboolean, gtk_css_provider_load_from_data, (GtkCssProvider *css_provider, const gchar *data, gssize length,
@@ -413,6 +510,13 @@ void   nui_css_background(GtkWidget *w, unsigned color, int panel);
 void   nui_set_padding(GtkWidget *w, unsigned px);
 GtkClipboard *nui_clipboard(void);
 GtkWidget *nui_image_new(void);
+GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud);
+void   nui_list_column(GtkTreeView *view, const gchar *title, int index);
+void   nui_list_set_rows(GtkTreeView *view, int rows, uintptr_t key);
+int    nui_list_selected(GtkTreeView *view);
+void   nui_list_select(GtkTreeView *view, int row);
+char  *nui_list_cell_text(GtkTreeView *view, int row, int col); /* только с NUI_GUI_TEST; g_free */
+void   nui_sim_list_activate(GtkTreeView *view, int row);       /* только с NUI_GUI_TEST */
 int    nui_image_load(GtkWidget *w, const guchar *data, gsize len, int wh[2]);
 void   nui_image_show(GtkWidget *w, int width, int height);
 char  *nui_text_get(GtkTextBuffer *b);
@@ -428,6 +532,8 @@ int    nui_sim_file_chooser_add(const gchar *path);         /* только с N
 int    nui_dialog_open(int chooser);                        /* только с NUI_GUI_TEST */
 
 void nuiSignal(void *obj, uintptr_t ud);
+gchar *nuiListCell(uintptr_t key, int row, int col); /* текст ячейки List, g_malloc */
+void nuiListDrop(uintptr_t key);                     /* модель List уничтожена */
 int  nuiSignalRet(void *obj, void *arg, uintptr_t ud);
 int  nuiSource(uintptr_t ud);
 int  nuiWatch(int fd, unsigned cond, uintptr_t ud);

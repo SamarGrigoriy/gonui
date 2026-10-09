@@ -102,3 +102,17 @@ func SimChooserDone(accept bool) bool {
 
 // DialogOpen — открыт ли сейчас диалог: файловый (chooser) или сообщение.
 func DialogOpen(chooser bool) bool { return C.nui_dialog_open(C.int(b2i(chooser))) != 0 }
+
+// ListCellText — текст ячейки так, как его получает GtkTreeView (через модель).
+func ListCellText(view H, row, col int) string {
+	return gostrFree((*C.gchar)(C.nui_list_cell_text((*C.GtkTreeView)(view), C.int(row), C.int(col))))
+}
+
+// SimListSelect — как щелчок по строке.
+func SimListSelect(view H, row int) { C.nui_list_select((*C.GtkTreeView)(view), C.int(row)) }
+
+// SimListActivate — как двойной щелчок по строке (или Enter на ней).
+func SimListActivate(view H, row int) {
+	C.nui_list_select((*C.GtkTreeView)(view), C.int(row))
+	C.nui_sim_list_activate((*C.GtkTreeView)(view), C.int(row))
+}

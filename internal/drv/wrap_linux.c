@@ -268,6 +268,221 @@ void nui_image_show(GtkWidget *w, int width, int height) {
 	nui_image_render(w);
 }
 
+/* ---------- List: виртуальная модель GtkTreeModel ----------
+   Строки не хранятся: строка — номер в iter->user_data, текст ячейки при отрисовке
+   спрашивается у Go (nuiListCell). Новые данные — новая модель (nui_list_set_rows);
+   при её уничтожении Go забывает функцию ячеек (nuiListDrop). */
+typedef struct {
+	GObject parent;
+	int rows, cols, stamp;
+	uintptr_t key;
+} NuiListModel;
+
+static gpointer list_parent_class;
+
+#define LM(m) ((NuiListModel *)(m))
+#define ROW(it) ((int)(uintptr_t)(it)->user_data)
+
+static gboolean lm_iter(NuiListModel *m, GtkTreeIter *it, int row) {
+	if (row < 0 || row >= m->rows) {
+		it->stamp = 0;
+		return 0;
+	}
+	it->stamp = m->stamp;
+	it->user_data = (gpointer)(uintptr_t)row;
+	return 1;
+}
+
+static GtkTreeModelFlags lm_flags(GtkTreeModel *m) {
+	(void)m;
+	return NUI_GTK_TREE_MODEL_LIST_ONLY | NUI_GTK_TREE_MODEL_ITERS_PERSIST;
+}
+static gint lm_n_columns(GtkTreeModel *m) { return LM(m)->cols; }
+static GType lm_column_type(GtkTreeModel *m, gint i) {
+	(void)m;
+	(void)i;
+	return NUI_G_TYPE_STRING;
+}
+static gboolean lm_get_iter(GtkTreeModel *m, GtkTreeIter *it, GtkTreePath *p) {
+	return gtk_tree_path_get_depth(p) == 1 && lm_iter(LM(m), it, gtk_tree_path_get_indices(p)[0]);
+}
+static GtkTreePath *lm_get_path(GtkTreeModel *m, GtkTreeIter *it) {
+	(void)m;
+	return gtk_tree_path_new_from_indices(ROW(it), -1);
+}
+static void lm_get_value(GtkTreeModel *m, GtkTreeIter *it, gint col, GValue *v) {
+	g_value_init(v, NUI_G_TYPE_STRING);
+	g_value_take_string(v, nuiListCell(LM(m)->key, ROW(it), col));
+}
+static gboolean lm_next(GtkTreeModel *m, GtkTreeIter *it) { return lm_iter(LM(m), it, ROW(it) + 1); }
+static gboolean lm_previous(GtkTreeModel *m, GtkTreeIter *it) { return lm_iter(LM(m), it, ROW(it) - 1); }
+static gboolean lm_children(GtkTreeModel *m, GtkTreeIter *it, GtkTreeIter *parent) {
+	return !parent && lm_iter(LM(m), it, 0);
+}
+static gboolean lm_has_child(GtkTreeModel *m, GtkTreeIter *it) {
+	(void)m;
+	(void)it;
+	return 0;
+}
+static gint lm_n_children(GtkTreeModel *m, GtkTreeIter *it) { return it ? 0 : LM(m)->rows; }
+static gboolean lm_nth_child(GtkTreeModel *m, GtkTreeIter *it, GtkTreeIter *parent, gint n) {
+	return !parent && lm_iter(LM(m), it, n);
+}
+static gboolean lm_parent(GtkTreeModel *m, GtkTreeIter *it, GtkTreeIter *child) {
+	(void)m;
+	(void)it;
+	(void)child;
+	return 0;
+}
+
+static void lm_iface_init(gpointer g_iface, gpointer data) {
+	(void)data;
+	GtkTreeModelIface *i = g_iface;
+	i->get_flags = lm_flags;
+	i->get_n_columns = lm_n_columns;
+	i->get_column_type = lm_column_type;
+	i->get_iter = lm_get_iter;
+	i->get_path = lm_get_path;
+	i->get_value = lm_get_value;
+	i->iter_next = lm_next;
+	i->iter_previous = lm_previous;
+	i->iter_children = lm_children;
+	i->iter_has_child = lm_has_child;
+	i->iter_n_children = lm_n_children;
+	i->iter_nth_child = lm_nth_child;
+	i->iter_parent = lm_parent;
+}
+
+static void lm_finalize(GObject *o) {
+	nuiListDrop(LM(o)->key);
+	((GObjectClass *)list_parent_class)->finalize(o);
+}
+
+static void lm_class_init(gpointer klass, gpointer data) {
+	(void)data;
+	list_parent_class = g_type_class_peek_parent(klass);
+	((GObjectClass *)klass)->finalize = lm_finalize;
+}
+
+static GType lm_type(void) {
+	static GType t;
+	if (!t) {
+		t = g_type_register_static_simple(NUI_G_TYPE_OBJECT, "NuiListModel", sizeof(GObjectClass), lm_class_init,
+			sizeof(NuiListModel), 0, 0);
+		GInterfaceInfo info = {lm_iface_init, 0, 0};
+		g_type_add_interface_static(t, gtk_tree_model_get_type(), &info);
+	}
+	return t;
+}
+
+/* row-activated (двойной щелчок, Enter): у сигнала лишние аргументы — свой обработчик. */
+static void list_activated(GtkTreeView *v, GtkTreePath *p, GtkTreeViewColumn *c, gpointer ud) {
+	(void)p;
+	(void)c;
+	nuiSignal(v, (uintptr_t)ud);
+}
+
+/* Список в своей прокрутке, как TextView. Высота строк одинаковая (fixed-height-mode):
+   GTK не измеряет все строки, рисуются только видимые — миллион строк не тормозит. */
+GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud) {
+	GtkWidget *sw = gtk_scrolled_window_new(0, 0);
+	gtk_scrolled_window_set_policy((GtkScrolledWindow *)sw, NUI_GTK_POLICY_AUTOMATIC, NUI_GTK_POLICY_AUTOMATIC);
+	GtkWidget *v = gtk_tree_view_new();
+	GtkTreeView *tv = (GtkTreeView *)v;
+	gtk_tree_view_set_fixed_height_mode(tv, 1);
+	gtk_tree_view_set_enable_search(tv, 0);
+	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(tv), NUI_GTK_SELECTION_SINGLE);
+	g_signal_connect_data(v, "row-activated", (GCallback)list_activated, (gpointer)activate_ud, 0, 0);
+	gtk_container_add((GtkContainer *)sw, v);
+	gtk_widget_show(v);
+	*view = v;
+	return sw;
+}
+
+/* Колонка с текстом колонки index модели; длинный текст — с многоточием. Последняя
+   добавленная колонка забирает свободное место. Заголовки видны, если хоть один не пуст. */
+void nui_list_column(GtkTreeView *v, const gchar *title, int index) {
+	GtkCellRenderer *r = gtk_cell_renderer_text_new();
+	g_object_set(r, "ellipsize", NUI_PANGO_ELLIPSIZE_END, (char *)0);
+	GtkTreeViewColumn *c = gtk_tree_view_column_new();
+	gtk_tree_view_column_set_title(c, title);
+	gtk_tree_view_column_pack_start(c, r, 1);
+	gtk_tree_view_column_add_attribute(c, r, "text", index);
+	gtk_tree_view_column_set_sizing(c, NUI_GTK_TREE_VIEW_COLUMN_FIXED);
+	gtk_tree_view_column_set_resizable(c, 1);
+	if (index > 0)
+		gtk_tree_view_column_set_expand(gtk_tree_view_get_column(v, index - 1), 0);
+	gtk_tree_view_column_set_expand(c, 1);
+	gtk_tree_view_append_column(v, c);
+	gtk_tree_view_set_headers_visible(v, index > 0 || title[0]);
+}
+
+/* Ширина колонок — по заголовку и первым 100 строкам: все строки не измерить. */
+static void list_autosize(GtkTreeView *v, NuiListModel *m) {
+	PangoLayout *l = gtk_widget_create_pango_layout((GtkWidget *)v, "");
+	for (int c = 0; c < m->cols; c++) {
+		GtkTreeViewColumn *col = gtk_tree_view_get_column(v, c);
+		int w = 0, h = 0, best = 40;
+		const gchar *title = gtk_tree_view_column_get_title(col);
+		if (title && title[0]) { /* заголовок — кнопка: поля по бокам */
+			pango_layout_set_text(l, title, -1);
+			pango_layout_get_pixel_size(l, &w, &h);
+			best = w + 24 > best ? w + 24 : best;
+		}
+		for (int r = 0; r < m->rows && r < 100; r++) {
+			gchar *s = nuiListCell(m->key, r, c);
+			pango_layout_set_text(l, s, -1);
+			g_free(s);
+			pango_layout_get_pixel_size(l, &w, &h);
+			if (w + 16 > best)
+				best = w + 16;
+		}
+		gtk_tree_view_column_set_fixed_width(col, best < 400 ? best : 400);
+	}
+	g_object_unref(l);
+}
+
+/* Новые данные: новая модель (старую GTK отпустит — её функция ячеек забудется),
+   выделение снимается, прокрутка — в начало. Курсор ставится на первую строку без
+   выделения: иначе GtkTreeView в режиме SINGLE выделит её сам, как только получит
+   фокус (gtk_tree_view_focus_to_cursor), а на Windows такого нет. */
+void nui_list_set_rows(GtkTreeView *v, int rows, uintptr_t key) {
+	NuiListModel *m = g_object_new(lm_type(), 0);
+	m->rows = rows;
+	m->cols = (int)gtk_tree_view_get_n_columns(v);
+	m->stamp = (int)(key & 0x7fffffff) | 1;
+	m->key = key;
+	list_autosize(v, m);
+	gtk_tree_view_set_model(v, (GtkTreeModel *)m);
+	g_object_unref(m);
+	if (rows > 0) {
+		GtkTreePath *p = gtk_tree_path_new_from_indices(0, -1);
+		gtk_tree_view_set_cursor(v, p, 0, 0); /* заодно прокрутка в начало */
+		gtk_tree_path_free(p);
+	}
+	gtk_tree_selection_unselect_all(gtk_tree_view_get_selection(v));
+}
+
+int nui_list_selected(GtkTreeView *v) {
+	GtkTreeIter it;
+	if (!gtk_tree_selection_get_selected(gtk_tree_view_get_selection(v), 0, &it))
+		return -1;
+	return ROW(&it);
+}
+
+/* Выбрать строку, как это сделал бы пользователь: курсор, выделение, прокрутка к ней.
+   row < 0 — снять выделение. */
+void nui_list_select(GtkTreeView *v, int row) {
+	GtkTreeModel *m = gtk_tree_view_get_model(v);
+	if (row < 0 || !m || row >= LM(m)->rows) {
+		gtk_tree_selection_unselect_all(gtk_tree_view_get_selection(v));
+		return;
+	}
+	GtkTreePath *p = gtk_tree_path_new_from_indices(row, -1);
+	gtk_tree_view_set_cursor(v, p, 0, 0);
+	gtk_tree_path_free(p);
+}
+
 /* Весь текст буфера. Строку освобождает вызывающий (g_free). GtkTextIter — только на стеке C. */
 char *nui_text_get(GtkTextBuffer *b) {
 	NuiTextIter s, e;
@@ -423,6 +638,23 @@ static void nui_find_tree(GtkWidget *w, gpointer out) {
 		*(GtkWidget **)out = w;
 	else if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_container_get_type()))
 		gtk_container_forall((GtkContainer *)w, nui_find_tree, out);
+}
+
+/* Текст ячейки так, как его видит GtkTreeView: через модель (gtk_tree_model_get). */
+char *nui_list_cell_text(GtkTreeView *v, int row, int col) {
+	GtkTreeModel *m = gtk_tree_view_get_model(v);
+	GtkTreeIter it;
+	gchar *s = 0;
+	if (m && gtk_tree_model_iter_nth_child(m, &it, 0, row))
+		gtk_tree_model_get(m, &it, col, &s, -1);
+	return s;
+}
+
+/* Двойной щелчок или Enter по строке. */
+void nui_sim_list_activate(GtkTreeView *v, int row) {
+	GtkTreePath *p = gtk_tree_path_new_from_indices(row, -1);
+	gtk_tree_view_row_activated(v, p, gtk_tree_view_get_column(v, 0));
+	gtk_tree_path_free(p);
 }
 
 /* Добавить файл к выбранным, как Ctrl+щелчок; каталог уже загружен. select_filename ставит

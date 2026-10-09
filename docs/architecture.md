@@ -60,7 +60,7 @@ nui/
 ├── color.go                 Color, RGB, NoColor
 ├── window.go                Window
 ├── label.go  button.go  entry.go  check.go  combo.go
-├── slider.go  progress.go  textview.go  image.go
+├── slider.go  progress.go  textview.go  image.go  list.go
 ├── chat.go                  Chat, ChatStream — готовый чат из виджетов выше
 ├── misc.go                  Separator, Frame, Scroll, spacer (Stretch)
 ├── box.go                   Box, VBox, HBox, Expand, Stretch
@@ -85,7 +85,7 @@ nui/
 │   ├── gtk3_linux.h         непрозрачные типы, константы, ПРОТОТИПЫ (только объявления)
 │   ├── wrap_linux.c         C-обёртки nui_* (определения)
 │   ├── link_linux.go        #cgo LDFLAGS (только библиотеки), тип H, Nil, cstr/cpath/gostr
-│   ├── export_linux.go      4 трамплина //export → core.Dispatch
+│   ├── export_linux.go      4 трамплина //export → core.Dispatch; 2 экспорта модели List
 │   ├── app_linux.go         Init, Main, Quit, Wake, TimerAdd, WatchAdd, SourceRemove
 │   ├── window_linux.go      WindowNew, WindowSetChild, WindowShow …
 │   ├── widget_linux.go      общие функции: Show, Destroy, SetEnabled, SetAlign …
@@ -93,6 +93,7 @@ nui/
 │   ├── layout_linux.go      Box*, Grid*, Frame*, Scroll*, Separator*
 │   ├── dialog_linux.go      Message, FileDialog, OpenURI, ShowInFolder
 │   ├── image_linux.go       ImageNew, ImageLoad, ImageShow, ReadFile (GdkPixbuf)
+│   ├── list_linux.go        ListNew, ListSetRows … — модель GtkTreeModel в wrap_linux.c
 │   ├── clipboard_linux.go   ClipboardSet, ClipboardText
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)
@@ -101,7 +102,7 @@ nui/
 │   ├── export_windows.go    трамплин nuiWndProc //export
 │   ├── node_windows.go      узлы (Box, Grid — без HWND), раскладка, DPI, прокрутка
 │   ├── *_windows.go         остальное — как у Linux: app, window, widget, controls, layout, dialog,
-│   │                        image (GDI+), clipboard, sim
+│   │                        image (GDI+), list (ListView), clipboard, sim
 │   └── link_tinygo_windows.go  путь к библиотекам импорта mingw для TinyGo
 │
 ├── internal/layout/         движок раскладки для Win32: Measure, Arrange (layout.md, §7)

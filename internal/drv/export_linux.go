@@ -31,3 +31,18 @@ func nuiSource(ud C.uintptr_t) C.int { return C.int(core.Dispatch(uintptr(ud), 0
 func nuiWatch(fd C.int, cond C.uint, ud C.uintptr_t) C.int {
 	return C.int(core.Dispatch(uintptr(ud), uintptr(cond)))
 }
+
+// Модель List (list_linux.go): текст ячейки и уничтожение модели. Это не события
+// виджета, а вопросы модели к данным — поэтому мимо core.Dispatch.
+
+//export nuiListCell
+func nuiListCell(key C.uintptr_t, row, col C.int) *C.gchar {
+	s := ""
+	if cell := listCells[uintptr(key)]; cell != nil {
+		s = cell(int(row), int(col))
+	}
+	return C.g_strndup(cstr(s), C.gsize(len(s)))
+}
+
+//export nuiListDrop
+func nuiListDrop(key C.uintptr_t) { delete(listCells, uintptr(key)) }

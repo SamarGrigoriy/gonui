@@ -35,6 +35,7 @@ const (
 	kFrame
 	kScroll
 	kImage
+	kList
 )
 
 // Шрифты окна.
@@ -102,6 +103,12 @@ type node struct {
 	bmp        C.HBITMAP      // картинка под dpi окна
 	bmpW, bmpH int            // её размер, физические пиксели
 	bmpDpi     uint32
+
+	// List
+	columns   []string                  // заголовки колонок
+	cell      func(row, col int) string // текст ячейки (ListSetRows)
+	rows      int
+	colWidths []int // ширина колонок по тексту, физические пиксели
 
 	// Window
 	dpi        uint32
@@ -442,6 +449,9 @@ func place(w *node, h H, ox, oy int, hide bool) {
 			show = C.NUI_SW_HIDE
 		}
 		C.ShowWindow(n.hwnd, show)
+		if n.kind == kList {
+			listFillLast(n)
+		}
 	}
 	if n.kind == kScroll && len(n.kids) > 0 {
 		placeScroll(w, h, hide)
@@ -515,6 +525,9 @@ func setFont(n *node) {
 		n.font = C.nui_font_scaled(fontsFor(n)[fontNormal], C.int(n.fontPct), b2i(n.bold))
 	}
 	send(n.hwnd, C.NUI_WM_SETFONT, uintptr(unsafe.Pointer(fontOf(n))), 1)
+	if n.kind == kList { // ширина колонок — по тексту этим шрифтом
+		listAutosize(n)
+	}
 	if n.kind == kText { // поля внутри текста, как у TextView в GTK; WM_SETFONT их сбрасывает
 		m := uintptr(dpiOf(n).px(6))
 		send(n.hwnd, C.NUI_EM_SETMARGINS, C.NUI_EC_LEFTMARGIN|C.NUI_EC_RIGHTMARGIN, m|m<<16)
@@ -608,6 +621,8 @@ func measureLeaf(w *node, n *node) {
 		set(w.px(50), w.px(150), w.px(15))
 	case kText:
 		set(w.px(46), w.px(46), w.px(46)) // как TextView в GTK: размер задают SetMinSize или Expand
+	case kList:
+		set(w.px(46), w.px(46), w.px(71)) // как GtkTreeView в прокрутке (Adwaita), с заголовками и без
 	case kSeparator:
 		if n.vertical {
 			set(2, 2, 1)

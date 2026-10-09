@@ -217,3 +217,19 @@ func DialogOpen(chooser bool) bool {
 	k := C.nui_dialog_kind()
 	return C.nui_find_dialog() != nil && (k >= 3) == chooser
 }
+
+// ListCellText — текст ячейки так, как его получает ListView (LVN_GETDISPINFOW).
+func ListCellText(view H, row, col int) string {
+	buf := make([]uint16, 512)
+	n := int(C.nui_list_item_text(nodes[view].hwnd, C.int(row), C.int(col), wptr(buf), C.int(len(buf))))
+	return fromUTF16(buf[:n])
+}
+
+// SimListSelect — как щелчок по строке: уведомления LVN_ITEMCHANGED идут родителю.
+func SimListSelect(view H, row int) { C.nui_list_select(nodes[view].hwnd, C.int(row)) }
+
+// SimListActivate — строка выбрана и нажат Enter (метка nuiEnter, как в цикле).
+func SimListActivate(view H, row int) {
+	C.nui_list_select(nodes[view].hwnd, C.int(row))
+	SimEnter(view)
+}

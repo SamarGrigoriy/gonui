@@ -178,6 +178,35 @@ typedef struct _browseinfoW {
 	int iImage;
 } BROWSEINFOW;
 typedef struct HBITMAP__ *HBITMAP;
+/* ListView (List) */
+typedef struct tagNMHDR { HWND hwndFrom; UINT_PTR idFrom; UINT code; } NMHDR;
+typedef struct tagLVITEMW {
+	UINT mask;
+	int iItem, iSubItem;
+	UINT state, stateMask;
+	LPWSTR pszText;
+	int cchTextMax, iImage;
+	LPARAM lParam;
+	int iIndent, iGroupId;
+	UINT cColumns;
+	UINT *puColumns;
+	int *piColFmt;
+	int iGroup;
+} LVITEMW;
+typedef struct tagLVCOLUMNW {
+	UINT mask;
+	int fmt, cx;
+	LPWSTR pszText;
+	int cchTextMax, iSubItem, iImage, iOrder, cxMin, cxDefault, cxIdeal;
+} LVCOLUMNW;
+typedef struct tagLVDISPINFOW { NMHDR hdr; LVITEMW item; } NMLVDISPINFOW;
+typedef struct tagNMLISTVIEW {
+	NMHDR hdr;
+	int iItem, iSubItem;
+	UINT uNewState, uOldState, uChanged;
+	POINT ptAction;
+	LPARAM lParam;
+} NMLISTVIEW;
 typedef HANDLE HGLOBAL;
 typedef unsigned int UINT32;
 typedef struct _SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
@@ -230,6 +259,11 @@ _Static_assert(sizeof(TASKDIALOGCONFIG) == 160, "TASKDIALOGCONFIG");
 _Static_assert(sizeof(TOOLINFOW) == 72, "TOOLINFOW");
 _Static_assert(sizeof(DRAWITEMSTRUCT) == 64, "DRAWITEMSTRUCT");
 _Static_assert(sizeof(BITMAPINFO) == 44, "BITMAPINFO");
+_Static_assert(sizeof(NMHDR) == 24, "NMHDR");
+_Static_assert(sizeof(LVITEMW) == 88, "LVITEMW");
+_Static_assert(sizeof(LVCOLUMNW) == 56, "LVCOLUMNW");
+_Static_assert(sizeof(NMLVDISPINFOW) == 112, "NMLVDISPINFOW");
+_Static_assert(sizeof(NMLISTVIEW) == 64, "NMLISTVIEW");
 _Static_assert(sizeof(BLENDFUNCTION) == 4, "BLENDFUNCTION");
 _Static_assert(sizeof(GdiplusStartupInput) == 24, "GdiplusStartupInput");
 
@@ -341,6 +375,37 @@ NUI_CONST(DT_NOPREFIX, 0x00000800)
 NUI_CONST(DT_EXPANDTABS, 0x00000040)
 NUI_CONST(ICC_STANDARD_CLASSES, 0x00004000)
 NUI_CONST(ICC_BAR_CLASSES, 0x00000004)
+NUI_CONST(ICC_LISTVIEW_CLASSES, 0x00000001)
+NUI_CONST(WM_NOTIFY, 0x004E)
+NUI_CONST(LVS_REPORT, 0x0001)
+NUI_CONST(LVS_SINGLESEL, 0x0004)
+NUI_CONST(LVS_SHOWSELALWAYS, 0x0008)
+NUI_CONST(LVS_OWNERDATA, 0x1000)
+NUI_CONST(LVS_NOCOLUMNHEADER, 0x4000)
+NUI_CONST(LVS_EX_FULLROWSELECT, 0x00000020)
+NUI_CONST(LVS_EX_LABELTIP, 0x00004000)
+NUI_CONST(LVS_EX_DOUBLEBUFFER, 0x00010000)
+NUI_CONST(LVM_SETEXTENDEDLISTVIEWSTYLE, 0x1036)
+NUI_CONST(LVM_INSERTCOLUMNW, 0x1061)
+NUI_CONST(LVM_SETCOLUMNWIDTH, 0x101E)
+NUI_CONST(LVM_GETCOLUMNWIDTH, 0x101D)
+NUI_CONST(LVM_SETITEMCOUNT, 0x102F)
+NUI_CONST(LVM_GETNEXTITEM, 0x100C)
+NUI_CONST(LVM_SETITEMSTATE, 0x102B)
+NUI_CONST(LVM_ENSUREVISIBLE, 0x1013)
+NUI_CONST(LVM_GETSTRINGWIDTHW, 0x1057)
+NUI_CONST(LVM_GETITEMTEXTW, 0x1073)
+NUI_CONST(LVCF_WIDTH, 0x0002)
+NUI_CONST(LVCF_TEXT, 0x0004)
+NUI_CONST(LVCF_SUBITEM, 0x0008)
+NUI_CONST(LVNI_SELECTED, 0x0002)
+NUI_CONST(LVIS_FOCUSED, 0x0001)
+NUI_CONST(LVIS_SELECTED, 0x0002)
+NUI_CONST(LVIF_TEXT, 0x0001)
+NUI_CONST(LVIF_STATE, 0x0008)
+NUI_CONST(LVN_ITEMCHANGED, -101)
+NUI_CONST(LVN_ITEMACTIVATE, -114)
+NUI_CONST(LVN_GETDISPINFOW, -177)
 NUI_CONST(ICC_PROGRESS_CLASS, 0x00000020)
 NUI_CONST(ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID, 0x004)
 NUI_CONST(ACTCTX_FLAG_RESOURCE_NAME_VALID, 0x008)
@@ -636,7 +701,7 @@ NUI_FNPTR(GpStatus, GdipDisposeImageAttributes, (GpImageAttributes *imageattr))
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
-enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER };
+enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL };
 
 int   nui_init(void);
 HWND  nui_msg_window(void);
@@ -665,6 +730,9 @@ void *nui_image_decode(const BYTE *data, int len, int orient, int wh[2]); /* 0 �
 HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита, альфа умножена */
 void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
+void  nui_list_column(HWND lv, int index, LPCWSTR title);
+void  nui_list_select(HWND lv, int row);
+int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */
 HWND  nui_tooltip_new(HWND owner);
 void  nui_tooltip_set(HWND tip, HWND ctl, LPCWSTR text); /* text == 0 — убрать */
 LRESULT nuiWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp); /* //export в export_windows.go */
