@@ -53,6 +53,8 @@ func Focus(h H)
 // Window
 func WindowNew(id uint32, title string) H
 func WindowSetTitle(h H, s string)
+func WindowSetKeys(h H, on bool)          // OnKey: на GTK окно подписано с создания — ничего не делает
+func KeyDecode(arg uintptr) (key uint32, mods uint8) // arg события EvKey; key 0 — о клавише не сообщаем
 func WindowSetChild(h, child H)         // старого ребёнка — gtk_container_remove (он уничтожится); child == Nil — только удалить
 func WindowSetSize(h H, w, ht int)      // см. §7 «Window»
 func WindowSetResizable(h H, on bool)
@@ -114,6 +116,8 @@ func TextNew(id uint32) (outer, view H)
 func TextSetText(view H, s string); TextText(view H) string
 func TextAppend(view H, s string, autoscroll bool, maxLines int)
 func TextSetReadOnly(view H, on bool); TextSetMonospace(view H, on bool); TextSetWrap(view H, on bool)
+func TextSetEnter(view H, id uint32, on bool) // Enter без Shift → EvEnter (TextView.OnEnter)
+func TextSetPlaceholder(view H, s string)
 
 // List: outer — прокрутка, view — сам список; строки — по требованию через cell
 func ListNew(id uint32, columns []string) (outer, view H)
@@ -442,7 +446,7 @@ void g_variant_unref(GVariant*)                                                 
 
 | nui | Создание | Сигналы → Kind | Особенности |
 |---|---|---|---|
-| Window | `gtk_window_new(TOPLEVEL)`, `set_title`, `set_position(CENTER)`, `border_width 12` | `delete-event` → EvClose (через `nui_connect_ret`), `destroy` → EvDestroy | Окно не показывается при создании. `WindowSetSize`: у растягиваемого окна до показа — `set_default_size`, после — `gtk_window_resize`; у нерастягиваемого — `gtk_widget_set_size_request` (окно = max(запрос, естественный размер)). `SetDefault`: `gtk_widget_set_can_default(btn, TRUE)` + `gtk_window_set_default` |
+| Window | `gtk_window_new(TOPLEVEL)`, `set_title`, `set_position(CENTER)`, `border_width 12` | `delete-event` → EvClose (через `nui_connect_ret`), `key-press-event` → EvKey (ответ 1 — клавиша обработана, окно не передаёт её виджету с фокусом), `destroy` → EvDestroy | Окно не показывается при создании. `WindowSetSize`: у растягиваемого окна до показа — `set_default_size`, после — `gtk_window_resize`; у нерастягиваемого — `gtk_widget_set_size_request` (окно = max(запрос, естественный размер)). `SetDefault`: `gtk_widget_set_can_default(btn, TRUE)` + `gtk_window_set_default` |
 | Label | `gtk_label_new`, `gtk_label_set_xalign(0.0)` | — | Жирность и цвет: `nui_label_style` хранит упакованное состояние в самой метке (`g_object_set_data`, число, не указатель Go) — у `nui.Label` нет лишних полей, и `hello` от них не растёт. `SetTextAlign` → `gtk_label_set_xalign` (0 / 0.5 / 1) **и** `gtk_label_set_justify` (LEFT / CENTER / RIGHT): `xalign` двигает блок текста целиком, а `justify` выравнивает строки внутри многострочного текста. `SetStyle` → `nui_label_style` (атрибуты Pango: вес 700/400, цвет `r*257, g*257, b*257`). Многоточие: `gtk_label_set_ellipsize`; с `EllipsisNone` минимальная ширина = ширина текста |
 | Button | `gtk_button_new_with_label` | `clicked` → EvClick | Подчёркивания в тексте не превращаются в мнемоники — это нормально |
 | Entry | `gtk_entry_new`, `set_activates_default(TRUE)` | `changed` → EvChange, `activate` → EvEnter | `SetReadOnly` → `gtk_editable_set_editable(!on)`. nui выключает `activates_default`, когда задан `OnEnter` |
@@ -451,6 +455,8 @@ void g_variant_unref(GVariant*)                                                 
 | Slider | `gtk_scale_new_with_range(HORIZONTAL, min, max, 1)`, `set_digits(0)` | `value-changed` → EvChange | Значение округляется до целого на стороне Go. При `min >= max` GTK вернул бы `NULL`, поэтому nui проверяет это до вызова и паникует |
 | Progress | `gtk_progress_bar_new` | — | `SetText("")` → `set_show_text(FALSE)` |
 | List | `nui_list_new`: прокрутка + `gtk_tree_view_new` (`fixed-height-mode`, без поиска, выбор SINGLE); колонка — `nui_list_column`: `GtkCellRendererText` с многоточием, `FIXED`, `resizable`, `expand` у последней | `changed` **у GtkTreeSelection** → EvChange; `row-activated` (свой C-обработчик: у сигнала лишние аргументы) → EvEnter | Своя модель `NuiListModel` (GObject + интерфейс `GtkTreeModel`, раскладки сверяет check-protos): строка — номер в `iter->user_data`, `get_value` спрашивает текст у Go (`nuiListCell`). `SetRows` — новая модель; старую отпускает GtkTreeView, её `finalize` вызывает `nuiListDrop`. Ширина колонок — по заголовку и первым 100 строкам (`PangoLayout`), не больше 400. После `SetRows` курсор ставится на первую строку и выделение снимается: иначе в режиме SINGLE GtkTreeView сам выделит строку при получении фокуса. Повторы `changed` (движение курсора) отбрасывает nui |
+| OnKey (`KeyDecode`) | — | — | Из `GdkEventKey`: `keyval` → код nui (буквы — в верхний регистр, KP_*, F1…F12, стрелки…), `state` → Shift (`GDK_SHIFT_MASK`), Ctrl (`GDK_CONTROL_MASK`), Alt (`GDK_MOD1_MASK`). Если `keyval` не латиница и не цифра (русская раскладка: Ctrl+S — «ы»), `nui_key_by_code` ищет латинскую букву или цифру той же клавиши (`hardware_keycode`) во всех раскладках через `gdk_keymap_get_entries_for_keycode` |
+| TextView.OnEnter, SetPlaceholder | `nui_text_enter`, `nui_text_placeholder` | `key-press-event` поля (свой C-обработчик) → EvEnter | Enter (Return, KP_Enter, ISO_Enter) без Shift: сначала `gtk_text_view_im_context_filter_keypress` — Enter, которым метод ввода заканчивает набор, его; иначе EvEnter, и перевода строки нет. Подсказка — обработчик `draw` после текста (`G_CONNECT_AFTER`): пустой буфер → `PangoLayout` с переносом от начала первой строки (`get_iter_location` → `buffer_to_window_coords`), цвет текста с половинной прозрачностью (`pango_cairo_show_layout`); `changed` буфера перерисовывает поле целиком |
 | TextView | `gtk_scrolled_window_new(NULL, NULL)` + `set_policy(AUTOMATIC, AUTOMATIC)` + `gtk_text_view_new` внутри | `changed` **у буфера** → EvChange (тот же ud) | Хендлов два: outer — для раскладки, view — для текста. `SetWrap` → `WORD_CHAR`/`NONE`. `SetReadOnly` → `editable` и `cursor_visible`. `Append`, `Clear` и `SetText` присылают `changed` синхронно — гасится `quiet`. `SetText` на непустом буфере и вставка поверх выделения присылают **два** `changed` (удаление и вставка) |
 | Separator | `gtk_separator_new(orientation)` | — | — |
 | Frame | `gtk_frame_new(title)` | — | Ребёнок — `gtk_container_add` |
@@ -513,7 +519,7 @@ int    nui_show_items(const char *uri, const char *dir_uri);
 // link_linux.go
 /*
 #cgo LDFLAGS: -l:libgtk-3.so.0 -l:libgobject-2.0.so.0 -l:libglib-2.0.so.0 -l:libgio-2.0.so.0 -l:libpango-1.0.so.0
-#cgo LDFLAGS: -l:libgdk-3.so.0 -l:libgdk_pixbuf-2.0.so.0 -l:libcairo.so.2
+#cgo LDFLAGS: -l:libgdk-3.so.0 -l:libgdk_pixbuf-2.0.so.0 -l:libcairo.so.2 -l:libpangocairo-1.0.so.0
 #include "gtk3_linux.h"
 */
 import "C"
@@ -530,7 +536,7 @@ export CGO_LDFLAGS := -Wl,--gc-sections -Wl,--as-needed
 - Обычный `go build` без Makefile тоже работает, только C-часть не вычищается.
 
 - `-l:имя.so.N` линкует по точному имени файла. Поэтому хватает runtime-пакетов: `libgtk-3-0` (в Debian 13 — `libgtk-3-0t64`), `libglib2.0-0`, `libpango-1.0-0`. Символьные ссылки `libgtk-3.so` из `-dev` не нужны.
-- `--gc-sections` и `-ffunction-sections` выбрасывают неиспользуемые обёртки, а `--as-needed` — неиспользуемые библиотеки. Например, без `ShowInFolder` не нужна libgio, а без `Image` — libgdk-3, libgdk_pixbuf-2.0 и libcairo (вторая строка `#cgo LDFLAGS`; все три — зависимости самой GTK, отдельно их ставить не нужно).
+- `--gc-sections` и `-ffunction-sections` выбрасывают неиспользуемые обёртки, а `--as-needed` — неиспользуемые библиотеки. Например, без `ShowInFolder` не нужна libgio, а без `Image` — libgdk-3, libgdk_pixbuf-2.0 и libcairo, без подсказки в `TextView` (её использует и `Chat`) — libpangocairo (вторая строка `#cgo LDFLAGS`; всё это — зависимости самой GTK, отдельно ставить не нужно).
 - gc при cgo в стороннем пакете линкует внешним линковщиком (gcc), поэтому флаги работают.
 - TinyGo (ADR-17) линкует встроенным `ld.lld`. Путь `-L/usr/lib/<multiarch>`, `crt*.o`, `-lc` и `--dynamic-linker` задаёт target-файл nui, поэтому `-l:имя.so.N` из `#cgo LDFLAGS` находятся без дополнительных переменных. `CGO_CFLAGS`/`CGO_LDFLAGS` TinyGo не нужны: релизная сборка спайка S3 весит 35 952 байта без них.
 

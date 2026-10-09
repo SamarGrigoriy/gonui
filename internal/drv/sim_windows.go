@@ -233,3 +233,41 @@ func SimListActivate(view H, row int) {
 	C.nui_list_select(nodes[view].hwnd, C.int(row))
 	SimEnter(view)
 }
+
+// SimKey — нажатие клавиши в окне win: тот же путь, что у цикла (NUI_WM_KEY), только
+// модификаторы — из mods, а не из GetKeyState. Не забрало окно — символ (WM_CHAR)
+// получает виджет с фокусом.
+func SimKey(win H, key uint32, mods uint8) {
+	n := nodes[win]
+	vk := key
+	switch {
+	case key >= KeyF1 && key < KeyF1+12:
+		vk = 0x70 + key - KeyF1
+	case key >= KeyEnter:
+		vk = [...]uint32{0x0D, 0x1B, 0x09, 0x08, 0x2E, 0x2D, 0x24, 0x23, 0x21, 0x22, 0x25, 0x27, 0x26, 0x28}[key-KeyEnter]
+	}
+	if C.GetPropW(n.hwnd, wstr("nuiKeys")) != nil &&
+		send(msg(), C.NUI_WM_KEY, uintptr(vk)|uintptr(mods)<<16, uintptrOf(n.hwnd)) != 0 {
+		return
+	}
+	ch := key
+	switch {
+	case key >= 'A' && key <= 'Z' && mods&ModShift == 0:
+		ch = key - 'A' + 'a'
+	case key == KeyEnter && mods == ModShift: // Shift+Enter: перевод строки в многострочном поле
+		ch = '\r'
+	}
+	if ch < 0x100 && mods&(ModCtrl|ModAlt) == 0 {
+		C.PostMessageW(C.GetFocus(), C.NUI_WM_CHAR, C.WPARAM(ch), 0)
+	}
+}
+
+// SimKeyPosted — клавиша без модификаторов через настоящий цикл: WM_KEYDOWN в очередь
+// виджету с фокусом, перехват OnKey — в nui_loop (window_key).
+func SimKeyPosted(win H, key uint32) {
+	vk := key
+	if key == KeyF1+4 {
+		vk = 0x74
+	}
+	C.PostMessageW(C.GetFocus(), C.NUI_WM_KEYDOWN, C.WPARAM(vk), 0)
+}

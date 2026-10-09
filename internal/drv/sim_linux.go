@@ -41,13 +41,29 @@ func WindowPos(h H) (x, y, screenX, screenY int) {
 }
 
 // SimType — как ввод текста в поле: changed приходит один раз.
-func SimType(h H, s string) { C.gtk_entry_set_text((*C.GtkEntry)(h), cstr(s)) }
+func SimType(h H, s string) {
+	if isTextView(h) {
+		TextSetText(h, s)
+		return
+	}
+	C.gtk_entry_set_text((*C.GtkEntry)(h), cstr(s))
+}
+
+func isTextView(h H) bool {
+	return C.g_type_check_instance_is_a((*C.GTypeInstance)(h), C.gtk_text_view_get_type()) != 0
+}
 
 // SimComboType — ввод в поле ComboEntry.
 func SimComboType(h H, s string) { SimType(comboEntry(h), s) }
 
-// SimEnter — как Enter: activate.
-func SimEnter(h H) { C.gtk_widget_activate(widget(h)) }
+// SimEnter — как Enter: activate; у TextView — нажатие Enter (key-press-event поля).
+func SimEnter(h H) {
+	if isTextView(h) {
+		C.nui_sim_key(widget(h), 0xff0d, 0xff0d, 0)
+		return
+	}
+	C.gtk_widget_activate(widget(h))
+}
 
 // SimToggle — как щелчок по флажку.
 func SimToggle(h H) {
@@ -116,3 +132,42 @@ func SimListActivate(view H, row int) {
 	C.nui_list_select((*C.GtkTreeView)(view), C.int(row))
 	C.nui_sim_list_activate((*C.GtkTreeView)(view), C.int(row))
 }
+
+// SimKey — нажатие клавиши в окне win, как с клавиатуры: сначала OnKey окна, потом виджет
+// с фокусом. key — код nui ('A'…'Z', '0'…'9', ' ', Key*), mods — Mod*.
+func SimKey(win H, key uint32, mods uint8) {
+	kv := key
+	switch {
+	case key >= 'A' && key <= 'Z' && mods&ModShift == 0:
+		kv = key - 'A' + 'a'
+	case key >= KeyF1 && key < KeyF1+12:
+		kv = 0xffbe + key - KeyF1
+	case key >= KeyEnter:
+		kv = [...]uint32{0xff0d, 0xff1b, 0xff09, 0xff08, 0xffff, 0xff63, 0xff50, 0xff57, 0xff55, 0xff56,
+			0xff51, 0xff53, 0xff52, 0xff54}[key-KeyEnter]
+	}
+	var st C.guint
+	if mods&ModShift != 0 {
+		st |= C.NUI_GDK_SHIFT_MASK
+	}
+	if mods&ModCtrl != 0 {
+		st |= C.NUI_GDK_CONTROL_MASK
+	}
+	if mods&ModAlt != 0 {
+		st |= C.NUI_GDK_MOD1_MASK
+	}
+	C.nui_sim_key(widget(win), C.guint(kv), C.guint(kv), st)
+}
+
+// SimKeyval — нажатие с keyval GDK как есть, на клавише, где в раскладке по умолчанию
+// стоит codeOf: например, «ы» (0x6d9) на клавише 's' — как в русской раскладке.
+func SimKeyval(win H, keyval, codeOf uint32, mods uint8) {
+	var st C.guint
+	if mods&ModCtrl != 0 {
+		st |= C.NUI_GDK_CONTROL_MASK
+	}
+	C.nui_sim_key(widget(win), C.guint(keyval), C.guint(codeOf), st)
+}
+
+// SimKeyPosted — на GTK то же, что SimKey без модификаторов (на Windows — через цикл).
+func SimKeyPosted(win H, key uint32) { SimKey(win, key, 0) }

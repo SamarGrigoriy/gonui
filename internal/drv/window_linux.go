@@ -17,6 +17,7 @@ func WindowNew(id uint32, title string) H {
 	C.gtk_container_set_border_width((*C.GtkContainer)(w), 12)
 	h := adopt(w, id, false)
 	connectRet(h, "delete-event", id, core.EvClose)
+	connectRet(h, "key-press-event", id, core.EvKey) // OnKey (key_linux.go)
 	return h
 }
 

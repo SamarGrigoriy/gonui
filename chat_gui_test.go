@@ -22,10 +22,10 @@ func TestChatSend(t *testing.T) {
 		w = NewWindow("чат", c)
 		w.SetSize(400, 300)
 		w.Show()
-		drv.SimType(c.input.h, "  ")
-		drv.SimEnter(c.input.h)
-		drv.SimType(c.input.h, "Привет 🙂")
-		drv.SimEnter(c.input.h)
+		drv.SimType(c.input.view, "  ")
+		drv.SimEnter(c.input.view)
+		drv.SimType(c.input.view, "Привет 🙂")
+		drv.SimEnter(c.input.view)
 		if len(got) != 1 || got[0] != "Привет 🙂" || c.input.Text() != "" {
 			t.Errorf("отправка: OnSend %q, поле %q", got, c.input.Text())
 		}
@@ -33,8 +33,8 @@ func TestChatSend(t *testing.T) {
 			t.Errorf("лента %q, ожидалось %q", c.Text(), want)
 		}
 		c.SetBusy(true)
-		drv.SimType(c.input.h, "ещё")
-		drv.SimEnter(c.input.h)
+		drv.SimType(c.input.view, "ещё")
+		drv.SimEnter(c.input.view)
 		if len(got) != 1 || c.send.Enabled() {
 			t.Errorf("занятый чат: OnSend %d раз, «Отправить» доступна: %v", len(got), c.send.Enabled())
 		}
@@ -161,5 +161,37 @@ func TestChatDestroyed(t *testing.T) {
 			t.Error("уничтоженный чат должен молчать")
 		}
 		c.Stream("ИИ").WriteString("ничего")
+	})
+}
+
+// Многострочное сообщение: Shift+Enter переводит строку, Enter отправляет всё сообщение.
+func TestChatMultiline(t *testing.T) {
+	var c *Chat
+	var w *Window
+	var got []string
+	ui(func() {
+		c = NewChat()
+		c.OnSend(func(s string) { got = append(got, s) })
+		w = NewWindow("чат", c)
+		w.SetSize(400, 300)
+		w.Show()
+		c.Focus()
+		drv.SimType(c.input.view, "первая строка")
+		drv.SimKey(w.h, drv.KeyEnter, drv.ModShift) // перевод строки, не отправка
+	})
+	waitUntil(t, 2000, func() bool { return strings.Contains(c.input.Text(), "\n") })
+	ui(func() {
+		if len(got) != 0 {
+			t.Fatalf("Shift+Enter отправил сообщение: %q", got)
+		}
+		drv.SimType(c.input.view, "первая строка\nвторая строка")
+		drv.SimEnter(c.input.view)
+		if len(got) != 1 || got[0] != "первая строка\nвторая строка" {
+			t.Errorf("OnSend: %q", got)
+		}
+		if want := "Вы:\nпервая строка\nвторая строка\n\n"; c.Text() != want {
+			t.Errorf("лента %q, ожидалось %q", c.Text(), want)
+		}
+		w.Close()
 	})
 }

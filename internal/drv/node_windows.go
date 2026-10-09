@@ -88,7 +88,9 @@ type node struct {
 	marquee   bool
 	mono      bool
 	wrapText  bool
-	scrollX   int // Scroll: позиция прокрутки, физические пиксели
+	enterText bool   // TextView.OnEnter: метка nuiEnter = 2 (Enter без Shift)
+	hint      string // TextView.SetPlaceholder
+	scrollX   int    // Scroll: позиция прокрутки, физические пиксели
 	scrollY   int
 	contentW  int
 	contentH  int

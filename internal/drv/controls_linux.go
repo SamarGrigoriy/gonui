@@ -197,6 +197,14 @@ func TextNew(id uint32) (outer, view H) {
 	return outer, H(v)
 }
 
+// TextSetEnter: on — Enter без Shift даёт EvEnter вместо перевода строки (TextView.OnEnter).
+func TextSetEnter(view H, id uint32, on bool) {
+	C.nui_text_enter((*C.GtkTextView)(view), C.int(b2i(on)), ud(id, core.EvEnter))
+}
+
+// TextSetPlaceholder — подсказка в пустом поле; "" — без подсказки.
+func TextSetPlaceholder(view H, s string) { C.nui_text_placeholder((*C.GtkTextView)(view), cstr(s)) }
+
 func textBuffer(view H) *C.GtkTextBuffer { return C.gtk_text_view_get_buffer((*C.GtkTextView)(view)) }
 
 func TextSetText(view H, s string) { C.gtk_text_buffer_set_text(textBuffer(view), cstr(s), -1) }

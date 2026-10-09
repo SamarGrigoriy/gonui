@@ -12,7 +12,7 @@ import "nui"
 func main() {
 	err := nui.Run(func() {
 		chat := nui.NewChat()
-		chat.SetPlaceholder("Спросите что-нибудь…")
+		chat.SetPlaceholder("Спросите что-нибудь… (Shift+Enter — новая строка)")
 		chat.Add("Бот", "Здравствуйте! Я эхо-бот: отвечаю по буквам, как ИИ, который печатает ответ.")
 
 		var typing *nui.Timer

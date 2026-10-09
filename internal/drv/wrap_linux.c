@@ -483,6 +483,88 @@ void nui_list_select(GtkTreeView *v, int row) {
 	gtk_tree_path_free(p);
 }
 
+/* ---------- TextView: OnEnter и подсказка ---------- */
+
+/* Enter без Shift — EvEnter вместо перевода строки (Shift+Enter — перевод строки). Сначала
+   клавиша — методу ввода: Enter, который заканчивает набор (китайский, японский…), его. */
+static gboolean text_key(GtkWidget *w, GdkEventKey *e, gpointer ud) {
+	if (!g_object_get_data((GObject *)w, "nui-enter"))
+		return 0;
+	if ((e->keyval != 0xff0d && e->keyval != 0xff8d && e->keyval != 0xfe34) || (e->state & NUI_GDK_SHIFT_MASK))
+		return 0;
+	if (!gtk_text_view_im_context_filter_keypress((GtkTextView *)w, e))
+		nuiSignal(w, (uintptr_t)ud);
+	return 1;
+}
+
+void nui_text_enter(GtkTextView *v, int on, uintptr_t ud) {
+	if (!g_object_get_data((GObject *)v, "nui-enter-connected")) {
+		g_object_set_data_full((GObject *)v, "nui-enter-connected", (gpointer)1, 0);
+		g_signal_connect_data(v, "key-press-event", (GCallback)text_key, (gpointer)ud, 0, 0);
+	}
+	g_object_set_data_full((GObject *)v, "nui-enter", (gpointer)(uintptr_t)(on != 0), 0);
+}
+
+/* Подсказка в пустом поле: рисуется после текста (draw, G_CONNECT_AFTER) с начала первой
+   строки, цветом текста с половинной прозрачностью, как подсказка GtkEntry. */
+static gboolean text_draw_hint(GtkWidget *w, cairo_t *cr, gpointer data) {
+	(void)data;
+	GtkTextView *v = (GtkTextView *)w;
+	const gchar *s = g_object_get_data((GObject *)w, "nui-hint");
+	GtkTextBuffer *b = gtk_text_view_get_buffer(v);
+	if (!s || !s[0] || gtk_text_buffer_get_char_count(b) > 0)
+		return 0;
+	NuiTextIter it;
+	int r[4], x, y;
+	gtk_text_buffer_get_start_iter(b, (GtkTextIter *)&it);
+	gtk_text_view_get_iter_location(v, (GtkTextIter *)&it, (GdkRectangle *)r);
+	gtk_text_view_buffer_to_window_coords(v, NUI_GTK_TEXT_WINDOW_WIDGET, r[0], r[1], &x, &y);
+	GdkRGBA c;
+	gtk_style_context_get_color(gtk_widget_get_style_context(w), gtk_widget_get_state_flags(w), &c);
+	PangoLayout *l = gtk_widget_create_pango_layout(w, s);
+	int width = gtk_widget_get_allocated_width(w) - 2 * x;
+	if (width > 0) {
+		pango_layout_set_width(l, width * NUI_PANGO_SCALE);
+		pango_layout_set_wrap(l, NUI_PANGO_WRAP_WORD_CHAR);
+	}
+	cairo_set_source_rgba(cr, c.red, c.green, c.blue, c.alpha * 0.5);
+	cairo_move_to(cr, x, y);
+	pango_cairo_show_layout(cr, l);
+	g_object_unref(l);
+	return 0;
+}
+
+static void text_hint_changed(GtkTextBuffer *b, gpointer view) {
+	(void)b;
+	gtk_widget_queue_draw(view); /* пустое ↔ непустое: подсказку стереть или нарисовать целиком */
+}
+
+void nui_text_placeholder(GtkTextView *v, const gchar *s) {
+	if (!g_object_get_data((GObject *)v, "nui-hint-connected")) {
+		g_object_set_data_full((GObject *)v, "nui-hint-connected", (gpointer)1, 0);
+		g_signal_connect_data(v, "draw", (GCallback)text_draw_hint, 0, 0, 1 /* G_CONNECT_AFTER */);
+		g_signal_connect_data(gtk_text_view_get_buffer(v), "changed", (GCallback)text_hint_changed, v, 0, 0);
+	}
+	g_object_set_data_full((GObject *)v, "nui-hint", g_strdup(s), g_free);
+	gtk_widget_queue_draw((GtkWidget *)v);
+}
+
+/* ---------- OnKey ---------- */
+/* Латинская буква или цифра той же клавиши в любой раскладке: в русской раскладке
+   keyval у Ctrl+S — «ы», а программе нужно 'S'. 0 — такой нет. */
+guint nui_key_by_code(GdkEventKey *e) {
+	GdkKeymap *km = gdk_keymap_get_for_display(gdk_display_get_default());
+	guint *vals = 0, r = 0;
+	gint n = 0;
+	if (!km || !gdk_keymap_get_entries_for_keycode(km, e->hardware_keycode, 0, &vals, &n))
+		return 0;
+	for (int i = 0; i < n && !r; i++)
+		if ((vals[i] >= 'a' && vals[i] <= 'z') || (vals[i] >= '0' && vals[i] <= '9'))
+			r = vals[i];
+	g_free(vals);
+	return r;
+}
+
 /* Весь текст буфера. Строку освобождает вызывающий (g_free). GtkTextIter — только на стеке C. */
 char *nui_text_get(GtkTextBuffer *b) {
 	NuiTextIter s, e;
@@ -648,6 +730,30 @@ char *nui_list_cell_text(GtkTreeView *v, int row, int col) {
 	if (m && gtk_tree_model_iter_nth_child(m, &it, 0, row))
 		gtk_tree_model_get(m, &it, col, &s, -1);
 	return s;
+}
+
+/* Нажатие клавиши, как с клавиатуры: событие идёт окну верхнего уровня виджета w, а оно
+   передаёт его виджету с фокусом, если обработчики окна не забрали. 1 — клавишу
+   обработал кто-то: окно или виджет. code_of — keyval, по которому ищется клавиша
+   (hardware_keycode): так, keyval «ы» с клавишей S — это Ctrl+S в русской раскладке. */
+int nui_sim_key(GtkWidget *w, guint keyval, guint code_of, guint state) {
+	GdkDisplay *d = gdk_display_get_default();
+	GdkEventKey *e = (GdkEventKey *)gdk_event_new(NUI_GDK_KEY_PRESS);
+	GdkWindow *win = gtk_widget_get_window(w);
+	GdkKeymapKey *keys = 0;
+	gint n = 0;
+	e->window = win ? g_object_ref(win) : 0;
+	e->send_event = 1;
+	e->state = state;
+	e->keyval = keyval;
+	e->string = g_strdup("");
+	if (gdk_keymap_get_entries_for_keyval(gdk_keymap_get_for_display(d), code_of, &keys, &n) && n > 0)
+		e->hardware_keycode = (guint16)keys[0].keycode;
+	g_free(keys);
+	gdk_event_set_device((GdkEvent *)e, gdk_seat_get_keyboard(gdk_display_get_default_seat(d)));
+	int r = gtk_widget_event(w, (GdkEvent *)e);
+	gdk_event_free((GdkEvent *)e);
+	return r;
 }
 
 /* Двойной щелчок или Enter по строке. */

@@ -12,6 +12,7 @@ type TextView struct {
 	autoscroll bool
 	maxLines   int
 	onChange   func()
+	onEnter    func()
 }
 
 // NewTextView создаёт пустое поле многострочного текста.
@@ -108,6 +109,23 @@ func (t *TextView) SetBackground(c Color) {
 	}
 }
 
+// OnEnter: Enter без Shift вызывает fn вместо перевода строки, Shift+Enter переводит
+// строку — как поле ввода в чатах. Без обработчика (nil) Enter переводит строку.
+// Enter, которым заканчивается набор в методе ввода (китайский, японский…), остаётся ему.
+func (t *TextView) OnEnter(fn func()) {
+	if !t.dead() {
+		t.onEnter = fn
+		drv.TextSetEnter(t.view, t.id, fn != nil)
+	}
+}
+
+// SetPlaceholder — серая подсказка в пустом поле; "" убирает её.
+func (t *TextView) SetPlaceholder(s string) {
+	if !t.dead() {
+		drv.TextSetPlaceholder(t.view, s)
+	}
+}
+
 // OnChange: текст изменён пользователем. Вставка поверх выделения — это удаление
 // и вставка, поэтому обработчик может сработать дважды.
 func (t *TextView) OnChange(fn func()) { t.onChange = fn }
@@ -119,6 +137,10 @@ func (t *textViewEv) Event(k core.Kind, _ uintptr) uintptr {
 	case core.EvChange:
 		if t.quiet == 0 && t.onChange != nil {
 			t.onChange()
+		}
+	case core.EvEnter:
+		if t.onEnter != nil {
+			t.onEnter()
 		}
 	case core.EvDestroy:
 		t.destroyed()

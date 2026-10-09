@@ -95,6 +95,11 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			emit(n, core.EvEnter)
 		}
 		return 0, true
+	case C.NUI_WM_KEY: // OnKey окна: ответ 1 — клавиша обработана
+		if _, n := nodeOf(hwndOf(lp)); n != nil && n.kind == kWindow {
+			return core.Dispatch(core.UD(n.id, core.EvKey), wp), true
+		}
+		return 0, true
 	case C.NUI_WM_LISTSEL: // выделение в списке снято — сообщить, если новое не появилось
 		if _, n := nodeOf(hwndOf(lp)); n != nil {
 			emit(n, core.EvChange)

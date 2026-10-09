@@ -9,7 +9,8 @@ import (
 )
 
 // Chat — готовый чат (api.md, §18): лента сообщений, поле ввода, кнопки «Отправить»
-// и «Стоп». Собран из TextView, Entry и Button, поэтому выглядит родным на каждой ОС.
+// и «Стоп». Собран из TextView и Button, поэтому выглядит родным на каждой ОС. Поле ввода
+// многострочное: Enter отправляет, Shift+Enter переводит строку.
 // Ответ, который приходит частями (например, от ИИ), пишется через Stream — из любой
 // горутины.
 //
@@ -22,7 +23,7 @@ type Chat struct {
 	*widget // корень — VBox: общие методы виджета (SetVisible, SetMinSize, Alive …)
 
 	log         *TextView
-	input       *Entry
+	input       *TextView
 	send, stop  *Button
 	you         string
 	onSend      func(text string)
@@ -42,17 +43,21 @@ func NewChat() *Chat {
 	c.log.SetReadOnly(true)
 	c.log.SetWrap(true)
 	c.log.SetAutoScroll(true)
-	c.input = NewEntry()
+	c.input = NewTextView()
+	c.input.SetWrap(true)
 	c.input.OnEnter(c.submit)
 	c.send = NewButton("Отправить", c.submit)
 	c.stop = NewButton("Стоп", c.pressStop)
 	c.stop.SetVisible(false)
+	c.send.SetAlign(AlignFill, AlignEnd) // кнопки — внизу строки ввода, как в мессенджерах
+	c.stop.SetAlign(AlignFill, AlignEnd)
 	root := VBox(Expand(c.log), HBox(Expand(c.input), c.stop, c.send))
 	c.widget = &root.widget
 	return c
 }
 
-// OnSend: пользователь отправил непустой текст (Enter или «Отправить»). К вызову fn
+// OnSend: пользователь отправил непустой текст (Enter или «Отправить»; Shift+Enter —
+// новая строка в сообщении). К вызову fn
 // поле уже очищено, а сообщение пользователя уже в ленте. Пока чат занят (SetBusy,
 // идёт Stream), отправить нельзя.
 func (c *Chat) OnSend(fn func(text string)) { c.onSend = fn }

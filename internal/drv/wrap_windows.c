@@ -76,13 +76,33 @@ int nui_init(void) {
 HWND nui_msg_window(void) { return msgWnd; }
 HWND nui_parking(void) { return parking; }
 
-// Цикл (§3): Enter в поле с OnEnter — до IsDialogMessage; клавиатура — IsDialogMessage
-// окна верхнего уровня (Tab, Shift+Tab, Enter = кнопка по умолчанию); остальное — как обычно.
+// OnKey окна (§3): нажатие — служебному окну, ответ 1 — клавиша обработана.
+// wParam: виртуальная клавиша и модификаторы (ModShift, ModCtrl, ModAlt) << 16.
+static int window_key(const MSG *m) {
+	if (m->message != NUI_WM_KEYDOWN && m->message != NUI_WM_SYSKEYDOWN)
+		return 0;
+	HWND root = GetAncestor(m->hwnd, NUI_GA_ROOT);
+	if (!root || !GetPropW(root, L"nuiKeys"))
+		return 0;
+	WPARAM mods = (GetKeyState(NUI_VK_SHIFT) < 0 ? 1 : 0) | (GetKeyState(NUI_VK_CONTROL) < 0 ? 2 : 0) |
+		(GetKeyState(NUI_VK_MENU) < 0 ? 4 : 0);
+	return SendMessageW(msgWnd, NUI_WM_KEY, (m->wParam & 0xFFFF) | mods << 16, (LPARAM)root) != 0;
+}
+
+// Цикл (§3): сначала OnKey окна; Enter в поле с OnEnter — до IsDialogMessage; клавиатура —
+// IsDialogMessage окна верхнего уровня (Tab, Shift+Tab, Enter = кнопка по умолчанию);
+// остальное — как обычно.
 void nui_loop(void) {
 	MSG m;
 	while (GetMessageW(&m, 0, 0, 0) > 0) {
 		if (m.message >= NUI_WM_KEYFIRST && m.message <= NUI_WM_KEYLAST) {
-			if (m.message == NUI_WM_KEYDOWN && m.wParam == NUI_VK_RETURN && GetPropW(m.hwnd, L"nuiEnter")) {
+			if (window_key(&m))
+				continue;
+			// nuiEnter: 1 — всегда (Entry с OnEnter), 2 — только без Shift (TextView с OnEnter:
+			// Shift+Enter — перевод строки).
+			HANDLE enter = GetPropW(m.hwnd, L"nuiEnter");
+			if (m.message == NUI_WM_KEYDOWN && m.wParam == NUI_VK_RETURN && enter &&
+				!((UINT_PTR)enter == 2 && GetKeyState(NUI_VK_SHIFT) < 0)) {
 				SendMessageW(msgWnd, NUI_WM_ENTER, 0, (LPARAM)m.hwnd);
 				continue;
 			}
@@ -644,6 +664,65 @@ void nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH b
 	GdiAlphaBlend(d->hDC, x, y, w, h, m, 0, 0, w, h, bf);
 	SelectObject(m, old);
 	DeleteDC(m);
+}
+
+// --- Подсказка в пустом многострочном поле (TextView.SetPlaceholder) ---
+// У многострочного EDIT нет EM_SETCUEBANNER: поле подклассируется, и после его WM_PAINT
+// подсказка рисуется серым в прямоугольнике текста. Переход пусто ↔ не пусто — полная
+// перерисовка, иначе от подсказки остались бы куски.
+
+static int edit_empty(HWND h) { return GetWindowTextLengthW(h) == 0; }
+
+static LRESULT hint_proc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+	WNDPROC old = (WNDPROC)GetPropW(h, L"nuiHintProc");
+	int edits = m == NUI_WM_CHAR || m == NUI_WM_KEYDOWN || m == NUI_WM_SETTEXT || m == NUI_EM_REPLACESEL ||
+		m == NUI_WM_CUT || m == NUI_WM_PASTE || m == NUI_WM_CLEAR || m == NUI_WM_UNDO || m == NUI_EM_UNDO;
+	int was = edits ? edit_empty(h) : 0;
+	LRESULT r = CallWindowProcW(old, h, m, wp, lp);
+	if (edits && was != edit_empty(h))
+		InvalidateRect(h, 0, 1);
+	if (m == NUI_WM_PAINT && edit_empty(h)) {
+		LPCWSTR s = (LPCWSTR)GetPropW(h, L"nuiHint");
+		RECT rc;
+		SendMessageW(h, NUI_EM_GETRECT, 0, (LPARAM)&rc);
+		HDC dc = GetDC(h);
+		HGDIOBJ f = SelectObject(dc, (HGDIOBJ)SendMessageW(h, NUI_WM_GETFONT, 0, 0));
+		SetTextColor(dc, GetSysColor(NUI_COLOR_GRAYTEXT));
+		SetBkMode(dc, NUI_TRANSPARENT);
+		DrawTextW(dc, s, -1, &rc, NUI_DT_WORDBREAK | NUI_DT_NOPREFIX | NUI_DT_EDITCONTROL);
+		SelectObject(dc, f);
+		ReleaseDC(h, dc);
+	}
+	if (m == NUI_WM_NCDESTROY)
+		nui_edit_hint(h, 0);
+	return r;
+}
+
+void nui_edit_hint(HWND h, LPCWSTR hint) {
+	WCHAR *old = GetPropW(h, L"nuiHint");
+	WNDPROC proc = (WNDPROC)GetPropW(h, L"nuiHintProc");
+	if (old) {
+		RemovePropW(h, L"nuiHint");
+		CoTaskMemFree(old);
+	}
+	if (!hint || !hint[0]) {
+		if (proc) {
+			SetWindowLongPtrW(h, NUI_GWLP_WNDPROC, (LONG_PTR)proc);
+			RemovePropW(h, L"nuiHintProc");
+		}
+		InvalidateRect(h, 0, 1);
+		return;
+	}
+	int n = 0;
+	while (hint[n])
+		n++;
+	WCHAR *s = CoTaskMemAlloc((SIZE_T)(n + 1) * sizeof(WCHAR));
+	for (int i = 0; i <= n; i++)
+		s[i] = hint[i];
+	SetPropW(h, L"nuiHint", s);
+	if (!proc)
+		SetPropW(h, L"nuiHintProc", (HANDLE)SetWindowLongPtrW(h, NUI_GWLP_WNDPROC, (LONG_PTR)hint_proc));
+	InvalidateRect(h, 0, 1);
 }
 
 // --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---

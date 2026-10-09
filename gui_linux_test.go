@@ -134,3 +134,25 @@ func TestListSize(t *testing.T) {
 		w.Close()
 	})
 }
+
+// OnKey в русской раскладке: keyval у Ctrl+S — «ы», а OnKey получает 'S' — по положению
+// клавиши (на Windows так устроены сами коды VK_A…VK_Z).
+func TestOnKeyCyrillicLayout(t *testing.T) {
+	var got []Key
+	ui(func() {
+		w := NewWindow("раскладка", NewLabel("Ctrl+S"))
+		w.OnKey(func(k Key, m Mod) bool {
+			if m == ModCtrl {
+				got = append(got, k)
+			}
+			return true
+		})
+		w.Show()
+		drv.SimKeyval(w.h, 0x6d9, 's', drv.ModCtrl) // Cyrillic_yeru
+		drv.SimKeyval(w.h, 0x6c3, 'w', drv.ModCtrl) // Cyrillic_tse на клавише W
+		w.Close()
+	})
+	if len(got) != 2 || got[0] != 'S' || got[1] != 'W' {
+		t.Errorf("OnKey получил %q, ожидалось ['S' 'W']", got)
+	}
+}

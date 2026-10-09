@@ -384,4 +384,26 @@ func TextSetWrap(view H, on bool) {
 	recreate(view, "EDIT", text, textStyle(n), C.NUI_WS_EX_CLIENTEDGE)
 	send(n.hwnd, C.NUI_EM_SETLIMITTEXT, 0x7FFFFFFE, 0)
 	TextSetReadOnly(view, readOnly)
+	TextSetEnter(view, n.id, n.enterText) // новый контрол — метка и подсказка заново
+	TextSetPlaceholder(view, n.hint)
+}
+
+// TextSetEnter: on — Enter без Shift даёт EvEnter вместо перевода строки (метку
+// nuiEnter = 2 проверяет цикл до IsDialogMessage); Shift+Enter — перевод строки.
+func TextSetEnter(view H, id uint32, on bool) {
+	n := nodes[view]
+	n.enterText = on
+	if on {
+		C.SetPropW(n.hwnd, wstr("nuiEnter"), handleOf(2))
+	} else {
+		C.RemovePropW(n.hwnd, wstr("nuiEnter"))
+	}
+}
+
+// TextSetPlaceholder — подсказка в пустом поле (nui_edit_hint: у многострочного EDIT
+// нет EM_SETCUEBANNER); "" — без подсказки.
+func TextSetPlaceholder(view H, s string) {
+	n := nodes[view]
+	n.hint = s
+	C.nui_edit_hint(n.hwnd, wstr(crlf(osText(s))))
 }

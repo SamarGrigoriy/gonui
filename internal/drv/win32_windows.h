@@ -16,6 +16,7 @@ typedef int BOOL, INT;
 typedef unsigned int UINT;
 typedef unsigned char BYTE;
 typedef unsigned short WORD, ATOM, USHORT, LANGID;
+typedef short SHORT;
 typedef unsigned long DWORD, ULONG, COLORREF;
 typedef long LONG, HRESULT;
 typedef long long LONG_PTR, INT_PTR;
@@ -295,6 +296,11 @@ NUI_CONST(WM_DRAWITEM, 0x002B)
 NUI_CONST(WM_CTLCOLORBTN, 0x0135)
 NUI_CONST(WM_SETICON, 0x0080)
 NUI_CONST(WM_KEYDOWN, 0x0100)
+NUI_CONST(WM_SYSKEYDOWN, 0x0104)
+NUI_CONST(WM_CHAR, 0x0102)
+NUI_CONST(VK_SHIFT, 0x10)
+NUI_CONST(VK_CONTROL, 0x11)
+NUI_CONST(VK_MENU, 0x12)
 NUI_CONST(WM_KEYFIRST, 0x0100)
 NUI_CONST(WM_KEYLAST, 0x0109)
 NUI_CONST(WM_COMMAND, 0x0111)
@@ -373,6 +379,17 @@ NUI_CONST(DT_WORDBREAK, 0x00000010)
 NUI_CONST(DT_CALCRECT, 0x00000400)
 NUI_CONST(DT_NOPREFIX, 0x00000800)
 NUI_CONST(DT_EXPANDTABS, 0x00000040)
+NUI_CONST(DT_EDITCONTROL, 0x00002000)
+NUI_CONST(GWLP_WNDPROC, -4)
+NUI_CONST(WM_PAINT, 0x000F)
+NUI_CONST(WM_NCDESTROY, 0x0082)
+NUI_CONST(WM_SETTEXT, 0x000C)
+NUI_CONST(WM_CUT, 0x0300)
+NUI_CONST(WM_PASTE, 0x0302)
+NUI_CONST(WM_CLEAR, 0x0303)
+NUI_CONST(WM_UNDO, 0x0304)
+NUI_CONST(EM_UNDO, 0x00C7)
+NUI_CONST(EM_GETRECT, 0x00B2)
 NUI_CONST(ICC_STANDARD_CLASSES, 0x00004000)
 NUI_CONST(ICC_BAR_CLASSES, 0x00000004)
 NUI_CONST(ICC_LISTVIEW_CLASSES, 0x00000001)
@@ -597,6 +614,9 @@ NUI_FN(LONG_PTR, SetWindowLongPtrW, (HWND hWnd, int nIndex, LONG_PTR dwNewLong))
 NUI_FN(LONG_PTR, GetWindowLongPtrW, (HWND hWnd, int nIndex))
 NUI_FN(BOOL, SetPropW, (HWND hWnd, LPCWSTR lpString, HANDLE hData))
 NUI_FN(HANDLE, GetPropW, (HWND hWnd, LPCWSTR lpString))
+NUI_FN(LRESULT, CallWindowProcW, (WNDPROC lpPrevWndFunc, HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam))
+NUI_FN(SHORT, GetKeyState, (int nVirtKey))
+NUI_FN(HWND, GetFocus, (void))
 NUI_FN(HANDLE, RemovePropW, (HWND hWnd, LPCWSTR lpString))
 NUI_FN(HWND, GetAncestor, (HWND hwnd, UINT gaFlags))
 NUI_FN(HWND, SetParent, (HWND hWndChild, HWND hWndNewParent))
@@ -701,7 +721,7 @@ NUI_FNPTR(GpStatus, GdipDisposeImageAttributes, (GpImageAttributes *imageattr))
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
-enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL };
+enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL, NUI_WM_KEY };
 
 int   nui_init(void);
 HWND  nui_msg_window(void);
@@ -731,6 +751,7 @@ HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита,
 void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 void  nui_list_column(HWND lv, int index, LPCWSTR title);
+void  nui_edit_hint(HWND edit, LPCWSTR hint); /* подсказка в пустом многострочном поле; 0 — убрать */
 void  nui_list_select(HWND lv, int row);
 int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */
 HWND  nui_tooltip_new(HWND owner);

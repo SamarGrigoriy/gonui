@@ -179,13 +179,14 @@ S1 ─► S2 ─┬─(успех)───────────────�
 **Готово:**
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
-- `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md).
+- `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- `Window.OnKey` — клавиши окна, `TextView.OnEnter` и `SetPlaceholder`, многострочное поле ввода в `Chat` ([api.md](api.md), §5, §13, §18), [отчёт](reports/keys.md).
 
 В порядке пользы ([api.md](api.md), §21):
 1. Canvas;
 2. меню;
 3. ~~буфер обмена~~ — готово;
-4. `OnKey`;
+4. ~~`OnKey`~~ — готово;
 5. ~~List~~ — готово;
 6. ~~Image~~ — готово.
 

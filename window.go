@@ -10,6 +10,7 @@ type Window struct {
 	h       drv.H
 	id      uint32
 	onClose func() bool
+	onKey   func(k Key, m Mod) bool
 }
 
 // NewWindow создаёт окно — скрытым, с отступом 12, по центру экрана (на Wayland
@@ -165,6 +166,28 @@ func (w *Window) SetIconName(name string) {
 // окно остаётся. Без обработчика окно закрывается. nil снимает обработчик.
 func (w *Window) OnClose(fn func() bool) { w.onClose = fn }
 
+// OnKey: нажата клавиша, пока окно активно, — раньше, чем её получит виджет с фокусом.
+// fn возвращает true, если клавиша обработана: тогда виджет её не получит (Enter не
+// нажмёт кнопку по умолчанию, буква не попадёт в поле). Повтор при удержании клавиши
+// тоже приходит сюда. Об отпускании клавиш и о самих Shift, Ctrl, Alt nui не сообщает.
+// nil снимает обработчик.
+//
+//	w.OnKey(func(k nui.Key, m nui.Mod) bool {
+//		if k == 'S' && m == nui.ModCtrl {
+//			save()
+//			return true
+//		}
+//		return false
+//	})
+func (w *Window) OnKey(fn func(k Key, m Mod) bool) {
+	core.CheckThread()
+	keyDecode = drv.KeyDecode
+	w.onKey = fn
+	if w.id != 0 {
+		drv.WindowSetKeys(w.h, fn != nil)
+	}
+}
+
 // Focus передаёт фокус окну.
 func (w *Window) Focus() {
 	if !w.dead() {
@@ -172,13 +195,23 @@ func (w *Window) Focus() {
 	}
 }
 
+// keyDecode — drv.KeyDecode, но только после первого OnKey: прямой вызов из Event держал
+// бы разбор клавиш (и libgdk на Linux) в каждой программе, даже без OnKey.
+var keyDecode func(arg uintptr) (key uint32, mods uint8)
+
 type windowEv Window
 
-func (w *windowEv) Event(k core.Kind, _ uintptr) uintptr {
+func (w *windowEv) Event(k core.Kind, arg uintptr) uintptr {
 	switch k {
 	case core.EvClose:
 		if w.onClose != nil && !w.onClose() {
 			return 1 // окно остаётся
+		}
+	case core.EvKey:
+		if w.onKey != nil {
+			if key, m := keyDecode(arg); key != 0 && w.onKey(Key(key), Mod(m)) {
+				return 1 // клавиша обработана
+			}
 		}
 	case core.EvDestroy:
 		core.Release(w.id)

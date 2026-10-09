@@ -20,10 +20,12 @@ typedef void *gpointer;
 typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnectFlags, GIOCondition,
             GtkPolicyType, GtkWrapMode, GtkJustification, PangoEllipsizeMode, PangoWeight,
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
-            GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags;
+            GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags,
+            GtkStateFlags, GtkTextWindowType, PangoWrapMode;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
+typedef unsigned char guint8;
 typedef double gdouble;
 typedef long gssize;
 typedef void (*GCallback)(void);
@@ -54,6 +56,26 @@ typedef struct _GError GError;             typedef struct _GVariant GVariant;
 typedef struct _GVariantType GVariantType; typedef struct _GDBusConnection GDBusConnection;
 typedef struct _GCancellable GCancellable; typedef struct _GAsyncResult GAsyncResult;
 typedef struct _GdkWindow GdkWindow;
+typedef struct _GdkDisplay GdkDisplay;     typedef struct _GdkSeat GdkSeat;
+typedef struct _GdkDevice GdkDevice;       typedef struct _GdkKeymap GdkKeymap;
+typedef union _GdkEvent GdkEvent;
+typedef struct _cairo cairo_t;
+typedef struct _GdkRGBA { double red, green, blue, alpha; } GdkRGBA;
+typedef struct _GdkRectangle GdkRectangle;
+typedef struct _GdkKeymapKey { guint keycode; gint group, level; } GdkKeymapKey;
+/* GdkEventKey: драйвер читает keyval, state и hardware_keycode (OnKey); тесты — заполняют. */
+typedef struct _GdkEventKey {
+	int type;
+	GdkWindow *window;
+	signed char send_event;
+	guint32 time;
+	guint state, keyval;
+	gint length;
+	gchar *string;
+	guint16 hardware_keycode;
+	guint8 group;
+	guint8 is_modifier; /* в GTK — битовое поле в этом же байте; cgo TinyGo битовых полей не понимает */
+} GdkEventKey;
 typedef struct _GtkCssProvider GtkCssProvider; typedef struct _GtkStyleContext GtkStyleContext;
 typedef struct _GtkStyleProvider GtkStyleProvider;
 typedef struct _GtkClipboard GtkClipboard; typedef struct _GdkAtom *GdkAtom;
@@ -177,6 +199,13 @@ NUI_CONST(GTK_FILE_CHOOSER_ACTION_SAVE, 1)
 NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
 NUI_CONST(G_BUS_TYPE_SESSION, 2)
 NUI_CONST(G_DBUS_CALL_FLAGS_NONE, 0)
+NUI_CONST(GDK_KEY_PRESS, 8)
+NUI_CONST(GTK_TEXT_WINDOW_WIDGET, 1)
+NUI_CONST(PANGO_WRAP_WORD_CHAR, 2)
+NUI_CONST(PANGO_SCALE, 1024)
+NUI_CONST(GDK_SHIFT_MASK, 1)
+NUI_CONST(GDK_CONTROL_MASK, 4)
+NUI_CONST(GDK_MOD1_MASK, 8)
 NUI_CONST(G_TYPE_STRING, 64)
 NUI_CONST(G_TYPE_OBJECT, 80)
 NUI_CONST(GTK_TREE_MODEL_ITERS_PERSIST, 1)
@@ -186,7 +215,9 @@ NUI_CONST(GTK_SELECTION_SINGLE, 1)
 #ifdef NUI_CHECK
 _Static_assert(sizeof(NuiTextIter) >= sizeof(GtkTextIter), "NuiTextIter меньше GtkTextIter");
 _Static_assert(sizeof(GType) == sizeof(unsigned long), "GType");
+_Static_assert(sizeof(GdkRectangle) == 4 * sizeof(int), "GdkRectangle — int[4] в text_draw_hint");
 #endif
+_Static_assert(sizeof(GdkRGBA) == 32, "GdkRGBA");
 /* Раскладки для модели List: те же числа в обоих режимах (x86-64, arm64). */
 _Static_assert(sizeof(GObject) == 24, "GObject");
 _Static_assert(sizeof(GObjectClass) == 136, "GObjectClass");
@@ -195,6 +226,10 @@ _Static_assert(sizeof(GtkTreeIter) == 32, "GtkTreeIter");
 _Static_assert(__builtin_offsetof(GtkTreeModelIface, get_flags) == 56, "GtkTreeModelIface.get_flags");
 _Static_assert(sizeof(GtkTreeModelIface) == 176, "GtkTreeModelIface");
 _Static_assert(sizeof(GInterfaceInfo) == 24, "GInterfaceInfo");
+_Static_assert(sizeof(GdkEventKey) == 56, "GdkEventKey");
+_Static_assert(__builtin_offsetof(GdkEventKey, keyval) == 28, "GdkEventKey.keyval");
+_Static_assert(__builtin_offsetof(GdkEventKey, hardware_keycode) == 48, "GdkEventKey.hardware_keycode");
+_Static_assert(sizeof(GdkKeymapKey) == 12, "GdkKeymapKey");
 
 /* ---------- 4. Прототипы ---------- */
 /* GLib, GObject, цикл событий. (w) — только из обёрток. */
@@ -326,6 +361,34 @@ NUI_FN(PangoLayout *, gtk_widget_create_pango_layout, (GtkWidget *widget, const 
 NUI_FN(void, pango_layout_set_text, (PangoLayout *layout, const char *text, int length))     /* (w) */
 NUI_FN(void, pango_layout_get_pixel_size, (PangoLayout *layout, int *width, int *height))    /* (w) */
 NUI_FN(void, gtk_widget_queue_draw, (GtkWidget *widget))
+/* OnKey: клавиша по положению — через раскладки (GdkKeymap) */
+NUI_FN(GdkDisplay *, gdk_display_get_default, (void))                                         /* (w) */
+NUI_FN(GdkKeymap *, gdk_keymap_get_for_display, (GdkDisplay *display))                       /* (w) */
+NUI_FN(gboolean, gdk_keymap_get_entries_for_keycode, (GdkKeymap *keymap, guint hardware_keycode,
+       GdkKeymapKey **keys, guint **keyvals, gint *n_entries))                               /* (w) */
+NUI_FN(gboolean, gdk_keymap_get_entries_for_keyval, (GdkKeymap *keymap, guint keyval,
+       GdkKeymapKey **keys, gint *n_keys))                                                   /* тесты */
+NUI_FN(GdkEvent *, gdk_event_new, (int type))                                                 /* тесты */
+NUI_FN(void, gdk_event_free, (GdkEvent *event))                                               /* тесты */
+NUI_FN(void, gdk_event_set_device, (GdkEvent *event, GdkDevice *device))                      /* тесты */
+NUI_FN(GdkSeat *, gdk_display_get_default_seat, (GdkDisplay *display))                       /* тесты */
+NUI_FN(GdkDevice *, gdk_seat_get_keyboard, (GdkSeat *seat))                                  /* тесты */
+NUI_FN(gboolean, gtk_widget_event, (GtkWidget *widget, GdkEvent *event))                     /* тесты */
+/* TextView: OnEnter и подсказка в пустом поле */
+NUI_FN(gboolean, gtk_text_view_im_context_filter_keypress, (GtkTextView *text_view, GdkEventKey *event)) /* (w) */
+NUI_FN(gint, gtk_text_buffer_get_char_count, (GtkTextBuffer *buffer))                          /* (w) */
+NUI_FN(void, gtk_text_buffer_get_start_iter, (GtkTextBuffer *buffer, GtkTextIter *iter))       /* (w) */
+NUI_FN(void, gtk_text_view_get_iter_location, (GtkTextView *text_view, const GtkTextIter *iter, GdkRectangle *location)) /* (w) */
+NUI_FN(void, gtk_text_view_buffer_to_window_coords, (GtkTextView *text_view, GtkTextWindowType win,
+       gint buffer_x, gint buffer_y, gint *window_x, gint *window_y))                       /* (w) */
+NUI_FN(GtkStateFlags, gtk_widget_get_state_flags, (GtkWidget *widget))                        /* (w) */
+NUI_FN(void, gtk_style_context_get_color, (GtkStyleContext *context, GtkStateFlags state, GdkRGBA *color)) /* (w) */
+NUI_FN(int, gtk_widget_get_allocated_width, (GtkWidget *widget))                              /* (w) */
+NUI_FN(void, pango_layout_set_width, (PangoLayout *layout, int width))                       /* (w) */
+NUI_FN(void, pango_layout_set_wrap, (PangoLayout *layout, PangoWrapMode wrap))               /* (w) */
+NUI_FN(void, cairo_move_to, (cairo_t *cr, double x, double y))                                /* (w) */
+NUI_FN(void, cairo_set_source_rgba, (cairo_t *cr, double red, double green, double blue, double alpha)) /* (w) */
+NUI_FN(void, pango_cairo_show_layout, (cairo_t *cr, PangoLayout *layout))                    /* (w) */
 NUI_FN(void, gtk_style_context_add_provider, (GtkStyleContext *context, GtkStyleProvider *provider, guint priority)) /* (w) */
 NUI_FN(GtkCssProvider *, gtk_css_provider_new, (void))                                       /* (w) */
 NUI_FN(gboolean, gtk_css_provider_load_from_data, (GtkCssProvider *css_provider, const gchar *data, gssize length,
@@ -470,6 +533,7 @@ NUI_FN(gchar *, gtk_file_chooser_get_filename, (GtkFileChooser *chooser)) /* g_f
 NUI_FN(gboolean, gtk_file_chooser_set_filename, (GtkFileChooser *chooser, const char *filename))          /* тесты */
 NUI_FN(gboolean, gtk_file_chooser_select_filename, (GtkFileChooser *chooser, const char *filename))       /* тесты */
 NUI_FN_CONST(GType, gtk_tree_view_get_type)                                                               /* тесты */
+NUI_FN_CONST(GType, gtk_text_view_get_type)                                                               /* тесты */
 NUI_FN_CONST(GType, gtk_container_get_type)                                                               /* тесты */
 NUI_FN(void, gtk_container_forall, (GtkContainer *container, GtkCallback callback, gpointer callback_data)) /* тесты */
 NUI_FN(gboolean, gtk_widget_get_mapped, (GtkWidget *widget))                                              /* тесты */
@@ -515,6 +579,10 @@ void   nui_list_column(GtkTreeView *view, const gchar *title, int index);
 void   nui_list_set_rows(GtkTreeView *view, int rows, uintptr_t key);
 int    nui_list_selected(GtkTreeView *view);
 void   nui_list_select(GtkTreeView *view, int row);
+guint  nui_key_by_code(GdkEventKey *e);
+void   nui_text_enter(GtkTextView *view, int on, uintptr_t ud);
+void   nui_text_placeholder(GtkTextView *view, const gchar *s);
+int    nui_sim_key(GtkWidget *w, guint keyval, guint code_of, guint state); /* только с NUI_GUI_TEST */
 char  *nui_list_cell_text(GtkTreeView *view, int row, int col); /* только с NUI_GUI_TEST; g_free */
 void   nui_sim_list_activate(GtkTreeView *view, int row);       /* только с NUI_GUI_TEST */
 int    nui_image_load(GtkWidget *w, const guchar *data, gsize len, int wh[2]);
