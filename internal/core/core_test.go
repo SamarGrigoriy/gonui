@@ -351,3 +351,91 @@ func TestDebugHooksAreHarmlessWithoutUIThread(t *testing.T) {
 		CheckThread()
 	}
 }
+
+func TestParseJSON(t *testing.T) {
+	v, err := ParseJSON([]byte(` { "messages" : [ {"role":"user","content":"Привет\n\"мир\" \u0041\ud83d\ude42\/"},
+		{"n": -1.5e+3, "t": true, "f": false, "z": null, "e": [], "o": {}} ] } `))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, ok := v.Get("messages")
+	if !ok || m.Kind != 'a' || len(m.Arr) != 2 {
+		t.Fatalf("messages: %+v", m)
+	}
+	if c, _ := m.Arr[0].Get("content"); c.Str != "Привет\n\"мир\" A🙂/" {
+		t.Errorf("content = %q", c.Str)
+	}
+	o := m.Arr[1]
+	for k, want := range map[string]JSON{"n": {Kind: 'n', Str: "-1.5e+3"}, "t": {Kind: 'b', Str: "true"},
+		"f": {Kind: 'b', Str: "false"}, "z": {Kind: 'z'}} {
+		if got, _ := o.Get(k); got.Kind != want.Kind || got.Str != want.Str {
+			t.Errorf("%s = %+v, ожидалось %+v", k, got, want)
+		}
+	}
+	if e, _ := o.Get("e"); e.Kind != 'a' || len(e.Arr) != 0 {
+		t.Errorf("пустой массив: %+v", e)
+	}
+	if e, _ := o.Get("o"); e.Kind != 'o' || len(e.Keys) != 0 {
+		t.Errorf("пустой объект: %+v", e)
+	}
+	if _, ok := o.Get("нет"); ok {
+		t.Error("Get несуществующего поля")
+	}
+	// Экранирования, одинокие половины суррогатных пар, числа.
+	for in, want := range map[string]string{
+		`"\b\f\r\t\\"`:   "\b\f\r\t\\",
+		`"\ud83d\ude42"`: "🙂",
+		`"\ud83d"`:       "\uFFFD",
+		`"\ud83dx"`:      "\uFFFDx",
+		`"\ud83d\u0041"`: "\uFFFDA",
+		`"\ud83d\uZZZZ"`: "",
+		`"\uDE42"`:       "\uFFFD",
+		`"\u00e9\u00C9"`: "éÉ",
+		"\"\xff\"":       "\uFFFD",
+	} {
+		v, err := ParseJSON([]byte(in))
+		if want == "" {
+			if err == nil {
+				t.Errorf("%s: ожидалась ошибка", in)
+			}
+			continue
+		}
+		if err != nil || v.Str != want {
+			t.Errorf("%s = %q, %v; ожидалось %q", in, v.Str, err, want)
+		}
+	}
+	for _, n := range []string{"0", "-0", "12", "0.5", "1e5", "1E-2", "-3.25e+10"} {
+		if v, err := ParseJSON([]byte(n)); err != nil || v.Kind != 'n' || v.Str != n {
+			t.Errorf("число %s: %+v, %v", n, v, err)
+		}
+	}
+	deep := make([]byte, 0, 2*(jsonMaxDepth+2))
+	for i := 0; i <= jsonMaxDepth+1; i++ {
+		deep = append(deep, '[')
+	}
+	for i := 0; i <= jsonMaxDepth+1; i++ {
+		deep = append(deep, ']')
+	}
+	bad := []string{"", " ", "[1,", "[1 2]", "[", `{"a"`, `{"a":1`, `{"a":1 "b":2}`, `{1:2}`, `{"a" 1}`,
+		`{"a":}`, `[}`, "[1", `{"a`, "tru", "nul", "x", `"abc`, `"a\`, `"\x"`, `"\u12"`, "\"a\x01\"", "-", "01x", "1.",
+		"1e", "1e+", "[1]x", `{"a":[`, string(deep), `["a",`}
+	for _, in := range bad {
+		if _, err := ParseJSON([]byte(in)); err == nil {
+			t.Errorf("%q: ожидалась ошибка", in)
+		}
+	}
+	if _, err := ParseJSON([]byte("[1,")); err == nil || err.Error() != "байт 3: неожиданный конец" {
+		t.Errorf("текст ошибки: %v", err)
+	}
+}
+
+func TestQuoteJSON(t *testing.T) {
+	s := "Привет \"мир\"\\\n\r\t\x01 🙂"
+	q := QuoteJSON(s)
+	if q != `"Привет \"мир\"\\\n\r\t\u0001 🙂"` {
+		t.Errorf("QuoteJSON = %s", q)
+	}
+	if v, err := ParseJSON([]byte(q)); err != nil || v.Str != s {
+		t.Errorf("туда и обратно: %q, %v", v.Str, err)
+	}
+}

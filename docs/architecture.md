@@ -79,6 +79,7 @@ nui/
 │   ├── queue.go             Post, Drain
 │   ├── text.go              itoa, FixUTF8, dir — вместо fmt/strings/path (size.md)
 │   ├── image.go             Fit (SetFit), Orientation (EXIF-поворот JPEG)
+│   ├── json.go              ParseJSON, QuoteJSON — история чата без encoding/json
 │   ├── debug_on.go          проверка потока и прочее         //go:build nuidebug
 │   ├── debug_off.go         пустые заглушки                  //go:build !nuidebug
 │   └── *_test.go

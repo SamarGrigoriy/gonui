@@ -523,6 +523,11 @@ func (c *Chat) OnStop(fn func())              // «Стоп» во время о
 func (c *Chat) SetBusy(on bool); Busy() bool
 func (c *Chat) Clear(); Text() string
 func (c *Chat) LastMessage() string            // текст последнего сообщения без подписи
+func (c *Chat) Messages() []ChatMessage        // история: все сообщения по порядку
+func (c *Chat) LoadJSON(data []byte) error     // очистить ленту и показать историю из JSON
+func (c *Chat) JSON() []byte                   // история в JSON — для файла
+
+type ChatMessage struct{ Who, Text string }    // подпись ("" — без неё) и текст
 func (c *Chat) SetPlaceholder(s string)
 func (c *Chat) SetLabels(you, send, stop string) // по умолчанию «Вы», «Отправить», «Стоп»
 func (c *Chat) Focus()
@@ -567,6 +572,45 @@ w := nui.NewWindow("Чат", chat)
 w.SetSize(460, 420)
 w.Show()
 ```
+
+**История в JSON.** `LoadJSON` очищает ленту и показывает сообщения по порядку, как `Add`. При ошибке лента не меняется, ошибка начинается с `nui: JSON чата:` и называет байт или номер сообщения. Понимает два вида:
+
+```json
+[
+  {"who": "Вы", "text": "Как прочитать файл целиком?"},
+  {"who": "ИИ", "text": "data, err := os.ReadFile(\"заметки.txt\")"}
+]
+```
+
+```json
+{"messages": [
+  {"role": "system", "content": "Ты помощник по Go."},
+  {"role": "user", "content": "Как прочитать файл целиком?"},
+  {"role": "assistant", "content": "os.ReadFile"}
+]}
+```
+
+| Поле | Как читается |
+|---|---|
+| подпись | `"who"`, иначе `"name"`. Без них — по `"role"`: `user` — подпись пользователя (`SetLabels`, по умолчанию «Вы»), `assistant` — «ИИ»; `system`, `developer`, `tool`, `function` в ленте не показываются; другая роль — подписью как есть |
+| текст | `"text"`, иначе `"content"`: строка или массив частей `[{"type": "text", "text": "…"}]` — части склеиваются, картинки пропускаются. Сообщение без текста (например, `"content": null` с вызовом инструментов) пропускается |
+| прочее | неизвестные поля и поля верхнего уровня (`"model"` и т. п.) не мешают |
+
+`JSON()` пишет первый вид — по сообщению в строке. Сохранить и загрузить историю:
+
+```go
+os.WriteFile("история.json", chat.JSON(), 0o644) // например, в OnClose окна
+
+if data, err := os.ReadFile("история.json"); err == nil {
+	if err := chat.LoadJSON(data); err != nil {
+		nui.Alert(w, "История не загружена", err.Error())
+	}
+}
+```
+
+`Messages()` — та же история срезом: её удобно отправлять модели как контекст разговора. Сообщение, которое ещё приходит (`Stream`), в ней — с тем текстом, что уже в ленте.
+
+JSON разбирает сама nui (`internal/core`, без `encoding/json`): программа с чатом не растёт на размер `encoding/json`.
 
 Сеть, разбор потокового ответа модели и ключи — дело приложения: nui не тянет `net/http` в бинарник. Полный пример без сети, с эхо-ботом, — [examples/chat](../examples/chat/main.go).
 

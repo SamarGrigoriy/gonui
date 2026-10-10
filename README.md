@@ -3,7 +3,7 @@
 > **Статус (09.10.2026): Linux готов, Windows — первая версия.**
 > - **Linux, фазы 1–3** ([фаза 1](docs/reports/phase-1.md), [фаза 2](docs/reports/phase-2.md), [фаза 3](docs/reports/phase-3.md)): ядро, драйвер GTK3, все виджеты MVP, диалоги и оболочка. `examples/form` со всеми виджетами — 41 808 байт в TinyGo.
 > - **Windows, фаза 5** ([отчёт](docs/reports/phase-5.md)): движок раскладки, повторяющий GTK до пикселя; драйвер Win32. Примеры и интеграционные тесты проходят под Wine; на настоящей Windows их ещё не запускали.
-> - **Готовый чат** `nui.NewChat()` — например, для общения с ИИ: ответ пишется частями из горутины ([api.md, §18](docs/api.md), [отчёт](docs/reports/chat.md), `examples/chat`).
+> - **Готовый чат** `nui.NewChat()` — например, для общения с ИИ: ответ пишется частями из горутины; история загружается из JSON и сохраняется в JSON, в том числе в формате API моделей ([api.md, §18](docs/api.md), [отчёт](docs/reports/chat.md), `examples/chat`).
 > - **Оформление** ([отчёт](docs/reports/styles.md)): фон у окна, Box и Grid, цвет и фон у подписей, кнопок, полей и чата, размер шрифта подписей (ADR-19). **Окно на весь экран:** `SetMaximized`, `SetFullscreen`.
 > - **Буфер обмена:** `nui.SetClipboard`, `nui.Clipboard`; `Chat.LastMessage` — для кнопки «Скопировать ответ» ([api.md, §17](docs/api.md), [отчёт](docs/reports/clipboard.md)).
 > - **Перетаскивание файлов** на окно `Window.OnDropFiles`; `nui.Args()` — аргументы командной строки без потерь русских букв в TinyGo на Windows. Пример `examples/viewer` — просмотрщик картинок: список, картинка, открытие нескольких файлов, перетаскивание, клавиши ([отчёт](docs/reports/drop.md)).

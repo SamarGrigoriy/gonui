@@ -5,6 +5,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"nui/internal/core"
 	"nui/internal/drv"
 )
 
@@ -29,10 +30,16 @@ type Chat struct {
 	onSend      func(text string)
 	onStop      func()
 	busy        bool
-	cur         *ChatStream // сообщение, которое сейчас дописывается
-	tick        *Timer      // переносит текст cur в ленту
-	lastNewline bool        // лента кончается переводом строки
-	last        string      // текст последнего сообщения — для «Скопировать ответ»
+	cur         *ChatStream   // сообщение, которое сейчас дописывается
+	tick        *Timer        // переносит текст cur в ленту
+	lastNewline bool          // лента кончается переводом строки
+	msgs        []ChatMessage // история: Messages, JSON, LastMessage
+}
+
+// ChatMessage — сообщение чата: подпись и текст.
+type ChatMessage struct {
+	Who  string // подпись: «Вы», «ИИ»…; "" — без подписи
+	Text string
 }
 
 // NewChat создаёт чат. Лента растягивается: задайте окну размер (SetSize) или вставьте
@@ -81,7 +88,7 @@ func (c *Chat) Add(who, text string) {
 	c.finish()
 	c.appendLog(header(who) + text)
 	c.endMessage()
-	c.last = text
+	c.msgs = append(c.msgs, ChatMessage{who, text})
 }
 
 // Stream начинает сообщение, которое приходит частями, и делает чат занятым. Писать
@@ -95,7 +102,7 @@ func (c *Chat) Stream(who string) *ChatStream {
 	}
 	c.finish()
 	c.appendLog(header(who))
-	c.last = ""
+	c.msgs = append(c.msgs, ChatMessage{Who: who})
 	c.cur = s
 	c.setBusy(true)
 	c.tick = Every(40, c.flush)
@@ -121,16 +128,129 @@ func (c *Chat) Clear() {
 	c.finish()
 	c.log.Clear()
 	c.lastNewline = true
-	c.last = ""
+	c.msgs = nil
 }
 
 // LastMessage — текст последнего сообщения без подписи (у незаконченного — то, что уже
 // в ленте). Например, для кнопки «Скопировать ответ»: nui.SetClipboard(chat.LastMessage()).
 func (c *Chat) LastMessage() string {
-	if c.dead() {
+	if c.dead() || len(c.msgs) == 0 {
 		return ""
 	}
-	return c.last
+	return c.msgs[len(c.msgs)-1].Text
+}
+
+// Messages — история: все сообщения ленты по порядку (у незаконченного Stream — то, что
+// уже пришло). Её же удобно отправлять модели как контекст разговора.
+func (c *Chat) Messages() []ChatMessage {
+	if c.dead() {
+		return nil
+	}
+	return append([]ChatMessage(nil), c.msgs...)
+}
+
+// JSON — история в формате LoadJSON: [{"who": "Вы", "text": "…"}, …], по сообщению в
+// строке. Сохраните её в файл (os.WriteFile), а при запуске загрузите LoadJSON.
+func (c *Chat) JSON() []byte {
+	b := []byte("[")
+	for i, m := range c.Messages() {
+		if i > 0 {
+			b = append(b, ',')
+		}
+		b = append(b, "\n  {\"who\": "...)
+		b = append(b, core.QuoteJSON(m.Who)...)
+		b = append(b, ", \"text\": "...)
+		b = append(b, core.QuoteJSON(m.Text)...)
+		b = append(b, '}')
+	}
+	return append(b, "\n]\n"...)
+}
+
+// LoadJSON показывает историю из JSON: лента очищается, затем все сообщения — по порядку,
+// как Add. Ошибка — лента не меняется. Понимает два вида (api.md, §18):
+//
+//	[{"who": "Вы", "text": "Привет"}, {"who": "ИИ", "text": "Здравствуйте!"}]
+//	{"messages": [{"role": "user", "content": "Привет"}, {"role": "assistant", "content": "…"}]}
+//
+// Второй — формат API моделей. Подпись — поле "who" (или "name"); без него — по "role":
+// user — подпись пользователя (SetLabels, по умолчанию «Вы»), assistant — «ИИ»; сообщения
+// system, developer и tool не показываются. Текст — "text" или "content": строка или
+// массив частей [{"type": "text", "text": "…"}] (картинки пропускаются). Сообщения без
+// текста пропускаются, неизвестные поля — тоже.
+func (c *Chat) LoadJSON(data []byte) error {
+	if c.dead() {
+		return nil
+	}
+	v, err := core.ParseJSON(data)
+	if err != nil {
+		return errors.New("nui: JSON чата: " + err.Error())
+	}
+	if m, ok := v.Get("messages"); ok && v.Kind == 'o' {
+		v = m
+	}
+	if v.Kind != 'a' {
+		return errors.New("nui: JSON чата: нужен массив сообщений или объект с полем \"messages\"")
+	}
+	var msgs []ChatMessage
+	for i, m := range v.Arr {
+		if m.Kind != 'o' {
+			return errors.New("nui: JSON чата: сообщение " + core.Itoa(i+1) + " — не объект")
+		}
+		who, show := c.jsonWho(m)
+		text := jsonText(m)
+		if show && text != "" {
+			msgs = append(msgs, ChatMessage{who, text})
+		}
+	}
+	c.Clear()
+	for _, m := range msgs {
+		c.Add(m.Who, m.Text)
+	}
+	return nil
+}
+
+// jsonWho — подпись сообщения; show = false — сообщение не для ленты (system, tool…).
+func (c *Chat) jsonWho(m core.JSON) (who string, show bool) {
+	for _, k := range []string{"who", "name"} {
+		if v, ok := m.Get(k); ok && v.Kind == 's' {
+			return v.Str, true
+		}
+	}
+	role, ok := m.Get("role")
+	if !ok {
+		return "", true
+	}
+	switch role.Str {
+	case "user":
+		return c.you, true
+	case "assistant":
+		return "ИИ", true
+	case "system", "developer", "tool", "function":
+		return "", false
+	}
+	return role.Str, true
+}
+
+// jsonText — текст сообщения: "text" или "content", строка или массив частей с "text".
+func jsonText(m core.JSON) string {
+	for _, k := range []string{"text", "content"} {
+		v, ok := m.Get(k)
+		switch {
+		case !ok:
+			continue
+		case v.Kind == 's':
+			return v.Str
+		case v.Kind == 'a':
+			s := ""
+			for _, part := range v.Arr {
+				if t, ok := part.Get("text"); ok && t.Kind == 's' {
+					s += t.Str
+				}
+			}
+			return s
+		}
+	}
+	return ""
 }
 
 // Text — вся лента.
@@ -229,7 +349,7 @@ func (c *Chat) flush() {
 	}
 	text, done := s.take(false)
 	c.appendLog(text)
-	c.last += text
+	c.streamed(text)
 	if done {
 		c.cur = nil
 		c.stopTick()
@@ -247,11 +367,18 @@ func (c *Chat) finish() {
 	s.Close()
 	text, _ := s.take(true)
 	c.appendLog(text)
-	c.last += text
+	c.streamed(text)
 	c.cur = nil
 	c.stopTick()
 	c.endMessage()
 	c.setBusy(false)
+}
+
+// streamed дописывает пришедший текст Stream к последнему сообщению истории.
+func (c *Chat) streamed(text string) {
+	if n := len(c.msgs); n > 0 {
+		c.msgs[n-1].Text += text
+	}
 }
 
 func (c *Chat) stopTick() {
