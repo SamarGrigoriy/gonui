@@ -26,6 +26,7 @@ const (
 	Grid          // сетка: Col, Row, Cols, Rows у детей
 	Frame         // один ребёнок внутри оформления Inset
 	Scroll        // один ребёнок; если не помещается — прокручивается
+	Stack         // дети в одном месте внутри Inset (страницы Tabs); размер — по самому большому
 )
 
 // Выравнивание внутри ячейки — значения совпадают с nui.Align.
@@ -49,7 +50,7 @@ type Node struct {
 	// (полосы прокрутки).
 	Min, Nat, Floor Size
 
-	Inset   Insets // Frame, Scroll: оформление вокруг ребёнка
+	Inset   Insets // Frame, Scroll, Stack: оформление вокруг детей
 	Padding int    // отступ вокруг содержимого: Box.Padding, Grid.Padding
 
 	Spacing        int // Box: промежуток между детьми
@@ -74,6 +75,8 @@ func Measure(n *Node) {
 		measureGrid(n)
 	case Frame, Scroll:
 		measureBin(n)
+	case Stack:
+		measureStack(n)
 	}
 	// gtk_widget_real_adjust_size_request: size request поднимает минимум,
 	// а естественный размер не бывает меньше минимального.
@@ -99,6 +102,12 @@ func Arrange(n *Node, cell Rect) {
 	case Frame:
 		if c := child(n); c != nil {
 			Arrange(c, inner(n))
+		}
+	case Stack: // GtkNotebook: все видимые страницы получают одно место
+		for _, c := range n.Children {
+			if !c.Hidden {
+				Arrange(c, inner(n))
+			}
 		}
 	case Scroll:
 		// GtkViewport: ребёнок получает видимую область, но не меньше своего минимума.
@@ -163,6 +172,22 @@ func measureBin(n *Node) {
 	n.Nat = Size{c.Nat.W + dx, c.Nat.H + dy}
 	if n.Kind == Frame {
 		n.Min = Size{c.Min.W + dx, c.Min.H + dy}
+	}
+}
+
+// measureStack — GtkNotebook: оформление плюс самая большая из видимых страниц (по
+// каждой оси отдельно); скрытые страницы не в счёт.
+func measureStack(n *Node) {
+	dx := n.Inset.L + n.Inset.R + 2*n.Padding
+	dy := n.Inset.T + n.Inset.B + 2*n.Padding
+	n.Min, n.Nat = Size{dx, dy}, Size{dx, dy}
+	for _, c := range n.Children {
+		if c.Hidden {
+			continue
+		}
+		Measure(c)
+		n.Min = Size{maxInt(n.Min.W, c.Min.W+dx), maxInt(n.Min.H, c.Min.H+dy)}
+		n.Nat = Size{maxInt(n.Nat.W, c.Nat.W+dx), maxInt(n.Nat.H, c.Nat.H+dy)}
 	}
 }
 

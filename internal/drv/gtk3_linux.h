@@ -124,6 +124,7 @@ struct _GList { gpointer data; GList *next; GList *prev; };
 /* Одним объявлением: cgo TinyGo не видит полей структуры, описанной после typedef. */
 typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
 typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned; typedef struct _GtkMenu GtkMenu;
+typedef struct _GtkNotebook GtkNotebook;
 typedef void (*GtkMenuDetachFunc)(GtkWidget *attach_widget, GtkMenu *menu);
 typedef struct _GtkMenuShell GtkMenuShell; typedef struct _GtkMenuItem GtkMenuItem;
 typedef struct _GtkCheckMenuItem GtkCheckMenuItem; typedef struct _GtkAccelLabel GtkAccelLabel;
@@ -451,6 +452,14 @@ NUI_FN(void, gtk_paned_pack1, (GtkPaned *paned, GtkWidget *child, gboolean resiz
 NUI_FN(void, gtk_paned_pack2, (GtkPaned *paned, GtkWidget *child, gboolean resize, gboolean shrink))
 NUI_FN(void, gtk_paned_set_position, (GtkPaned *paned, gint position))
 NUI_FN(gint, gtk_paned_get_position, (GtkPaned *paned))
+/* Tabs: GtkNotebook */
+NUI_FN(GtkWidget *, gtk_notebook_new, (void))                                               /* (w) */
+NUI_FN(void, gtk_notebook_set_scrollable, (GtkNotebook *notebook, gboolean scrollable))    /* (w) */
+NUI_FN(gint, gtk_notebook_append_page, (GtkNotebook *notebook, GtkWidget *child, GtkWidget *tab_label))
+NUI_FN(void, gtk_notebook_set_current_page, (GtkNotebook *notebook, gint page_num))
+NUI_FN(gint, gtk_notebook_get_current_page, (GtkNotebook *notebook))
+NUI_FN(GtkWidget *, gtk_notebook_get_nth_page, (GtkNotebook *notebook, gint page_num))      /* (w) */
+NUI_FN(void, gtk_notebook_set_tab_label_text, (GtkNotebook *notebook, GtkWidget *child, const gchar *tab_text))
 /* Canvas: GtkDrawingArea, cairo, события мыши */
 NUI_FN(GtkWidget *, gtk_drawing_area_new, (void))
 NUI_FN(void, gtk_widget_add_events, (GtkWidget *widget, gint events))
@@ -720,6 +729,7 @@ GtkContainer *nui_window_content(GtkWindow *w);
 void   nui_ctx_set(GtkWidget *w, GtkWidget *menu);
 GtkWidget *nui_ctx_owner_at(GtkWidget *top, int x, int y); /* только с NUI_GUI_TEST: чьё меню у точки окна */
 void   nui_window_menubar_resize(GtkWindow *w);
+GtkWidget *nui_tabs_new(uintptr_t ud);
 GtkWidget *nui_image_new(void);
 GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud);
 void   nui_list_column(GtkTreeView *view, const gchar *title, int index);

@@ -248,6 +248,28 @@ func TestFrame(t *testing.T) {
 	}
 }
 
+func TestStack(t *testing.T) {
+	a, b, c := flex(40, 80, 20), flex(60, 70, 50), flex(300, 300, 300)
+	c.Hidden = true
+	s := &Node{Kind: Stack, Inset: Insets{1, 38, 1, 1}, Children: []*Node{a, b, c}}
+	run(s, Rect{0, 0, 120, 100})
+	if s.Min != (Size{62, 89}) || s.Nat != (Size{82, 89}) {
+		t.Fatalf("Stack: min %v nat %v (скрытая страница не в счёт)", s.Min, s.Nat)
+	}
+	want(t, "первая страница", a.Out, Rect{1, 38, 118, 61})
+	want(t, "вторая — там же", b.Out, Rect{1, 38, 118, 61})
+	s.Floor = Size{150, 0} // ярлыки шире страниц
+	Measure(s)
+	if s.Min != (Size{150, 89}) || s.Nat != (Size{150, 89}) {
+		t.Fatalf("Stack с широкими ярлыками: min %v nat %v", s.Min, s.Nat)
+	}
+	empty := &Node{Kind: Stack, Inset: Insets{1, 1, 1, 1}}
+	Measure(empty)
+	if empty.Min != (Size{2, 2}) {
+		t.Fatalf("пустой Stack: %v", empty.Min)
+	}
+}
+
 func TestScroll(t *testing.T) {
 	a := flex(50, 200, 300)
 	s := &Node{Kind: Scroll, Floor: Size{40, 40}, Children: []*Node{a}}

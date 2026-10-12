@@ -15,10 +15,8 @@ func Hide(h H) { C.ShowWindow(nodes[h].hwnd, C.NUI_SW_HIDE) }
 // экране (скрыт сам, скрыт родитель, окно не показано) — 0, 0.
 func Size(h H) (w, ht int) {
 	n := nodes[h]
-	for m := n; m != nil; m = get(m.parent) {
-		if m.hidden {
-			return 0, 0
-		}
+	if effectiveHidden(h) { // скрыт сам, предок или страница вкладок не текущая
+		return 0, 0
 	}
 	win := get(n.win)
 	if win == nil || C.IsWindowVisible(win.hwnd) == 0 {
@@ -72,6 +70,9 @@ func SetVisible(h H, on bool) {
 		return
 	}
 	n.hidden = !on
+	if p := get(n.parent); p != nil && p.kind == kTabs {
+		tabsHooks.visibility(n.parent, h)
+	}
 	invalidate(n.parent)
 	if n.parent == Nil && n.hwnd != nil && !on {
 		C.ShowWindow(n.hwnd, C.NUI_SW_HIDE)

@@ -309,7 +309,7 @@ func nodeAt(host H, x, y int) H {
 		for _, k := range nodes[cur].kids {
 			kn := nodes[k]
 			o := kn.lay.Out
-			if !kn.hidden && kn.kind != kScroll && x >= o.X && x < o.X+o.W && y >= o.Y && y < o.Y+o.H {
+			if !kn.hidden && kn.kind != kScroll && !offPage(k) && x >= o.X && x < o.X+o.W && y >= o.Y && y < o.Y+o.H {
 				next = k
 			}
 		}

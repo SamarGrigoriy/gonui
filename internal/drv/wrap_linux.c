@@ -487,6 +487,37 @@ void nui_ctx_set(GtkWidget *w, GtkWidget *menu) {
 	ctx_anchor(w, 0, 0);
 }
 
+/* ---------- Вкладки (Tabs): GtkNotebook ----------
+   switch-page приходит и на программные переключения. Пользователь переключает только
+   с видимой страницы; GTK сам уходит со страницы, которую прячут (gtk_widget_hide), —
+   это не действие пользователя (ADR-8): до переключения запоминаем, видна ли текущая,
+   после — EvChange, только если была видна. Add, Remove, SetCurrent глушит nui. */
+
+static void tabs_before(GtkNotebook *nb, GtkWidget *page, guint num, gpointer ud) {
+	(void)page;
+	(void)num;
+	(void)ud;
+	gint cur = gtk_notebook_get_current_page(nb);
+	GtkWidget *old = cur < 0 ? 0 : gtk_notebook_get_nth_page(nb, cur);
+	g_object_set_data((GObject *)nb, "nui-user", (gpointer)(uintptr_t)(old && gtk_widget_get_visible(old)));
+}
+
+static void tabs_after(GtkNotebook *nb, GtkWidget *page, guint num, gpointer ud) {
+	(void)page;
+	(void)num;
+	if (g_object_get_data((GObject *)nb, "nui-user"))
+		nuiSignal(nb, (uintptr_t)ud);
+}
+
+/* Ярлыки, которые не помещаются, прокручиваются стрелками, как на Windows. */
+GtkWidget *nui_tabs_new(uintptr_t ud) {
+	GtkWidget *nb = gtk_notebook_new();
+	gtk_notebook_set_scrollable((GtkNotebook *)nb, 1);
+	g_signal_connect_data(nb, "switch-page", (GCallback)tabs_before, 0, 0, 0);
+	g_signal_connect_data(nb, "switch-page", (GCallback)tabs_after, (gpointer)ud, 0, 1 /* G_CONNECT_AFTER */);
+	return nb;
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная

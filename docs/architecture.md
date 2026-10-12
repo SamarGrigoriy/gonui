@@ -72,6 +72,7 @@ nui/
 ├── menu.go                  Menu, MenuItem, Window.SetMenu, SetContextMenu
 ├── canvas.go                Canvas, Painter, MouseEvent
 ├── split.go                 Split, HSplit, VSplit
+├── tabs.go                  Tabs — вкладки
 ├── args.go                  Args — аргументы командной строки
 ├── nui_gui_test.go          интеграционные тесты            //go:build gui
 │
@@ -106,6 +107,7 @@ nui/
 │   ├── menu_linux.go        MenuBar, MenuSub, MenuItemNew … (окно перестраивается в wrap_linux.c)
 │   ├── canvas_linux.go      CanvasNew, Paint*, MouseDecode (cairo)
 │   ├── split_linux.go       SplitNew, SplitSet, SplitSetPosition (GtkPaned)
+│   ├── tabs_linux.go        TabsNew, TabsAdd, TabsSetCurrent … (GtkNotebook)
 │   ├── args_linux.go        Args (/proc/self/cmdline)
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)

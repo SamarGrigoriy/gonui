@@ -100,6 +100,8 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			return core.Dispatch(core.UD(n.id, core.EvKey), wp), true
 		}
 		return 0, true
+	case C.NUI_WM_TABSKEY: // Ctrl+Tab, Ctrl+PgDn…: ответ 1 — фокус во вкладках, переключено
+		return uintptr(b2i(tabsHooks.key != nil && tabsHooks.key(hwndOf(lp), wp != 0))), true
 	case C.NUI_WM_LISTSEL: // выделение в списке снято — сообщить, если новое не появилось
 		if _, n := nodeOf(hwndOf(lp)); n != nil {
 			emit(n, core.EvChange)
@@ -138,8 +140,14 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			return 0, true
 		}
 	case C.NUI_WM_NOTIFY:
-		if _, c := nodeOf(nmhdrOf(lp).hwndFrom); c != nil && c.kind == kList {
+		nm := nmhdrOf(lp)
+		h, c := nodeOf(nm.hwndFrom)
+		if c != nil && c.kind == kList {
 			return listNotify(c, lp), true
+		}
+		if c != nil && c.kind == kTabs && uint32(nm.code) == tcnSelChange {
+			tabsHooks.clicked(h)
+			return 0, true
 		}
 	case C.NUI_WM_DRAWITEM: // цветная кнопка (BS_OWNERDRAW) и картинка (SS_OWNERDRAW)
 		d := drawItemOf(lp)

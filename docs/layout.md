@@ -65,12 +65,13 @@
 - `Spacing(colGap, rowGap)` ставится между соседними **непустыми** колонками и строками. Пустые колонки и строки имеют нулевой размер. Если GTK ведёт себя иначе, верным считается GTK: это зафиксируют golden-тесты, а пункт будет исправлен.
 - Внутри ячейки виджет располагается по `SetAlign`.
 
-## 5. Window, Frame, Scroll
+## 5. Window, Frame, Tabs, Scroll
 
 - **Window.** Содержимое занимает всю клиентскую область за вычетом `Padding`.
   - Минимальный размер окна = минимальный размер содержимого + 2·Padding.
   - `SetSize` для растягиваемого окна задаёт начальный размер, для нерастягиваемого — фиксированный (не меньше естественного размера содержимого). См. [api.md](api.md), §5.
 - **Frame** добавляет рамку и заголовок. Её размер = размер ребёнка + оформление ОС.
+- **Tabs** (вид `Stack` движка) — как GtkNotebook: оформление ОС (ярлыки и рамка) плюс самая большая из видимых страниц, по каждой оси отдельно; скрытые страницы не в счёт. Все видимые страницы получают одно и то же место, показана текущая. Ширина — не меньше самого широкого ярлыка со стрелками прокрутки ярлыков (у драйвера Win32 — `Floor`).
 - **Scroll.** Минимальный размер маленький — по полосам прокрутки, естественный равен естественному размеру ребёнка (в GTK для этого включены `propagate-natural-width/height`). Ребёнок получает видимую область, но не меньше своего минимума; если не помещается, появляются полосы прокрутки.
 
 ## 6. Как это ложится на GTK
@@ -110,12 +111,12 @@ type Rect struct{ X, Y, W, H int }
 type Insets struct{ L, T, R, B int }
 
 type Node struct {
-	Kind            uint8  // Leaf, VBox, HBox, Grid, Frame, Scroll
+	Kind            uint8  // Leaf, VBox, HBox, Grid, Frame, Scroll, Stack
 	Hidden          bool   // SetVisible(false)
 	Expand          bool   // ребёнок Box забирает свободное место
 	HAlign, VAlign  uint8  // AlignFill, AlignStart, AlignCenter, AlignEnd — как nui.Align
 	Min, Nat, Floor Size   // Leaf: Min, Nat — от драйвера; контейнеры: Min, Nat считает Measure
-	Inset           Insets // Frame, Scroll: оформление вокруг ребёнка — от драйвера
+	Inset           Insets // Frame, Scroll, Stack: оформление вокруг детей — от драйвера
 	Padding         int    // Box.Padding, Grid.Padding
 	Spacing, ColGap, RowGap int
 	Col, Row, Cols, Rows    int    // ребёнок Grid

@@ -213,6 +213,13 @@ typedef struct tagLVCOLUMNW {
 	int cchTextMax, iSubItem, iImage, iOrder, cxMin, cxDefault, cxIdeal;
 } LVCOLUMNW;
 typedef struct tagLVDISPINFOW { NMHDR hdr; LVITEMW item; } NMLVDISPINFOW;
+typedef struct tagTCITEMW {
+	UINT mask;
+	DWORD dwState, dwStateMask;
+	LPWSTR pszText;
+	int cchTextMax, iImage;
+	LPARAM lParam;
+} TCITEMW;
 typedef struct tagNMLISTVIEW {
 	NMHDR hdr;
 	int iItem, iSubItem;
@@ -290,6 +297,7 @@ _Static_assert(sizeof(LVITEMW) == 88, "LVITEMW");
 _Static_assert(sizeof(LVCOLUMNW) == 56, "LVCOLUMNW");
 _Static_assert(sizeof(NMLVDISPINFOW) == 112, "NMLVDISPINFOW");
 _Static_assert(sizeof(NMLISTVIEW) == 64, "NMLISTVIEW");
+_Static_assert(sizeof(TCITEMW) == 40, "TCITEMW");
 _Static_assert(sizeof(BLENDFUNCTION) == 4, "BLENDFUNCTION");
 _Static_assert(sizeof(GdiplusStartupInput) == 24, "GdiplusStartupInput");
 
@@ -438,6 +446,27 @@ NUI_CONST(LVS_EX_FULLROWSELECT, 0x00000020)
 NUI_CONST(LVS_EX_LABELTIP, 0x00004000)
 NUI_CONST(LVS_EX_DOUBLEBUFFER, 0x00010000)
 NUI_CONST(LVM_SETEXTENDEDLISTVIEWSTYLE, 0x1036)
+NUI_CONST(ICC_TAB_CLASSES, 0x00000008)
+NUI_CONST(TCIF_TEXT, 0x0001)
+NUI_CONST(TCM_DELETEALLITEMS, 0x1309)
+NUI_CONST(TCM_GETITEMRECT, 0x130A)
+NUI_CONST(TCM_GETCURSEL, 0x130B)
+NUI_CONST(TCM_SETCURSEL, 0x130C)
+NUI_CONST(TCM_ADJUSTRECT, 0x1328)
+NUI_CONST(TCM_INSERTITEMW, 0x133E)
+/* TCN_SELCHANGE = TCN_FIRST - 1 = 0U - 551U: в enum не помещается (TinyGo сделал бы его
+   отрицательным) — в Go это константа tcnSelChange, здесь только сверка. */
+#ifdef NUI_CHECK
+_Static_assert(TCN_SELCHANGE == 0xFFFFFDD9u, "TCN_SELCHANGE");
+#endif
+NUI_CONST(WM_PRINTCLIENT, 0x0318)
+NUI_CONST(PRF_CLIENT, 0x00000004)
+NUI_CONST(PRF_ERASEBKGND, 0x00000008)
+NUI_CONST(RGN_DIFF, 4)
+NUI_CONST(SM_CXHSCROLL, 21)
+NUI_CONST(VK_TAB, 0x09)
+NUI_CONST(VK_PRIOR, 0x21)
+NUI_CONST(VK_NEXT, 0x22)
 NUI_CONST(LVM_INSERTCOLUMNW, 0x1061)
 NUI_CONST(LVM_SETCOLUMNWIDTH, 0x101E)
 NUI_CONST(LVM_GETCOLUMNWIDTH, 0x101D)
@@ -736,6 +765,10 @@ NUI_FN(BOOL, SetProcessDpiAwarenessContext, (DPI_AWARENESS_CONTEXT value))
 NUI_FN(UINT, GetDpiForWindow, (HWND hwnd))
 NUI_FN(UINT, GetDpiForSystem, (void))
 NUI_FN(int, GetSystemMetricsForDpi, (int nIndex, UINT dpi))
+NUI_FN(HRGN, CreateRectRgn, (int x1, int y1, int x2, int y2))
+NUI_FN(int, CombineRgn, (HRGN hrgnDst, HRGN hrgnSrc1, HRGN hrgnSrc2, int iMode))
+NUI_FN(int, SetWindowRgn, (HWND hWnd, HRGN hRgn, BOOL bRedraw))
+NUI_FN(HWND, WindowFromPoint, (POINT Point))                                               /* тесты */
 NUI_FN(BOOL, SystemParametersInfoForDpi, (UINT uiAction, UINT uiParam, PVOID pvParam, UINT fWinIni, UINT dpi))
 NUI_FN(BOOL, AdjustWindowRectExForDpi, (RECT *lpRect, DWORD dwStyle, BOOL bMenu, DWORD dwExStyle, UINT dpi))
 
@@ -826,7 +859,7 @@ NUI_FNPTR(GpStatus, GdipFillEllipse, (GpGraphics *graphics, GpBrush *brush, REAL
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
-enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL, NUI_WM_KEY };
+enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL, NUI_WM_KEY, NUI_WM_TABSKEY };
 
 int   nui_init(void);
 HWND  nui_msg_window(void);
@@ -872,6 +905,14 @@ void  nui_paint_text_size(NuiPaint *p, LPCWSTR s, int len, float out[2]);
 int   nui_menu_set_text(HMENU m, UINT item, int byPos, LPCWSTR text);
 void  nui_edit_hint(HWND edit, LPCWSTR hint); /* подсказка в пустом многострочном поле; 0 — убрать */
 void  nui_list_select(HWND lv, int row);
+/* Tabs: SysTabControl32 */
+void  nui_tabs_insert(HWND tab, int i, LPCWSTR title);
+void  nui_tabs_inner(HWND tab, int w, int h, int out[4]); /* область страниц в окне w×h: x, y, ширина, высота */
+void  nui_tabs_hole(HWND tab, int w, int h, const int in[4]); /* окно контрола без области страниц */
+int   nui_tabs_item_width(HWND tab, int i);
+COLORREF nui_tabs_pane(void); /* цвет области страниц у темы */
+void  nui_tabs_click(HWND tab, int i);      /* только с NUI_GUI_TEST: щелчок по ярлыку i */
+HWND  nui_hwnd_at(HWND win, int x, int y);  /* только с NUI_GUI_TEST: окно под точкой клиентской области */
 int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */
 void  nui_sim_drop(HWND w, LPCWSTR files, int len); /* только с NUI_GUI_TEST: files — «путь\0путь\0\0» */
 HWND  nui_tooltip_new(HWND owner);

@@ -38,6 +38,7 @@ const (
 	kList
 	kCanvas
 	kSplit    // две панели; HWND — полоса между ними (за неё тянут)
+	kTabs     // вкладки: SysTabControl32 над страницами
 	kMenu     // HMENU: строка меню или подменю
 	kMenuItem // пункт меню (в hmenu — меню, где он лежит)
 )
@@ -126,6 +127,12 @@ type node struct {
 	splitCur  int    // размер первой панели после раскладки, физические пиксели
 	dragStart [2]int // начало перетаскивания: splitCur и координата курсора на экране
 
+	// Tabs
+	tabCur   H      // текущая страница; Nil — нет
+	tabShown []H    // страницы с ярлыками (видимые) в порядке ярлыков
+	tabHole  [6]int // вырезанная область страниц: размер контрола и прямоугольник, физические пиксели
+	tabTitle string // у страницы: заголовок её ярлыка
+
 	// List
 	columns   []string                  // заголовки колонок
 	cell      func(row, col int) string // текст ячейки (ListSetRows)
@@ -150,6 +157,20 @@ type node struct {
 }
 
 const noColor = 1 << 24
+
+// tabsHooks — код вкладок, нужный общему коду узлов: раскладка, фон, удаление, события.
+// Задаёт TabsNew: прямые вызовы держали бы его в каждой программе, и без вкладок (TinyGo).
+// Кроме key, хуки вызываются только при узле kTabs — значит, после TabsNew.
+var tabsHooks struct {
+	measure    func(w, n *node)
+	hole       func(n *node)
+	pane       func() uint32
+	detach     func(h, page H) // до удаления page из детей
+	sync       func(h H)
+	visibility func(h, page H)
+	clicked    func(h H)
+	key        func(focus C.HWND, back bool) bool
+}
 
 var (
 	nodes    = []*node{nil} // H — индекс; 0 — Nil
@@ -259,11 +280,17 @@ func effectiveDisabled(h H) bool {
 func detach(h H) {
 	n := nodes[h]
 	if p := get(n.parent); p != nil {
+		if p.kind == kTabs {
+			tabsHooks.detach(n.parent, h)
+		}
 		for i, k := range p.kids {
 			if k == h {
 				p.kids = append(p.kids[:i:i], p.kids[i+1:]...)
 				break
 			}
+		}
+		if p.kind == kTabs {
+			tabsHooks.sync(n.parent)
 		}
 		invalidate(n.parent)
 	}
@@ -453,6 +480,9 @@ func prepare(w *node, h H) {
 		l.Min, l.Nat, l.Expand = layout.Size{}, layout.Size{}, true
 	case kSplit: // как ряд с промежутком-полосой; панели расставляет placeSplit
 		l.Spacing, l.Padding = w.px(splitGap), 0
+	case kTabs:
+		tabsHooks.measure(w, n)
+		w.panels = true // область страниц рисует хост (eraseBackground)
 	default:
 		if !n.measured {
 			measureLeaf(w, n)
@@ -497,13 +527,16 @@ func place(w *node, h H, ox, oy int, hide bool) {
 		if n.kind == kList {
 			listFillLast(n)
 		}
+		if n.kind == kTabs {
+			tabsHooks.hole(n)
+		}
 	}
 	if n.kind == kScroll && len(n.kids) > 0 {
 		placeScroll(w, h, hide)
 		return
 	}
 	for _, k := range n.kids {
-		place(w, k, ox, oy, hide)
+		place(w, k, ox, oy, hide || n.kind == kTabs && k != n.tabCur)
 	}
 }
 
@@ -772,7 +805,7 @@ func scrollBy(h H, vertical bool, code, thumb int, wheel int) {
 
 func effectiveHidden(h H) bool {
 	for ; h != Nil; h = nodes[h].parent {
-		if nodes[h].hidden {
+		if nodes[h].hidden || offPage(h) {
 			return true
 		}
 	}
@@ -865,11 +898,15 @@ func brushFor(c uint32) C.HBRUSH {
 	return b
 }
 
-// inheritedBg — фон ближайшей цветной панели (Box, Grid) или окна выше узла.
+// inheritedBg — фон ближайшей цветной панели (Box, Grid), области страниц вкладок или
+// окна выше узла.
 func inheritedBg(n *node) uint32 {
 	for p := get(n.parent); p != nil; p = get(p.parent) {
 		if p.bg != noColor && (p.kind == kBox || p.kind == kGrid || p.kind == kWindow) {
 			return p.bg
+		}
+		if p.kind == kTabs {
+			return tabsHooks.pane()
 		}
 	}
 	if w := get(n.win); w != nil {
@@ -947,6 +984,15 @@ func paintPanels(w *node, h H, dc C.HDC, ox, oy int) {
 	if n.bg != noColor && (n.kind == kBox || n.kind == kGrid) {
 		p, o := w.px(n.padding), n.lay.Out
 		C.nui_fill(dc, C.int(o.X-p-ox), C.int(o.Y-p-oy), C.int(o.W+2*p), C.int(o.H+2*p), bgr(n.bg))
+	}
+	if n.kind == kTabs { // область страниц (вырезана из контрола) и панели текущей страницы
+		o, in := n.lay.Out, n.lay.Inset
+		C.nui_fill(dc, C.int(o.X+in.L-ox), C.int(o.Y+in.T-oy), C.int(o.W-in.L-in.R), C.int(o.H-in.T-in.B),
+			bgr(tabsHooks.pane()))
+		if n.tabCur != Nil {
+			paintPanels(w, n.tabCur, dc, ox, oy)
+		}
+		return
 	}
 	for _, k := range n.kids {
 		paintPanels(w, k, dc, ox, oy)

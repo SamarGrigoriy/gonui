@@ -234,8 +234,8 @@ func SimListActivate(view H, row int) {
 	SimEnter(view)
 }
 
-// SimKey — нажатие клавиши в окне win: тот же путь, что у цикла (NUI_WM_KEY), только
-// модификаторы — из mods, а не из GetKeyState. Не забрало окно — символ (WM_CHAR)
+// SimKey — нажатие клавиши в окне win: тот же путь, что у цикла (NUI_WM_KEY, затем
+// NUI_WM_TABSKEY), только модификаторы — из mods, а не из GetKeyState. Не забрало окно — символ (WM_CHAR)
 // получает виджет с фокусом.
 func SimKey(win H, key uint32, mods uint8) {
 	n := nodes[win]
@@ -249,6 +249,12 @@ func SimKey(win H, key uint32, mods uint8) {
 	if C.GetPropW(n.hwnd, wstr("nuiKeys")) != nil &&
 		send(msg(), C.NUI_WM_KEY, uintptr(vk)|uintptr(mods)<<16, uintptrOf(n.hwnd)) != 0 {
 		return
+	}
+	if mods&ModCtrl != 0 && (key == KeyTab || key == KeyPageUp || key == KeyPageDown) { // tabs_key
+		back := key == KeyPageUp || key == KeyTab && mods&ModShift != 0
+		if send(msg(), C.NUI_WM_TABSKEY, uintptr(b2i(back)), uintptrOf(C.GetFocus())) != 0 {
+			return
+		}
 	}
 	ch := key
 	switch {
@@ -378,4 +384,22 @@ func ContextMenuOwner(win H, x, y int) H {
 		}
 	}
 	return Nil
+}
+
+// SimTabsSelect — пользователь щёлкнул ярлык страницы i.
+func SimTabsSelect(h H, i int) {
+	n := nodes[h]
+	for j, k := range n.tabShown {
+		if k == n.kids[i] {
+			C.nui_tabs_click(n.hwnd, C.int(j))
+		}
+	}
+}
+
+// HwndAt — виджет, которому достанется щелчок в точке (x, y) окна win (логические пиксели
+// от левого верхнего угла содержимого): с учётом регионов окон и HTTRANSPARENT. Nil — окно.
+func HwndAt(win H, x, y int) H {
+	w := nodes[win]
+	h, _ := nodeOf(C.nui_hwnd_at(w.hwnd, C.int(w.px(x)), C.int(w.px(y))))
+	return h
 }

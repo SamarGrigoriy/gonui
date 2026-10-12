@@ -42,7 +42,8 @@ static void comctl_init(void) {
 		(nui_InitCommonControlsEx_fn)(void (*)(void))GetProcAddress(m, "InitCommonControlsEx");
 	if (init) {
 		INITCOMMONCONTROLSEX icc = {sizeof icc,
-			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS | NUI_ICC_LISTVIEW_CLASSES};
+			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS | NUI_ICC_LISTVIEW_CLASSES |
+			NUI_ICC_TAB_CLASSES};
 		init(&icc);
 	}
 	taskDialog = (nui_TaskDialogIndirect_fn)(void (*)(void))GetProcAddress(m, "TaskDialogIndirect");
@@ -89,7 +90,29 @@ static int window_key(const MSG *m) {
 	return SendMessageW(msgWnd, NUI_WM_KEY, (m->wParam & 0xFFFF) | mods << 16, (LPARAM)root) != 0;
 }
 
-// Цикл (§3): сначала OnKey окна; Enter в поле с OnEnter — до IsDialogMessage; клавиатура —
+// Ctrl+Tab и Ctrl+PgDn — следующая вкладка Tabs, внутри которых фокус; Ctrl+Shift+Tab и
+// Ctrl+PgUp — предыдущая. Ответ 1 — фокус во вкладках, клавиша обработана.
+static int tabs_key(const MSG *m) {
+	if (m->message != NUI_WM_KEYDOWN || GetKeyState(NUI_VK_CONTROL) >= 0)
+		return 0;
+	WPARAM back;
+	switch (m->wParam) {
+	case NUI_VK_TAB:
+		back = GetKeyState(NUI_VK_SHIFT) < 0;
+		break;
+	case NUI_VK_NEXT:
+		back = 0;
+		break;
+	case NUI_VK_PRIOR:
+		back = 1;
+		break;
+	default:
+		return 0;
+	}
+	return SendMessageW(msgWnd, NUI_WM_TABSKEY, back, (LPARAM)m->hwnd) != 0;
+}
+
+// Цикл (§3): сначала OnKey окна, затем переключение вкладок; Enter в поле с OnEnter — до IsDialogMessage; клавиатура —
 // IsDialogMessage окна верхнего уровня (Tab, Shift+Tab, Enter = кнопка по умолчанию);
 // остальное — как обычно.
 void nui_loop(void) {
@@ -97,6 +120,8 @@ void nui_loop(void) {
 	while (GetMessageW(&m, 0, 0, 0) > 0) {
 		if (m.message >= NUI_WM_KEYFIRST && m.message <= NUI_WM_KEYLAST) {
 			if (window_key(&m))
+				continue;
+			if (tabs_key(&m))
 				continue;
 			// nuiEnter: 1 — всегда (Entry с OnEnter), 2 — только без Shift (TextView с OnEnter:
 			// Shift+Enter — перевод строки).
@@ -925,7 +950,86 @@ void nui_list_select(HWND lv, int row) {
 	SendMessageW(lv, NUI_LVM_ENSUREVISIBLE, (WPARAM)row, 0);
 }
 
+// --- Tabs (driver-win32.md, §5): SysTabControl32 ---
+
+void nui_tabs_insert(HWND tab, int i, LPCWSTR title) {
+	TCITEMW it = {0};
+	it.mask = NUI_TCIF_TEXT;
+	it.pszText = (LPWSTR)title;
+	SendMessageW(tab, NUI_TCM_INSERTITEMW, (WPARAM)i, (LPARAM)&it);
+}
+
+void nui_tabs_inner(HWND tab, int w, int h, int out[4]) {
+	RECT r = {0, 0, w, h};
+	SendMessageW(tab, NUI_TCM_ADJUSTRECT, 0, (LPARAM)&r);
+	out[0] = r.left;
+	out[1] = r.top;
+	out[2] = r.right - r.left;
+	out[3] = r.bottom - r.top;
+}
+
+// Окно контрола — только ярлыки и рамка: область страниц вырезана. Щелчки по ней достаются
+// контролам страниц (они под контролом в Z-порядке, как дети рамки Frame), и контрол её
+// не закрашивает — её фон и цветные панели рисует хост.
+void nui_tabs_hole(HWND tab, int w, int h, const int in[4]) {
+	HRGN all = CreateRectRgn(0, 0, w, h);
+	if (in[2] > 0 && in[3] > 0) {
+		HRGN hole = CreateRectRgn(in[0], in[1], in[0] + in[2], in[1] + in[3]);
+		CombineRgn(all, all, hole, NUI_RGN_DIFF);
+		DeleteObject(hole);
+	}
+	SetWindowRgn(tab, all, 1); // регион теперь принадлежит окну
+}
+
+int nui_tabs_item_width(HWND tab, int i) {
+	RECT r = {0, 0, 0, 0};
+	SendMessageW(tab, NUI_TCM_GETITEMRECT, (WPARAM)i, (LPARAM)&r);
+	return r.right - r.left;
+}
+
+// Цвет области страниц у темы: в Windows 10 и 11 она светлее фона окна, без темы — как фон.
+// Временный контрол рисуется в память поверх фона окна; берётся точка в середине страницы.
+COLORREF nui_tabs_pane(void) {
+	COLORREF face = GetSysColor(NUI_COLOR_BTNFACE);
+	HWND tab = nui_control(L"SysTabControl32", L"", 0, 0, parking, 0);
+	if (!tab)
+		return face;
+	nui_tabs_insert(tab, 0, L"x");
+	SetWindowPos(tab, 0, 0, 0, 100, 100, NUI_SWP_NOZORDER | NUI_SWP_NOACTIVATE);
+	HDC dc = GetDC(tab), mem = CreateCompatibleDC(dc);
+	HBITMAP bmp = CreateCompatibleBitmap(dc, 100, 100);
+	HGDIOBJ old = SelectObject(mem, bmp);
+	nui_fill(mem, 0, 0, 100, 100, face);
+	SendMessageW(tab, NUI_WM_PRINTCLIENT, (WPARAM)mem, NUI_PRF_CLIENT | NUI_PRF_ERASEBKGND);
+	int in[4];
+	nui_tabs_inner(tab, 100, 100, in);
+	COLORREF c = GetPixel(mem, in[0] + in[2] / 2, in[1] + in[3] / 2);
+	SelectObject(mem, old);
+	DeleteObject(bmp);
+	DeleteDC(mem);
+	ReleaseDC(tab, dc);
+	DestroyWindow(tab);
+	return c == (COLORREF)-1 ? face : c;
+}
+
 #ifdef NUI_GUI_TEST
+// Щелчок по ярлыку i, как мышью: контрол сам шлёт TCN_SELCHANGING и TCN_SELCHANGE.
+void nui_tabs_click(HWND tab, int i) {
+	RECT r = {0, 0, 0, 0};
+	SendMessageW(tab, NUI_TCM_GETITEMRECT, (WPARAM)i, (LPARAM)&r);
+	LPARAM at = (LPARAM)(((r.top + r.bottom) / 2) << 16 | ((r.left + r.right) / 2 & 0xFFFF));
+	SendMessageW(tab, NUI_WM_LBUTTONDOWN, 1 /* MK_LBUTTON */, at);
+	SendMessageW(tab, NUI_WM_LBUTTONUP, 0, at);
+}
+
+// Окно, которому достанется щелчок в точке (x, y) клиентской области win: с учётом
+// регионов окон и HTTRANSPARENT, как у настоящей мыши.
+HWND nui_hwnd_at(HWND win, int x, int y) {
+	POINT pt = {x, y};
+	ClientToScreen(win, &pt);
+	return WindowFromPoint(pt);
+}
+
 // На окно бросили файлы: HDROP, как его собирает оболочка (DROPFILES + пути UTF-16),
 // в очередь окну — дальше обычный WM_DROPFILES и DragQueryFileW.
 void nui_sim_drop(HWND w, LPCWSTR files, int len) {
