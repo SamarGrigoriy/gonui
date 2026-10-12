@@ -211,7 +211,7 @@ void nui_ideal_size(HWND button, int out[2]) {
 void nui_window_frame(HWND hwnd, int cw, int ch, int center, int out[4]) {
 	DWORD style = (DWORD)GetWindowLongPtrW(hwnd, NUI_GWL_STYLE);
 	RECT r = {0, 0, cw, ch};
-	AdjustWindowRectExForDpi(&r, style, 0, NUI_WS_EX_CONTROLPARENT, GetDpiForWindow(hwnd));
+	AdjustWindowRectExForDpi(&r, style, GetMenu(hwnd) != 0, NUI_WS_EX_CONTROLPARENT, GetDpiForWindow(hwnd));
 	int w = r.right - r.left, h = r.bottom - r.top;
 	RECT wr;
 	GetWindowRect(hwnd, &wr);
@@ -723,6 +723,15 @@ void nui_edit_hint(HWND h, LPCWSTR hint) {
 	if (!proc)
 		SetPropW(h, L"nuiHintProc", (HANDLE)SetWindowLongPtrW(h, NUI_GWLP_WNDPROC, (LONG_PTR)hint_proc));
 	InvalidateRect(h, 0, 1);
+}
+
+// Текст пункта меню (по команде или по позиции — у пункта с подменю команды нет).
+int nui_menu_set_text(HMENU m, UINT item, int byPos, LPCWSTR text) {
+	MENUITEMINFOW mi = {0};
+	mi.cbSize = sizeof mi;
+	mi.fMask = NUI_MIIM_STRING;
+	mi.dwTypeData = (LPWSTR)text;
+	return SetMenuItemInfoW(m, item, byPos, &mi);
 }
 
 // --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---

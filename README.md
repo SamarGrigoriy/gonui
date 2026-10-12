@@ -7,6 +7,7 @@
 > - **Оформление** ([отчёт](docs/reports/styles.md)): фон у окна, Box и Grid, цвет и фон у подписей, кнопок, полей и чата, размер шрифта подписей (ADR-19). **Окно на весь экран:** `SetMaximized`, `SetFullscreen`.
 > - **Буфер обмена:** `nui.SetClipboard`, `nui.Clipboard`; `Chat.LastMessage` — для кнопки «Скопировать ответ» ([api.md, §17](docs/api.md), [отчёт](docs/reports/clipboard.md)).
 > - **Перетаскивание файлов** на окно `Window.OnDropFiles`; `nui.Args()` — аргументы командной строки без потерь русских букв в TinyGo на Windows. Пример `examples/viewer` — просмотрщик картинок: список, картинка, открытие нескольких файлов, перетаскивание, клавиши ([отчёт](docs/reports/drop.md)).
+> - **Меню окна** `w.SetMenu(nui.NewMenu("Файл", nui.Item("Открыть…", open).Shortcut('O', nui.ModCtrl), …))`: подменю, флажки, сочетания клавиш, которые показываются в меню и работают и в русской раскладке ([отчёт](docs/reports/menu.md)).
 > - **Клавиши окна** `Window.OnKey` (Ctrl+S работает и в русской раскладке); в чате многострочный ввод: Enter отправляет, Shift+Enter — новая строка ([отчёт](docs/reports/keys.md)).
 > - **Список и таблица** `nui.NewList` — строки по требованию, миллион строк открывается сразу ([api.md, §20](docs/api.md), [отчёт](docs/reports/list.md)).
 > - **Картинки и выбор нескольких файлов:** `nui.NewImage` — PNG, JPEG, GIF, BMP, чёткие на HiDPI; `nui.OpenFiles` ([api.md, §19 и §16](docs/api.md), [отчёт](docs/reports/image.md)).

@@ -80,3 +80,33 @@ func keyvalKey(kv uint32) uint32 {
 	}
 	return 0
 }
+
+// keyKeyval — keyval GDK для клавиши nui (обратное keyvalKey): буквы — строчные, как в
+// сочетаниях GTK.
+func keyKeyval(key uint32) uint32 {
+	switch {
+	case key >= 'A' && key <= 'Z':
+		return key - 'A' + 'a'
+	case key >= KeyF1 && key < KeyF1+12:
+		return 0xffbe + key - KeyF1
+	case key >= KeyEnter && key <= KeyDown:
+		return [...]uint32{0xff0d, 0xff1b, 0xff09, 0xff08, 0xffff, 0xff63, 0xff50, 0xff57, 0xff55, 0xff56,
+			0xff51, 0xff53, 0xff52, 0xff54}[key-KeyEnter]
+	}
+	return key // цифры, пробел
+}
+
+// gdkMods — модификаторы nui в маску GDK.
+func gdkMods(mods uint8) uint32 {
+	var st uint32
+	if mods&ModShift != 0 {
+		st |= C.NUI_GDK_SHIFT_MASK
+	}
+	if mods&ModCtrl != 0 {
+		st |= C.NUI_GDK_CONTROL_MASK
+	}
+	if mods&ModAlt != 0 {
+		st |= C.NUI_GDK_MOD1_MASK
+	}
+	return st
+}

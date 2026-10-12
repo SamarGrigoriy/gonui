@@ -147,7 +147,7 @@ func (w *Window) SetBackground(c Color) {
 // SetPadding — отступ между краем окна и содержимым, по умолчанию 12.
 func (w *Window) SetPadding(px int) {
 	if !w.dead() {
-		drv.SetPadding(w.h, px)
+		drv.WindowSetPadding(w.h, px)
 	}
 }
 
@@ -194,7 +194,7 @@ func (w *Window) OnKey(fn func(k Key, m Mod) bool) {
 	keyDecode = drv.KeyDecode
 	w.onKey = fn
 	if w.id != 0 {
-		drv.WindowSetKeys(w.h, fn != nil)
+		drv.WindowSetKeys(w.h, fn != nil || menuHooks.has != nil && menuHooks.has(w))
 	}
 }
 
@@ -217,12 +217,17 @@ func (w *Window) Focus() {
 	}
 }
 
-// keyDecode и dropDecode — drv.KeyDecode и drv.DropPaths, но только после первого OnKey
-// и OnDropFiles: прямой вызов из Event держал бы их (и libgdk на Linux) в каждой
-// программе.
+// keyDecode, dropDecode и menuHooks — drv.KeyDecode, drv.DropPaths и сочетания меню, но
+// только после первого OnKey, OnDropFiles и SetMenu: прямой вызов (и даже поле с типом
+// пункта меню в Window) держал бы их код и описания типов в каждой программе TinyGo.
 var (
 	keyDecode  func(arg uintptr) (key uint32, mods uint8)
 	dropDecode func(arg uintptr) []string
+	menuHooks  struct {
+		choose func(w *Window, k Key, m Mod) bool // выбрать пункт меню окна по сочетанию
+		has    func(w *Window) bool               // у меню окна есть сочетания
+		forget func(w *Window)                    // окно уничтожено
+	}
 )
 
 type windowEv Window
@@ -239,11 +244,19 @@ func (w *windowEv) Event(k core.Kind, arg uintptr) uintptr {
 				w.onDrop(paths)
 			}
 		}
-	case core.EvKey:
-		if w.onKey != nil {
-			if key, m := keyDecode(arg); key != 0 && w.onKey(Key(key), Mod(m)) {
-				return 1 // клавиша обработана
-			}
+	case core.EvKey: // сначала сочетания меню, потом OnKey
+		if w.onKey == nil && (menuHooks.has == nil || !menuHooks.has((*Window)(w))) {
+			return 0
+		}
+		key, m := keyDecode(arg)
+		if key == 0 {
+			return 0
+		}
+		if menuHooks.choose != nil && menuHooks.choose((*Window)(w), Key(key), Mod(m)) {
+			return 1
+		}
+		if w.onKey != nil && w.onKey(Key(key), Mod(m)) {
+			return 1 // клавиша обработана
 		}
 	case core.EvDestroy:
 		core.Release(w.id)
@@ -257,6 +270,9 @@ func (w *windowEv) Event(k core.Kind, arg uintptr) uintptr {
 // windowGone — автовыход (ADR-15): окно уничтожено, и видимых окон не осталось.
 // Скрытые окна программу не держат; Hide сам выход не вызывает.
 func windowGone(w *Window) {
+	if menuHooks.forget != nil {
+		menuHooks.forget(w)
+	}
 	for i, o := range wins {
 		if o == w {
 			wins = append(wins[:i], wins[i+1:]...)

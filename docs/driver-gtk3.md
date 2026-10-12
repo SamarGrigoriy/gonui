@@ -58,6 +58,14 @@ func KeyDecode(arg uintptr) (key uint32, mods uint8) // arg события EvKey
 func WindowSetDrop(h H, id uint32, on bool)            // окно — приёмник файлов (OnDropFiles)
 func Parent(h H) H                                     // контейнер виджета (Box.Remove проверяет)
 func Size(h H) (w, ht int)                             // allocation, логические пиксели; не mapped — 0, 0
+func WindowSetPadding(h H, px int)                     // у окна с меню — ряда под меню
+// Меню окна: строка, подменю, пункты; сочетания только подписываются (срабатывают в nui)
+func MenuBar(win H) H; MenuBarRemove(win H); MenuDone(win H)
+func MenuSub(parent H, id uint32, title string) (item, menu H)
+func MenuItemNew(menu H, id uint32, check bool, text string, key uint32, mods uint8) H
+func MenuSepNew(menu H)
+func MenuItemSetEnabled(h H, on bool); MenuItemSetChecked(h H, on bool); MenuItemChecked(h H) bool
+func MenuItemSetText(h H, text string, key uint32, mods uint8)
 func WindowSize(h H) (w, ht int)                       // gtk_window_get_size
 func ContainerClear(h H)                               // уничтожить всех детей Box или Grid
 func DropPaths(arg uintptr) []string                   // пути из arg события EvDrop
@@ -462,6 +470,7 @@ void g_variant_unref(GVariant*)                                                 
 | Slider | `gtk_scale_new_with_range(HORIZONTAL, min, max, 1)`, `set_digits(0)` | `value-changed` → EvChange | Значение округляется до целого на стороне Go. При `min >= max` GTK вернул бы `NULL`, поэтому nui проверяет это до вызова и паникует |
 | Progress | `gtk_progress_bar_new` | — | `SetText("")` → `set_show_text(FALSE)` |
 | List | `nui_list_new`: прокрутка + `gtk_tree_view_new` (`fixed-height-mode`, без поиска, выбор SINGLE); колонка — `nui_list_column`: `GtkCellRendererText` с многоточием, `FIXED`, `resizable`, `expand` у последней | `changed` **у GtkTreeSelection** → EvChange; `row-activated` (свой C-обработчик: у сигнала лишние аргументы) → EvEnter | Своя модель `NuiListModel` (GObject + интерфейс `GtkTreeModel`, раскладки сверяет check-protos): строка — номер в `iter->user_data`, `get_value` спрашивает текст у Go (`nuiListCell`). `SetRows` — новая модель; старую отпускает GtkTreeView, её `finalize` вызывает `nuiListDrop`. Ширина колонок — по заголовку и первым 100 строкам (`PangoLayout`), не больше 400. После `SetRows` курсор ставится на первую строку и выделение снимается: иначе в режиме SINGLE GtkTreeView сам выделит строку при получении фокуса. Повторы `changed` (движение курсора) отбрасывает nui |
+| Меню окна | `nui_window_menubar`: при первом вызове окно перестраивается — `GtkWindow` (без отступа) → вертикальный ряд [`GtkMenuBar`, inner], inner — ряд с отступом окна, в нём содержимое (`WindowSetChild`, `WindowSetPadding` работают с ним). Без меню окно прежнее. Меню — `GtkMenu` под `GtkMenuItem` строки; пункты — `GtkMenuItem`, `GtkCheckMenuItem`, `GtkSeparatorMenuItem` | `activate` → EvClick (у флажка состояние уже переключено: класс-обработчик идёт первым), `destroy` → EvDestroy | Сочетание — `gtk_accel_label_set_accel` у `GtkAccelLabel` пункта: только подпись, без `GtkAccelGroup`; срабатывает в nui через EvKey окна. `gtk_check_menu_item_set_active` тоже шлёт `activate` — nui гасит его `quiet`. `nui_window_menubar_resize`: строка меню появилась, сменилась или убрана — окно (размер по умолчанию, текущий размер, size request) меняется на разницу её высоты: область под меню прежняя, как на Windows. `WindowSize` вычитает высоту строки, `WindowSetSize` прибавляет |
 | OnDropFiles | `nui_drop_enable`: `gtk_drag_dest_set(окно, GTK_DEST_DEFAULT_ALL, {"text/uri-list"}, COPY)` | `drag-data-received` (свой C-обработчик) → EvDrop | `GTK_DEST_DEFAULT_ALL`: GTK сам подсвечивает, запрашивает данные и вызывает `gtk_drag_finish`. `gtk_selection_data_get_uris` → `g_filename_from_uri` (не локальные URI пропускаются) → arg события — строка «путь\0путь\0\0». Поля ввода — сами приёмники текста: брошенное на них остаётся им |
 | Args | — | — | `/proc/self/cmdline` через `ReadFile` (`g_file_get_contents`), разделитель — `\0` |
 | OnKey (`KeyDecode`) | — | — | Из `GdkEventKey`: `keyval` → код nui (буквы — в верхний регистр, KP_*, F1…F12, стрелки…), `state` → Shift (`GDK_SHIFT_MASK`), Ctrl (`GDK_CONTROL_MASK`), Alt (`GDK_MOD1_MASK`). Если `keyval` не латиница и не цифра (русская раскладка: Ctrl+S — «ы»), `nui_key_by_code` ищет латинскую букву или цифру той же клавиши (`hardware_keycode`) во всех раскладках через `gdk_keymap_get_entries_for_keycode` |

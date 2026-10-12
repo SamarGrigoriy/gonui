@@ -180,6 +180,80 @@ void nui_container_clear(GtkContainer *c) {
 	g_list_free(kids);
 }
 
+/* ---------- Меню окна ----------
+   Окно без меню — как было: GtkWindow (отступ — его border-width) → содержимое. Первое
+   SetMenu перестраивает его: GtkWindow (без отступа) → ряд [строка меню, inner], inner —
+   GtkEventBox без своего окна (прозрачный: фон окна виден) с отступом окна, в нём
+   содержимое. Так меню во всю ширину, а отступ и раскладка содержимого прежние. inner,
+   как и окно, — GtkBin: WindowSetChild одинаков для обоих. */
+
+/* Куда класть содержимое окна и чей border-width — его отступ. */
+GtkContainer *nui_window_content(GtkWindow *w) {
+	GtkWidget *inner = g_object_get_data((GObject *)w, "nui-inner");
+	return inner ? (GtkContainer *)inner : (GtkContainer *)w;
+}
+
+/* Новая пустая строка меню окна; прежняя уничтожается вместе с пунктами. */
+GtkWidget *nui_window_menubar(GtkWindow *w) {
+	GtkWidget *outer = g_object_get_data((GObject *)w, "nui-outer");
+	if (!outer) {
+		GtkWidget *child = gtk_bin_get_child((GtkBin *)w);
+		GtkWidget *inner = gtk_event_box_new();
+		gtk_event_box_set_visible_window((GtkEventBox *)inner, 0);
+		outer = gtk_box_new(NUI_GTK_ORIENTATION_VERTICAL, 0);
+		gtk_container_set_border_width((GtkContainer *)inner, gtk_container_get_border_width((GtkContainer *)w));
+		gtk_container_set_border_width((GtkContainer *)w, 0);
+		if (child) {
+			g_object_ref(child);
+			gtk_container_remove((GtkContainer *)w, child);
+			gtk_container_add((GtkContainer *)inner, child);
+			g_object_unref(child);
+		}
+		gtk_box_pack_end((GtkBox *)outer, inner, 1, 1, 0);
+		gtk_container_add((GtkContainer *)w, outer);
+		gtk_widget_show(inner);
+		gtk_widget_show(outer);
+		g_object_set_data_full((GObject *)w, "nui-outer", outer, 0);
+		g_object_set_data_full((GObject *)w, "nui-inner", inner, 0);
+	}
+	GtkWidget *old = g_object_get_data((GObject *)w, "nui-menubar");
+	if (old)
+		gtk_widget_destroy(old);
+	GtkWidget *bar = gtk_menu_bar_new();
+	gtk_box_pack_start((GtkBox *)outer, bar, 0, 0, 0);
+	g_object_set_data_full((GObject *)w, "nui-menubar", bar, 0);
+	return bar;
+}
+
+/* Строка меню появилась, сменилась или убрана: окно растёт или уменьшается на разницу
+   её высоты, и область под меню остаётся прежней — как клиентская область на Windows.
+   Касается размера по умолчанию (окно ещё не показано), текущего размера и size request
+   нерастягиваемого окна. Высота строки — в данных окна "nui-menubar-h": её читают
+   WindowSize и WindowSetSize (программам без меню измерять нечего). */
+void nui_window_menubar_resize(GtkWindow *w) {
+	int old = (int)(uintptr_t)g_object_get_data((GObject *)w, "nui-menubar-h"), h = 0;
+	GtkWidget *bar = g_object_get_data((GObject *)w, "nui-menubar");
+	if (bar) {
+		int min = 0;
+		gtk_widget_show_all(bar);
+		gtk_widget_get_preferred_height(bar, &min, &h);
+	}
+	g_object_set_data_full((GObject *)w, "nui-menubar-h", (gpointer)(uintptr_t)h, 0);
+	int d = h - old, ww, wh;
+	if (!d)
+		return;
+	gtk_window_get_default_size(w, &ww, &wh);
+	if (wh > 0)
+		gtk_window_set_default_size(w, ww, wh + d);
+	gtk_widget_get_size_request((GtkWidget *)w, &ww, &wh);
+	if (wh > 0)
+		gtk_widget_set_size_request((GtkWidget *)w, ww, wh + d);
+	if (gtk_widget_get_visible((GtkWidget *)w)) {
+		gtk_window_get_size(w, &ww, &wh);
+		gtk_window_resize(w, ww, wh + d);
+	}
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная

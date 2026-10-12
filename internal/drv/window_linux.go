@@ -27,13 +27,21 @@ func WindowTitle(h H) string       { return gostr(C.gtk_window_get_title((*C.Gtk
 // WindowSetChild заменяет содержимое окна. Старый ребёнок удаляется из контейнера,
 // ссылок на него не остаётся, и GTK его уничтожает (destroy → EvDestroy).
 // child == Nil — только удалить.
-func WindowSetChild(h, child H) {
+// У окна с меню содержимое лежит под строкой меню, в своём GtkBin (nui_window_content).
+func WindowSetChild(h, child H) { containerSetChild(H(C.nui_window_content((*C.GtkWindow)(h))), child) }
+
+func containerSetChild(h, child H) {
 	if old := C.gtk_bin_get_child((*C.GtkBin)(h)); old != nil {
 		C.gtk_container_remove((*C.GtkContainer)(h), old)
 	}
 	if child != Nil {
 		C.gtk_container_add((*C.GtkContainer)(h), widget(child))
 	}
+}
+
+// WindowSetPadding — отступ окна: border-width окна, а у окна с меню — ряда под меню.
+func WindowSetPadding(h H, px int) {
+	C.gtk_container_set_border_width(C.nui_window_content((*C.GtkWindow)(h)), C.guint(max(px, 0)))
 }
 
 // WindowShow показывает окно, а если оно уже показано — поднимает наверх.
@@ -46,15 +54,24 @@ func WindowShow(h H) {
 // default size, после — resize), пользователь может его менять; нерастягиваемое —
 // фиксированный размер через size request: окно = max(запрос, размер содержимого).
 // Последний SetSize хранится в default size самого окна — у nui.Window нет лишних полей.
-// WindowSize — размер окна без рамки и заголовка, логические пиксели.
+// WindowSize — размер окна без рамки, заголовка и строки меню, логические пиксели: та же
+// область, что клиентская область на Windows.
 func WindowSize(h H) (w, ht int) {
 	var cw, ch C.gint
 	C.gtk_window_get_size((*C.GtkWindow)(h), &cw, &ch)
-	return int(cw), int(ch)
+	return int(cw), int(ch) - menubarHeight(h)
+}
+
+// menubarHeight — высота строки меню окна (её запоминает nui_window_menubar_resize); 0 — нет меню.
+func menubarHeight(h H) int {
+	return int(uintptr(C.g_object_get_data((*C.GObject)(h), cstr("nui-menubar-h"))))
 }
 
 func WindowSetSize(h H, w, ht int) {
 	win := (*C.GtkWindow)(h)
+	if ht > 0 {
+		ht += menubarHeight(h) // размер — под строкой меню
+	}
 	C.gtk_window_set_default_size(win, C.gint(w), C.gint(ht))
 	if C.gtk_window_get_resizable(win) == 0 {
 		C.gtk_widget_set_size_request(widget(h), C.gint(w), C.gint(ht))
@@ -74,7 +91,7 @@ func WindowSetResizable(h H, on bool) {
 	var w, ht C.gint
 	C.gtk_window_get_default_size(win, &w, &ht)
 	if w > 0 || ht > 0 {
-		WindowSetSize(h, int(w), int(ht))
+		WindowSetSize(h, int(w), int(ht)-menubarHeight(h))
 	}
 }
 
@@ -110,4 +127,4 @@ func WindowSetFullscreen(h H, on bool) {
 
 // ContainerSetChild — Frame, Scroll: удалить старого ребёнка (он уничтожится), добавить нового.
 // Прокрутка сама оборачивает ребёнка без собственной прокрутки в GtkViewport.
-func ContainerSetChild(h, child H) { WindowSetChild(h, child) }
+func ContainerSetChild(h, child H) { containerSetChild(h, child) }

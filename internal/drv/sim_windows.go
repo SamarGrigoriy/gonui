@@ -284,3 +284,18 @@ func SimDropFiles(win H, id uint32, paths []string) {
 
 // DefaultButton — кнопка по умолчанию окна; Nil — нет.
 func DefaultButton(win H) H { return nodes[win].defBtn }
+
+// SimMenuActivate — пункт меню выбран мышью: WM_COMMAND окну.
+func SimMenuActivate(item H) {
+	n := nodes[item]
+	send(nodes[n.win].hwnd, C.NUI_WM_COMMAND, uintptr(n.cmd), 0)
+}
+
+// MenuItemText — текст пункта, как его показывает Windows (с сочетанием после табуляции).
+func MenuItemText(item H) string {
+	n := nodes[item]
+	ref, by := menuRef(n)
+	buf := make([]uint16, 256)
+	l := int(C.GetMenuStringW(n.hmenu, ref, wptr(buf), C.int(len(buf)), by))
+	return fromUTF16(buf[:l])
+}

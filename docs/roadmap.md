@@ -180,6 +180,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
 - `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- меню окна: `Window.SetMenu`, `NewMenu`, `Item`, `CheckItem`, `SubMenu`, `Sep`, сочетания клавиш ([api.md](api.md), §5), [отчёт](reports/menu.md);
 - история чата в JSON: `Chat.LoadJSON`, `Chat.JSON`, `Chat.Messages`; формат API моделей тоже; `Chat.OnReply` — ответ закончен ([api.md](api.md), §18);
 - `Size()` у виджетов и окна; описано, как прокручивать растущий ряд (`Scroll`, [api.md](api.md), §4, §5, §14);
 - `Box.Remove`, `Box.Clear`, `Grid.Remove`, `Grid.Clear` — удаление виджетов из контейнеров ([api.md](api.md), §15);
@@ -188,7 +189,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 
 В порядке пользы ([api.md](api.md), §21):
 1. Canvas;
-2. меню;
+2. ~~меню~~ — готово;
 3. ~~буфер обмена~~ — готово;
 4. ~~`OnKey`~~ — готово;
 5. ~~List~~ — готово;

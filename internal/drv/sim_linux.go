@@ -142,27 +142,11 @@ func SimListActivate(view H, row int) {
 // SimKey — нажатие клавиши в окне win, как с клавиатуры: сначала OnKey окна, потом виджет
 // с фокусом. key — код nui ('A'…'Z', '0'…'9', ' ', Key*), mods — Mod*.
 func SimKey(win H, key uint32, mods uint8) {
-	kv := key
-	switch {
-	case key >= 'A' && key <= 'Z' && mods&ModShift == 0:
-		kv = key - 'A' + 'a'
-	case key >= KeyF1 && key < KeyF1+12:
-		kv = 0xffbe + key - KeyF1
-	case key >= KeyEnter:
-		kv = [...]uint32{0xff0d, 0xff1b, 0xff09, 0xff08, 0xffff, 0xff63, 0xff50, 0xff57, 0xff55, 0xff56,
-			0xff51, 0xff53, 0xff52, 0xff54}[key-KeyEnter]
+	kv := keyKeyval(key)
+	if key >= 'A' && key <= 'Z' && mods&ModShift != 0 {
+		kv = key // с Shift keyval буквы — заглавная
 	}
-	var st C.guint
-	if mods&ModShift != 0 {
-		st |= C.NUI_GDK_SHIFT_MASK
-	}
-	if mods&ModCtrl != 0 {
-		st |= C.NUI_GDK_CONTROL_MASK
-	}
-	if mods&ModAlt != 0 {
-		st |= C.NUI_GDK_MOD1_MASK
-	}
-	C.nui_sim_key(widget(win), C.guint(kv), C.guint(kv), st)
+	C.nui_sim_key(widget(win), C.guint(kv), C.guint(kv), C.guint(gdkMods(mods)))
 }
 
 // SimKeyval — нажатие с keyval GDK как есть, на клавише, где в раскладке по умолчанию
@@ -194,3 +178,19 @@ func SimDropFiles(win H, id uint32, paths []string) {
 
 // DefaultButton — кнопка по умолчанию окна; Nil — нет.
 func DefaultButton(win H) H { return H(C.gtk_window_get_default_widget((*C.GtkWindow)(win))) }
+
+// SimMenuActivate — пункт меню выбран мышью (у флажка состояние переключается).
+func SimMenuActivate(item H) { C.gtk_menu_item_activate((*C.GtkMenuItem)(item)) }
+
+// MenuItemText — текст пункта; сочетание (если есть) — после табуляции, как в меню Windows.
+func MenuItemText(item H) string {
+	s := gostr(C.gtk_menu_item_get_label((*C.GtkMenuItem)(item)))
+	var key C.guint
+	var mods C.GdkModifierType
+	label := C.gtk_bin_get_child((*C.GtkBin)(item))
+	C.gtk_accel_label_get_accel((*C.GtkAccelLabel)(H(label)), &key, &mods)
+	if key != 0 {
+		s += "\t" + core.Itoa(int(keyvalKey(uint32(key)))) + "/" + core.Itoa(int(mods))
+	}
+	return s
+}

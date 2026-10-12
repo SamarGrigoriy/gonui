@@ -180,6 +180,15 @@ typedef struct _browseinfoW {
 } BROWSEINFOW;
 typedef struct HBITMAP__ *HBITMAP;
 typedef struct HDROP__ *HDROP;
+typedef struct tagMENUITEMINFOW {
+	UINT cbSize, fMask, fType, fState, wID;
+	HMENU hSubMenu;
+	HBITMAP hbmpChecked, hbmpUnchecked;
+	ULONG_PTR dwItemData;
+	LPWSTR dwTypeData;
+	UINT cch;
+	HBITMAP hbmpItem;
+} MENUITEMINFOW;
 typedef struct tagCHANGEFILTERSTRUCT CHANGEFILTERSTRUCT;
 typedef struct _DROPFILES { DWORD pFiles; POINT pt; BOOL fNC, fWide; } DROPFILES;
 /* ListView (List) */
@@ -265,6 +274,7 @@ _Static_assert(sizeof(DRAWITEMSTRUCT) == 64, "DRAWITEMSTRUCT");
 _Static_assert(sizeof(BITMAPINFO) == 44, "BITMAPINFO");
 _Static_assert(sizeof(NMHDR) == 24, "NMHDR");
 _Static_assert(sizeof(DROPFILES) == 20, "DROPFILES");
+_Static_assert(sizeof(MENUITEMINFOW) == 80, "MENUITEMINFOW");
 _Static_assert(sizeof(LVITEMW) == 88, "LVITEMW");
 _Static_assert(sizeof(LVCOLUMNW) == 56, "LVCOLUMNW");
 _Static_assert(sizeof(NMLVDISPINFOW) == 112, "NMLVDISPINFOW");
@@ -399,6 +409,13 @@ NUI_CONST(ICC_BAR_CLASSES, 0x00000004)
 NUI_CONST(ICC_LISTVIEW_CLASSES, 0x00000001)
 NUI_CONST(WM_NOTIFY, 0x004E)
 NUI_CONST(WM_DROPFILES, 0x0233)
+NUI_CONST(MF_STRING, 0x0000)
+NUI_CONST(MF_GRAYED, 0x0001)
+NUI_CONST(MF_CHECKED, 0x0008)
+NUI_CONST(MF_POPUP, 0x0010)
+NUI_CONST(MF_BYPOSITION, 0x0400)
+NUI_CONST(MF_SEPARATOR, 0x0800)
+NUI_CONST(MIIM_STRING, 0x0040)
 NUI_CONST(WM_COPYDATA, 0x004A)
 NUI_CONST(MSGFLT_ALLOW, 1)
 NUI_CONST(LVS_REPORT, 0x0001)
@@ -629,6 +646,19 @@ NUI_FN(HANDLE, RemovePropW, (HWND hWnd, LPCWSTR lpString))
 NUI_FN(HWND, GetAncestor, (HWND hwnd, UINT gaFlags))
 NUI_FN(HWND, SetParent, (HWND hWndChild, HWND hWndNewParent))
 NUI_FN(BOOL, SetWindowPos, (HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags))
+NUI_FN(HMENU, CreateMenu, (void))
+NUI_FN(HMENU, CreatePopupMenu, (void))
+NUI_FN(BOOL, AppendMenuW, (HMENU hMenu, UINT uFlags, UINT_PTR uIDNewItem, LPCWSTR lpNewItem))
+NUI_FN(BOOL, SetMenu, (HWND hWnd, HMENU hMenu))
+NUI_FN(HMENU, GetMenu, (HWND hWnd))
+NUI_FN(BOOL, DrawMenuBar, (HWND hWnd))
+NUI_FN(BOOL, DestroyMenu, (HMENU hMenu))
+NUI_FN(BOOL, EnableMenuItem, (HMENU hMenu, UINT uIDEnableItem, UINT uEnable))
+NUI_FN(DWORD, CheckMenuItem, (HMENU hmenu, UINT uIDCheckItem, UINT uCheck))
+NUI_FN(UINT, GetMenuState, (HMENU hMenu, UINT uId, UINT uFlags))
+NUI_FN(int, GetMenuItemCount, (HMENU hMenu))
+NUI_FN(BOOL, SetMenuItemInfoW, (HMENU hmenu, UINT item, BOOL fByPositon, const MENUITEMINFOW *lpmii))
+NUI_FN(int, GetMenuStringW, (HMENU hMenu, UINT uIDItem, LPWSTR lpString, int cchMax, UINT flags))
 NUI_FN(BOOL, GetClientRect, (HWND hWnd, RECT *lpRect))
 NUI_FN(BOOL, GetWindowRect, (HWND hWnd, RECT *lpRect))
 NUI_FN(HWND, SetFocus, (HWND hWnd))
@@ -765,6 +795,7 @@ HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита,
 void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 void  nui_list_column(HWND lv, int index, LPCWSTR title);
+int   nui_menu_set_text(HMENU m, UINT item, int byPos, LPCWSTR text);
 void  nui_edit_hint(HWND edit, LPCWSTR hint); /* подсказка в пустом многострочном поле; 0 — убрать */
 void  nui_list_select(HWND lv, int row);
 int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */

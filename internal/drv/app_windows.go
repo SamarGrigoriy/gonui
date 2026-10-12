@@ -114,6 +114,9 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			notify(hwndOf(lp), uint32(wp>>16))
 			return 0, true
 		}
+		if wp>>16 == 0 && uint16(wp) >= firstMenuCmd && menuCommand(uint16(wp)) { // меню окна
+			return 0, true
+		}
 	case C.NUI_WM_HSCROLL, C.NUI_WM_VSCROLL:
 		if lp != 0 { // от трекбара
 			if _, c := nodeOf(hwndOf(lp)); c != nil && c.kind == kSlider {

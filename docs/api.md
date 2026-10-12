@@ -195,6 +195,7 @@ func NewWindow(title string, child Widget) *Window // child может быть 
 | `SetDefault(b *Button)` | кнопка по умолчанию: её нажимает Enter в `Entry` без `OnEnter` и в поле `ComboEntry` |
 | `SetIconName(name string)` | иконка из темы иконок по имени, например `"utilities-terminal"` или имя из вашего `.desktop` |
 | `OnClose(fn func() bool)` | пользователь закрывает окно (крестик, Alt+F4). `fn` возвращает `false` — окно остаётся. Без обработчика окно закрывается |
+| `SetMenu(menus ...*Menu)` | строка меню окна; без аргументов — убрать. Подробнее — ниже, «Меню окна» |
 | `OnDropFiles(fn func(paths []string))` | на окно перетащили файлы или папки из файлового менеджера; `paths` — абсолютные пути, на Linux — байты имён как есть. Бросить можно на любое место окна, кроме полей ввода (туда, как и везде, перетаскивается текст). `nil` снимает обработчик |
 | `OnKey(fn func(k Key, m Mod) bool)` | нажата клавиша, пока окно активно, — раньше, чем её получит виджет с фокусом. `fn` возвращает `true` — клавиша обработана, виджет её не получит. Подробнее — ниже. `nil` снимает обработчик |
 | `Show()` | показать окно, а если уже показано — поднять наверх |
@@ -203,6 +204,41 @@ func NewWindow(title string, child Widget) *Window // child может быть 
 | `Alive() bool`, `Focus()` | как у виджетов |
 
 Когда уничтожается окно и видимых окон не остаётся, вызывается `Quit()` (ADR-15).
+
+**Меню окна.**
+
+```go
+func NewMenu(title string, items ...*MenuItem) *Menu // меню в строке меню
+func Item(text string, fn func()) *MenuItem          // пункт
+func CheckItem(text string, fn func(on bool)) *MenuItem // пункт с флажком
+func SubMenu(title string, items ...*MenuItem) *MenuItem // вложенное меню
+func Sep() *MenuItem                                 // разделитель
+func (i *MenuItem) Shortcut(k Key, m Mod) *MenuItem  // сочетание клавиш (цепочкой)
+func (i *MenuItem) SetEnabled(on bool); Enabled() bool
+func (i *MenuItem) SetChecked(on bool); Checked() bool // CheckItem
+func (i *MenuItem) SetText(s string)
+
+w.SetMenu(
+	nui.NewMenu("Файл",
+		nui.Item("Открыть…", open).Shortcut('O', nui.ModCtrl),
+		nui.Item("Сохранить", save).Shortcut('S', nui.ModCtrl),
+		nui.SubMenu("Недавние", nui.Item("отчёт.txt", openReport)),
+		nui.Sep(),
+		nui.Item("Выход", nui.Quit).Shortcut('Q', nui.ModCtrl)),
+	nui.NewMenu("Вид",
+		nui.CheckItem("Боковая панель", func(on bool) { panel.SetVisible(on) })),
+)
+```
+
+| Что | Семантика |
+|---|---|
+| Сочетание | показывается в меню справа от текста и выбирает пункт, пока окно активно, — раньше `OnKey` и виджета с фокусом. Буквы — по положению клавиши, как в `OnKey`: Ctrl+O работает и в русской раскладке. У выключенного пункта сочетание не срабатывает и уходит дальше. На Windows подпись английская («Ctrl+O»), как у самой Windows; на Linux — как в теме GTK |
+| `CheckItem` | выбор переключает флажок и вызывает `fn` с новым состоянием. `SetChecked` флажок ставит без вызова (ADR-8) |
+| `SetEnabled(false)` | пункт серый, не выбирается ни мышью, ни сочетанием. У `SubMenu` — всё подменю |
+| Состояние | `SetEnabled`, `SetChecked`, `SetText` можно вызывать и до `SetMenu`, и после |
+| `SetMenu` повторно | прежняя строка уничтожается вместе с пунктами (их методы ничего не делают). Меню и пункт попадают в окно один раз; повтор — паника |
+| Размер окна | `SetSize` и `Size` — область под строкой меню: строка меню добавляется к окну, а не отнимается у содержимого, на всех ОС одинаково |
+| Клавиатура | F10 (на Windows и Alt) открывает меню — как в любой программе ОС. Мнемоник (подчёркнутых букв) nui не задаёт: `&` в тексте показывается как есть |
 
 **Клавиши окна.**
 
@@ -714,12 +750,6 @@ func NewCanvas(draw func(p *Painter)) *Canvas
 func (c *Canvas) Redraw()
 func (c *Canvas) OnMouse(fn func(e MouseEvent))
 // Painter: SetColor, SetLineWidth, Line, Rect, FillRect, Ellipse, Text, Size
-
-// Меню окна
-func (w *Window) SetMenu(menus ...*Menu)
-func NewMenu(title string, items ...MenuItem) *Menu
-func Item(text string, fn func()) MenuItem
-func Sep() MenuItem
 ```
 
 Не планируется: иконка в трее (в GTK3 устарела, AppIndicator — отдельная библиотека), веб-содержимое, свои темы.

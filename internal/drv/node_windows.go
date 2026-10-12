@@ -36,6 +36,8 @@ const (
 	kScroll
 	kImage
 	kList
+	kMenu     // HMENU: строка меню или подменю
+	kMenuItem // пункт меню (в hmenu — меню, где он лежит)
 )
 
 // Шрифты окна.
@@ -105,6 +107,14 @@ type node struct {
 	bmp        C.HBITMAP      // картинка под dpi окна
 	bmpW, bmpH int            // её размер, физические пиксели
 	bmpDpi     uint32
+
+	// Меню (Window.SetMenu)
+	hmenu     C.HMENU  // kMenu — само меню; kMenuItem — меню, где лежит пункт
+	cmd       uint16   // команда пункта (WM_COMMAND); 0 — пункт с подменю
+	pos       int      // позиция пункта с подменю в hmenu
+	menuBar   H        // окно: строка меню (kMenu)
+	menuNodes []H      // окно: все узлы меню — уничтожаются вместе с окном или строкой
+	menuKeep  [2]C.int // окно: клиентская область до смены меню (её и сохраняем)
 
 	// List
 	columns   []string                  // заголовки колонок
@@ -291,6 +301,7 @@ func destroyTree(h H, hwndToo bool) {
 		freeImage(n)
 	}
 	if n.kind == kWindow {
+		dropMenuNodes(n)
 		for i, f := range n.fonts {
 			if f != nil {
 				C.DeleteObject(C.HGDIOBJ(f))
