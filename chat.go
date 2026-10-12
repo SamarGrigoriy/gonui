@@ -29,6 +29,7 @@ type Chat struct {
 	you         string
 	onSend      func(text string)
 	onStop      func()
+	onReply     func(m ChatMessage)
 	busy        bool
 	cur         *ChatStream   // сообщение, которое сейчас дописывается
 	tick        *Timer        // переносит текст cur в ленту
@@ -68,6 +69,14 @@ func NewChat() *Chat {
 // поле уже очищено, а сообщение пользователя уже в ленте. Пока чат занят (SetBusy,
 // идёт Stream), отправить нельзя.
 func (c *Chat) OnSend(fn func(text string)) { c.onSend = fn }
+
+// OnReply: сообщение, начатое Stream, закончено — Close, «Стоп» или новое сообщение
+// (Add, Stream, Clear, LoadJSON) поверх, — и весь его текст уже в ленте и в истории
+// (Messages, JSON). m — это сообщение целиком. Вызывается в UI-потоке, один раз на
+// сообщение; если сообщение закончило новое, — до нового. Здесь удобно сохранять историю:
+//
+//	chat.OnReply(func(nui.ChatMessage) { os.WriteFile("история.json", chat.JSON(), 0o644) })
+func (c *Chat) OnReply(fn func(m ChatMessage)) { c.onReply = fn }
 
 // OnStop: пользователь нажал «Стоп». Кнопка видна, только пока чат занят и fn задан.
 // Текущее сообщение (Stream) к вызову fn уже закончено: дальнейшая запись в него вернёт
@@ -355,6 +364,7 @@ func (c *Chat) flush() {
 		c.stopTick()
 		c.endMessage()
 		c.setBusy(false)
+		c.replied()
 	}
 }
 
@@ -372,6 +382,14 @@ func (c *Chat) finish() {
 	c.stopTick()
 	c.endMessage()
 	c.setBusy(false)
+	c.replied()
+}
+
+// replied — OnReply с последним сообщением истории (его только что закончил Stream).
+func (c *Chat) replied() {
+	if c.onReply != nil && len(c.msgs) > 0 {
+		c.onReply(c.msgs[len(c.msgs)-1])
+	}
 }
 
 // streamed дописывает пришедший текст Stream к последнему сообщению истории.

@@ -6,6 +6,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"nui/internal/drv"
 )
 
 // LoadJSON: свой формат и формат API моделей; ошибки не трогают ленту; JSON() — туда и
@@ -83,6 +86,67 @@ func TestChatJSON(t *testing.T) {
 		w.Close()
 		if c.Messages() != nil || c.LoadJSON([]byte("[]")) != nil {
 			t.Error("уничтоженный чат: Messages не nil или LoadJSON с ошибкой")
+		}
+	})
+}
+
+// OnReply: ответ из горутины — один вызов с полным текстом, история уже записана;
+// «Стоп» — OnReply раньше OnStop; новое сообщение поверх — OnReply до него; Add без
+// Stream и уничтоженный чат — без вызова.
+func TestChatOnReply(t *testing.T) {
+	var c *Chat
+	var w *Window
+	var events []string
+	ui(func() {
+		c = NewChat()
+		c.OnReply(func(m ChatMessage) {
+			saved := string(c.JSON())
+			events = append(events, "reply:"+m.Who+":"+m.Text)
+			if !strings.Contains(saved, m.Text) || c.Busy() {
+				t.Errorf("к OnReply история без ответа или чат занят: %s", saved)
+			}
+		})
+		c.OnStop(func() { events = append(events, "stop") })
+		w = NewWindow("OnReply", c)
+		w.SetSize(400, 300)
+		w.Show()
+		st := c.Stream("ИИ")
+		go func() {
+			st.WriteString("Ответ ")
+			st.WriteString("целиком.")
+			st.Close()
+		}()
+	})
+	waitUntil(t, 2000, func() bool { return len(events) == 1 })
+	ui(func() {
+		if events[0] != "reply:ИИ:Ответ целиком." {
+			t.Errorf("OnReply: %q", events)
+		}
+		c.Add("Вы", "без Stream") // обычное сообщение — без OnReply
+		st := c.Stream("ИИ")
+		st.WriteString("на полуслове")
+		c.flush()
+		drv.SimClick(c.stop.h) // «Стоп»
+		st = c.Stream("ИИ")
+		st.WriteString("прервано")
+		c.flush()
+		c.Add("Вы", "новое") // заканчивает ответ — OnReply до нового сообщения
+	})
+	ui(func() {
+		want := []string{"reply:ИИ:Ответ целиком.", "reply:ИИ:на полуслове", "stop", "reply:ИИ:прервано"}
+		if !slices.Equal(events, want) {
+			t.Errorf("события %q, ожидалось %q", events, want)
+		}
+		if m := c.Messages(); m[len(m)-1] != (ChatMessage{"Вы", "новое"}) || m[len(m)-2].Text != "прервано" {
+			t.Errorf("история: %q", m)
+		}
+		c.Stream("ИИ").WriteString("не дойдёт")
+		w.Close() // чат уничтожен: таймер молча останавливается, OnReply нет
+	})
+	time.Sleep(200 * time.Millisecond) // таймер чата — каждые 40 мс
+	ui(func() {
+		if len(events) != 4 {
+			t.Errorf("после уничтожения чата: %q", events)
 		}
 	})
 }
