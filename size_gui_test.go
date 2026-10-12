@@ -38,6 +38,31 @@ func TestSize(t *testing.T) {
 	ui(func() { w.Close() })
 }
 
+// Свои размеры листьев без SetMinSize и Expand — одинаковые на всех ОС: у холста своего
+// размера нет, список — 46×71, как GtkTreeView в прокрутке.
+func TestLeafSizes(t *testing.T) {
+	var w *Window
+	var c *Canvas
+	var l *List
+	ui(func() {
+		c = NewCanvas(nil)
+		l = NewList("Имя")
+		l.SetAlign(AlignStart, AlignFill)
+		w = NewWindow("размеры листьев", VBox(c, l, NewLabel("под ними")))
+		w.Show()
+	})
+	waitUntil(t, 2000, func() bool { _, lh := l.Size(); return lh >= 71 }) // без исправления на Win32 — 0
+	ui(func() {
+		if _, ch := c.Size(); ch > 1 {
+			t.Errorf("холст без SetMinSize высотой %d, ожидалось 0 (GTK даёт 1)", ch)
+		}
+		if lw, lh := l.Size(); lw != 46 || lh != 71 {
+			t.Errorf("список %d×%d, ожидалось 46×71", lw, lh)
+		}
+		w.Close()
+	})
+}
+
 // Кнопки добавляются в VBox внутри Scroll: окно и прокрутка не растут, ряд прокручивается.
 func TestScrollKeepsWindowSize(t *testing.T) {
 	var w *Window

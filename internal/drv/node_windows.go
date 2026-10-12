@@ -723,7 +723,8 @@ func measureLeaf(w *node, n *node) {
 	case kText:
 		set(w.px(46), w.px(46), w.px(46)) // как TextView в GTK: размер задают SetMinSize или Expand
 	case kCanvas:
-		set(0, 0, 0)                      // своего размера нет: SetMinSize или Expand
+		set(0, 0, 0) // своего размера нет: SetMinSize или Expand
+	case kList:
 		set(w.px(46), w.px(46), w.px(71)) // как GtkTreeView в прокрутке (Adwaita), с заголовками и без
 	case kSeparator:
 		if n.vertical {
