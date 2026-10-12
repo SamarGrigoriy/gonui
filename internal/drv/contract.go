@@ -46,6 +46,14 @@ const (
 	ModAlt   = 4
 )
 
+// Виды событий мыши (MouseDecode); 0 — пропустить.
+const (
+	MouseDown  = 1
+	MouseUp    = 2
+	MouseMove  = 3
+	MouseWheel = 4
+)
+
 // Filter — фильтр файлового диалога: имя и шаблоны вида "*.log".
 type Filter struct {
 	Name     string

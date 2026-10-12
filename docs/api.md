@@ -740,23 +740,77 @@ l.OnActivate(func(row int) { nui.OpenURI("file://" + filepath.Join(dir, files[ro
 
 ---
 
-## 21. Не в MVP (наброски для фазы 6)
-
-Сигнатуры ориентировочные и закрепляются при реализации. Порядок — по пользе.
+## 21. Canvas — рисование
 
 ```go
-// Рисование: GtkDrawingArea + cairo / GDI+
-func NewCanvas(draw func(p *Painter)) *Canvas
-func (c *Canvas) Redraw()
+func NewCanvas(draw func(p *Painter)) *Canvas // draw рисует холст; может быть nil
+func (c *Canvas) Redraw()                      // нарисовать заново
 func (c *Canvas) OnMouse(fn func(e MouseEvent))
-// Painter: SetColor, SetLineWidth, Line, Rect, FillRect, Ellipse, Text, Size
+
+func (p *Painter) Size() (w, h float64)
+func (p *Painter) SetColor(c Color)            // NoColor — цвет текста темы
+func (p *Painter) SetLineWidth(w float64)
+func (p *Painter) Line(x1, y1, x2, y2 float64)
+func (p *Painter) Rect(x, y, w, h float64); FillRect(x, y, w, h float64)
+func (p *Painter) Ellipse(x, y, w, h float64); FillEllipse(x, y, w, h float64)
+func (p *Painter) Text(x, y float64, s string) // (x, y) — левый верхний угол
+func (p *Painter) TextSize(s string) (w, h float64)
+
+type MouseEvent struct {
+	Kind           MouseKind // MouseDown, MouseUp, MouseMove, MouseWheel
+	X, Y           float64   // от левого верхнего угла холста
+	Button         int       // 1 — левая, 2 — средняя, 3 — правая
+	Mod            Mod
+	WheelX, WheelY float64   // −1 — влево/вверх, +1 — вправо/вниз, на щелчок колеса
+}
 ```
+
+| Что | Семантика |
+|---|---|
+| Когда рисует | `draw` вызывается, когда холст надо показать: первый показ, изменение размера, перекрытие другим окном, `Redraw`. Несколько `Redraw` подряд — одна перерисовка. `Painter` действует только внутри `draw`: сохранённый на потом ничего не рисует |
+| Координаты | логические пиксели от левого верхнего угла, как у `SetMinSize`; на экране с масштабом 150 % холст 200×100 — 300×150 точек, рисунок масштабируется сам. Сглаживание включено. Чёткая линия толщиной 1 — по координате с половиной (`10.5`): целая координата — граница между точками, линия ляжет на две |
+| Начальное состояние | цвет — цвет текста темы, толщина линии — 1, фон — фон окна или цветной панели. Свой фон — `FillRect(0, 0, w, h)` первым делом |
+| Текст | шрифтом интерфейса; `\n` — перевод строки. Размер — `TextSize`: чтобы выровнять или вписать |
+| Размер холста | своего нет (0×0): `SetMinSize` или `Expand` |
+| Мышь | нажатие, отпускание, движение над холстом, колесо. Пока кнопка нажата, движение и отпускание приходят и за пределами холста (координаты могут быть отрицательными или больше размера). На Windows координаты — целые (точки экрана, пересчитанные в логические пиксели), на GTK бывают дробными. `OnMouse` получает и движение настоящего указателя, если он над холстом |
+
+График с маркером, который ходит за мышью:
+
+```go
+mx := 0.0
+var c *nui.Canvas
+c = nui.NewCanvas(func(p *nui.Painter) {
+	w, h := p.Size()
+	p.SetColor(nui.RGB(255, 255, 255))
+	p.FillRect(0, 0, w, h)
+	p.SetColor(nui.RGB(40, 90, 200))
+	p.SetLineWidth(2)
+	for i := 1; i <= 100; i++ {
+		x0, x1 := w*float64(i-1)/100, w*float64(i)/100
+		p.Line(x0, h/2-math.Sin(x0/w*2*math.Pi)*h/2, x1, h/2-math.Sin(x1/w*2*math.Pi)*h/2)
+	}
+	p.FillEllipse(mx-5, h/2-math.Sin(mx/w*2*math.Pi)*h/2-5, 10, 10)
+})
+c.OnMouse(func(e nui.MouseEvent) {
+	if e.Kind == nui.MouseMove {
+		mx = e.X
+		c.Redraw()
+	}
+})
+c.SetMinSize(400, 200)
+```
+
+Нет пока: многоугольников и кривых (только отрезки), картинок на холсте, своего шрифта текста, полупрозрачных цветов, двойного щелчка и клавиатуры у холста (клавиши — `Window.OnKey`).
+
+---
+
+## 22. Чего нет
 
 Не планируется: иконка в трее (в GTK3 устарела, AppIndicator — отдельная библиотека), веб-содержимое, свои темы.
 
 ---
 
-## 22. Пример целиком
+## 23. Пример целиком
 
 ```go
 package main

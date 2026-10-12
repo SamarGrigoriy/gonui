@@ -156,3 +156,16 @@ func TestOnKeyCyrillicLayout(t *testing.T) {
 		t.Errorf("OnKey получил %q, ожидалось ['S' 'W']", got)
 	}
 }
+
+// Canvas без SetMinSize в GTK — 0×0: так же меряет его драйвер Win32 (driver-win32.md, §6).
+func TestCanvasSize(t *testing.T) {
+	ui(func() {
+		c := NewCanvas(nil)
+		w := NewWindow("холст", VBox(c, NewLabel("под холстом")))
+		w.Show()
+		if a, b, cc, d := drv.Preferred(c.h); a != 0 || b != 0 || cc != 0 || d != 0 {
+			t.Errorf("Canvas %d/%d × %d/%d, ожидалось 0×0", a, b, cc, d)
+		}
+		w.Close()
+	})
+}

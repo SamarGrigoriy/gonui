@@ -194,3 +194,22 @@ func MenuItemText(item H) string {
 	}
 	return s
 }
+
+// SimMouse — событие мыши над виджетом, как от GDK: kind — Mouse*; у MouseWheel button —
+// направление (−1 вверх, +1 вниз). x, y — логические пиксели.
+func SimMouse(h H, kind uint8, x, y float64, button int, mods uint8) {
+	t := map[uint8]C.int{MouseDown: C.NUI_GDK_BUTTON_PRESS, MouseUp: C.NUI_GDK_BUTTON_RELEASE,
+		MouseMove: C.NUI_GDK_MOTION_NOTIFY, MouseWheel: C.NUI_GDK_SCROLL}[kind]
+	b := C.uint(button)
+	if kind == MouseWheel {
+		b = C.NUI_GDK_SCROLL_DOWN
+		if button < 0 {
+			b = C.NUI_GDK_SCROLL_UP
+		}
+	}
+	C.nui_sim_mouse(widget(h), t, C.double(x), C.double(y), b, C.uint(gdkMods(mods)))
+}
+
+// PixelAt — цвет точки (x, y) виджета на экране, 0xRRGGBB (логические пиксели = точки
+// при масштабе 1).
+func PixelAt(h H, x, y int) uint32 { return uint32(C.nui_pixel_at(widget(h), C.int(x), C.int(y))) }

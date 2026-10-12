@@ -14,7 +14,9 @@ const (
 	EvDestroy Kind = 5 // destroy
 	EvKey     Kind = 6 // нажатие клавиши в окне (OnKey) — с ответом: 1 = обработано
 	EvDrop    Kind = 7 // на окно перетащили файлы (OnDropFiles); arg — список путей драйвера
-	// 8–15 — для фазы 6: EvDraw, EvMouse …
+	EvDraw    Kind = 8 // Canvas: нарисовать; arg — контекст рисования драйвера
+	EvMouse   Kind = 9 // Canvas: событие мыши; arg — событие драйвера; ответ 1 — обработано
+	// 10–15 — свободны
 	KTimer Kind = 16 // источник GLib: таймер
 	KWatch Kind = 17 // источник GLib: fd
 	KDo    Kind = 18 // источник GLib: idle для очереди Do (id всегда 0)

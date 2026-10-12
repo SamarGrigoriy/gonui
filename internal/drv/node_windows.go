@@ -36,6 +36,7 @@ const (
 	kScroll
 	kImage
 	kList
+	kCanvas
 	kMenu     // HMENU: строка меню или подменю
 	kMenuItem // пункт меню (в hmenu — меню, где он лежит)
 )
@@ -647,7 +648,8 @@ func measureLeaf(w *node, n *node) {
 		set(w.px(50), w.px(150), w.px(15))
 	case kText:
 		set(w.px(46), w.px(46), w.px(46)) // как TextView в GTK: размер задают SetMinSize или Expand
-	case kList:
+	case kCanvas:
+		set(0, 0, 0)                      // своего размера нет: SetMinSize или Expand
 		set(w.px(46), w.px(46), w.px(71)) // как GtkTreeView в прокрутке (Adwaita), с заголовками и без
 	case kSeparator:
 		if n.vertical {

@@ -299,3 +299,45 @@ func MenuItemText(item H) string {
 	l := int(C.GetMenuStringW(n.hmenu, ref, wptr(buf), C.int(len(buf)), by))
 	return fromUTF16(buf[:l])
 }
+
+// SimMouse — событие мыши над холстом: настоящее сообщение окну холста (у колеса —
+// экранные координаты, как у Windows). x, y — логические пиксели; у MouseWheel button —
+// направление (−1 вверх, +1 вниз).
+func SimMouse(h H, kind uint8, x, y float64, button int, mods uint8) {
+	n := nodes[h]
+	s := float64(dpiOf(n).dpi) / 96
+	px, py := int(x*s+0.5), int(y*s+0.5)
+	var wp uintptr
+	if mods&ModShift != 0 {
+		wp |= C.NUI_MK_SHIFT
+	}
+	if mods&ModCtrl != 0 {
+		wp |= C.NUI_MK_CONTROL
+	}
+	var m uint32
+	switch kind {
+	case MouseDown:
+		m = [...]uint32{C.NUI_WM_LBUTTONDOWN, C.NUI_WM_MBUTTONDOWN, C.NUI_WM_RBUTTONDOWN}[button-1]
+	case MouseUp:
+		m = [...]uint32{C.NUI_WM_LBUTTONUP, C.NUI_WM_MBUTTONUP, C.NUI_WM_RBUTTONUP}[button-1]
+	case MouseMove:
+		m = C.NUI_WM_MOUSEMOVE
+	case MouseWheel:
+		m = C.NUI_WM_MOUSEWHEEL
+		wp |= uintptr(uint16(int16(-120*button))) << 16
+		pt := C.POINT{C.LONG(px), C.LONG(py)}
+		C.ClientToScreen(n.hwnd, &pt)
+		px, py = int(pt.x), int(pt.y)
+	}
+	send(n.hwnd, C.UINT(m), wp, uintptr(uint16(px))|uintptr(uint16(py))<<16)
+}
+
+// PixelAt — цвет точки (x, y) виджета на экране, 0xRRGGBB.
+func PixelAt(h H, x, y int) uint32 {
+	n := nodes[h]
+	s := float64(dpiOf(n).dpi) / 96
+	dc := C.GetDC(n.hwnd)
+	c := uint32(C.GetPixel(dc, C.int(float64(x)*s), C.int(float64(y)*s)))
+	C.ReleaseDC(n.hwnd, dc)
+	return c&0xFF<<16 | c&0xFF00 | c>>16&0xFF
+}

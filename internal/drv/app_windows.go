@@ -158,6 +158,9 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			return 0, true
 		}
 	case C.NUI_WM_ERASEBKGND:
+		if n.kind == kCanvas {
+			return 1, true // фон рисует WM_PAINT холста вместе с рисунком
+		}
 		if (n.kind == kWindow || n.kind == kScroll) && eraseBackground(n, hdcOf(wp)) {
 			return 1, true
 		}
@@ -169,6 +172,9 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 	}
 	if n.kind == kWindow {
 		return windowProc(h, n, m, wp, lp)
+	}
+	if n.kind == kCanvas {
+		return canvasProc(n, m, wp, lp)
 	}
 	return 0, false
 }

@@ -254,6 +254,115 @@ void nui_window_menubar_resize(GtkWindow *w) {
 	}
 }
 
+/* ---------- Canvas: рисование cairo в логических пикселях ----------
+   Масштаб экрана cairo учитывает сам (поверхность окна с device scale). Каждая фигура —
+   с нового пути: иначе линия соединилась бы с предыдущей. */
+
+/* Цвет текста темы. */
+void nui_paint_theme_color(cairo_t *cr, GtkWidget *w) {
+	GdkRGBA c;
+	gtk_style_context_get_color(gtk_widget_get_style_context(w), gtk_widget_get_state_flags(w), &c);
+	cairo_set_source_rgba(cr, c.red, c.green, c.blue, c.alpha);
+}
+
+/* Начало draw: цвет — цвет текста темы, толщина линии — 1. */
+void nui_paint_begin(cairo_t *cr, GtkWidget *w) {
+	nui_paint_theme_color(cr, w);
+	cairo_set_line_width(cr, 1);
+}
+
+void nui_paint_color(cairo_t *cr, unsigned rgb) {
+	cairo_set_source_rgb(cr, (rgb >> 16 & 0xFF) / 255.0, (rgb >> 8 & 0xFF) / 255.0, (rgb & 0xFF) / 255.0);
+}
+
+void nui_paint_line(cairo_t *cr, double x1, double y1, double x2, double y2) {
+	cairo_new_path(cr);
+	cairo_move_to(cr, x1, y1);
+	cairo_line_to(cr, x2, y2);
+	cairo_stroke(cr);
+}
+
+void nui_paint_rect(cairo_t *cr, double x, double y, double w, double h, int fill) {
+	cairo_new_path(cr);
+	cairo_rectangle(cr, x, y, w, h);
+	if (fill)
+		cairo_fill(cr);
+	else
+		cairo_stroke(cr);
+}
+
+/* Эллипс, вписанный в прямоугольник: окружность в масштабе (толщина линии — после
+   restore, поэтому одинаковая по всей линии). */
+void nui_paint_ellipse(cairo_t *cr, double x, double y, double w, double h, int fill) {
+	if (w <= 0 || h <= 0)
+		return;
+	cairo_new_path(cr);
+	cairo_save(cr);
+	cairo_translate(cr, x + w / 2, y + h / 2);
+	cairo_scale(cr, w / 2, h / 2);
+	cairo_arc(cr, 0, 0, 1, 0, 6.283185307179586);
+	cairo_restore(cr);
+	if (fill)
+		cairo_fill(cr);
+	else
+		cairo_stroke(cr);
+}
+
+/* Текст шрифтом интерфейса, (x, y) — левый верхний угол. */
+void nui_paint_text(cairo_t *cr, GtkWidget *w, double x, double y, const gchar *s) {
+	PangoLayout *l = gtk_widget_create_pango_layout(w, s);
+	cairo_new_path(cr);
+	cairo_move_to(cr, x, y);
+	pango_cairo_show_layout(cr, l);
+	g_object_unref(l);
+}
+
+void nui_paint_text_size(GtkWidget *w, const gchar *s, int out[2]) {
+	PangoLayout *l = gtk_widget_create_pango_layout(w, s);
+	pango_layout_get_pixel_size(l, &out[0], &out[1]);
+	g_object_unref(l);
+}
+
+/* Событие мыши → вид (1 нажатие, 2 отпускание, 3 движение, 4 колесо; 0 — пропустить:
+   двойное и тройное нажатие GTK присылает лишним событием после второго обычного),
+   координаты и info: кнопка, модификаторы nui, колесо (−1 вверх, +1 вниз, −2 влево,
+   +2 вправо). */
+int nui_mouse_decode(GdkEvent *e, double xy[2], int info[3]) {
+	int kind = 0;
+	guint button = 0;
+	GdkModifierType st = 0;
+	GdkScrollDirection dir = 0;
+	switch (gdk_event_get_event_type(e)) {
+	case NUI_GDK_BUTTON_PRESS:
+		kind = 1;
+		break;
+	case NUI_GDK_BUTTON_RELEASE:
+		kind = 2;
+		break;
+	case NUI_GDK_MOTION_NOTIFY:
+		kind = 3;
+		break;
+	case NUI_GDK_SCROLL:
+		kind = 4;
+		break;
+	default:
+		return 0;
+	}
+	gdk_event_get_coords(e, &xy[0], &xy[1]);
+	gdk_event_get_button(e, &button);
+	gdk_event_get_state(e, &st);
+	info[0] = (int)button;
+	info[1] = (st & NUI_GDK_SHIFT_MASK ? 1 : 0) | (st & NUI_GDK_CONTROL_MASK ? 2 : 0) | (st & NUI_GDK_MOD1_MASK ? 4 : 0);
+	info[2] = 0;
+	if (kind == 4) {
+		if (!gdk_event_get_scroll_direction(e, &dir))
+			return 0; /* плавная прокрутка не запрошена — сюда не приходит */
+		int d = (int)dir;
+		info[2] = d == NUI_GDK_SCROLL_UP ? -1 : d == NUI_GDK_SCROLL_DOWN ? 1 : d == NUI_GDK_SCROLL_LEFT ? -2 : 2;
+	}
+	return kind;
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная
@@ -885,6 +994,39 @@ int nui_sim_key(GtkWidget *w, guint keyval, guint code_of, guint state) {
 	int r = gtk_widget_event(w, (GdkEvent *)e);
 	gdk_event_free((GdkEvent *)e);
 	return r;
+}
+
+/* Цвет точки (x, y) виджета на экране: 0xRRGGBB. */
+unsigned nui_pixel_at(GtkWidget *w, int x, int y) {
+	GdkPixbuf *pb = gdk_pixbuf_get_from_window(gtk_widget_get_window(w), x, y, 1, 1);
+	if (!pb)
+		return 0xFFFFFFFF;
+	guchar *p = gdk_pixbuf_get_pixels(pb);
+	unsigned c = (unsigned)p[0] << 16 | (unsigned)p[1] << 8 | p[2];
+	g_object_unref(pb);
+	return c;
+}
+
+/* Событие мыши, как от GDK: type — GDK_BUTTON_PRESS, RELEASE, MOTION_NOTIFY или SCROLL
+   (для него button — направление). Идёт виджету через gtk_widget_event. */
+void nui_sim_mouse(GtkWidget *w, int type, double x, double y, unsigned button, unsigned state) {
+	GdkEvent *e = gdk_event_new(type);
+	GdkWindow *win = gtk_widget_get_window(w);
+	GdkEventButton *b = (GdkEventButton *)e;
+	b->window = win ? g_object_ref(win) : 0;
+	b->send_event = 1;
+	if (type == NUI_GDK_MOTION_NOTIFY) {
+		GdkEventMotion *m = (GdkEventMotion *)e;
+		m->x = x, m->y = y, m->state = state;
+	} else if (type == NUI_GDK_SCROLL) {
+		GdkEventScroll *s = (GdkEventScroll *)e;
+		s->x = x, s->y = y, s->state = state, s->direction = (int)button;
+	} else {
+		b->x = x, b->y = y, b->state = state, b->button = button;
+	}
+	gdk_event_set_device(e, gdk_seat_get_pointer(gdk_display_get_default_seat(gdk_display_get_default())));
+	gtk_widget_event(w, e);
+	gdk_event_free(e);
 }
 
 /* Двойной щелчок или Enter по строке. */

@@ -180,6 +180,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
 - `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- `Canvas` — рисование: линии, прямоугольники, эллипсы, текст, мышь ([api.md](api.md), §21), [отчёт](reports/canvas.md);
 - меню окна: `Window.SetMenu`, `NewMenu`, `Item`, `CheckItem`, `SubMenu`, `Sep`, сочетания клавиш ([api.md](api.md), §5), [отчёт](reports/menu.md);
 - история чата в JSON: `Chat.LoadJSON`, `Chat.JSON`, `Chat.Messages`; формат API моделей тоже; `Chat.OnReply` — ответ закончен ([api.md](api.md), §18);
 - `Size()` у виджетов и окна; описано, как прокручивать растущий ряд (`Scroll`, [api.md](api.md), §4, §5, §14);
@@ -187,8 +188,8 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - `Window.OnDropFiles` — перетаскивание файлов на окно, `nui.Args` — аргументы командной строки без потерь на Windows, пример `examples/viewer` ([api.md](api.md), §1, §5), [отчёт](reports/drop.md);
 - `Window.OnKey` — клавиши окна, `TextView.OnEnter` и `SetPlaceholder`, многострочное поле ввода в `Chat` ([api.md](api.md), §5, §13, §18), [отчёт](reports/keys.md).
 
-В порядке пользы ([api.md](api.md), §21):
-1. Canvas;
+В порядке пользы:
+1. ~~Canvas~~ — готово;
 2. ~~меню~~ — готово;
 3. ~~буфер обмена~~ — готово;
 4. ~~`OnKey`~~ — готово;

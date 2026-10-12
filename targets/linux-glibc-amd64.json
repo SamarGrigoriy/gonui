@@ -20,7 +20,8 @@
 		"/usr/lib/x86_64-linux-gnu/crt1.o",
 		"/usr/lib/x86_64-linux-gnu/crti.o",
 		"/usr/lib/x86_64-linux-gnu/crtn.o",
-		"-lc"
+		"-lc",
+		"-l:libm.so.6"
 	],
 	"extra-files": [
 		"src/runtime/asm_amd64.S",

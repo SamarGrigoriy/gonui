@@ -22,7 +22,7 @@ typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnect
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
             GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags,
             GtkStateFlags, GtkTextWindowType, PangoWrapMode, GtkDestDefaults, GdkDragAction,
-            GdkModifierType;
+            GdkModifierType, GdkEventType, GdkScrollDirection, GdkEventMask;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -64,6 +64,40 @@ typedef struct _cairo cairo_t;
 typedef struct _GdkRGBA { double red, green, blue, alpha; } GdkRGBA;
 typedef struct _GdkRectangle GdkRectangle;
 typedef struct _GdkKeymapKey { guint keycode; gint group, level; } GdkKeymapKey;
+/* События мыши (Canvas): драйвер читает их функциями доступа GDK, тесты — заполняют. */
+typedef struct _GdkEventButton {
+	int type;
+	GdkWindow *window;
+	signed char send_event;
+	guint32 time;
+	double x, y, *axes;
+	guint state, button;
+	GdkDevice *device;
+	double x_root, y_root;
+} GdkEventButton;
+typedef struct _GdkEventMotion {
+	int type;
+	GdkWindow *window;
+	signed char send_event;
+	guint32 time;
+	double x, y, *axes;
+	guint state;
+	short is_hint;
+	GdkDevice *device;
+	double x_root, y_root;
+} GdkEventMotion;
+typedef struct _GdkEventScroll {
+	int type;
+	GdkWindow *window;
+	signed char send_event;
+	guint32 time;
+	double x, y;
+	guint state;
+	int direction;
+	GdkDevice *device;
+	double x_root, y_root, delta_x, delta_y;
+	guint is_stop; /* в GTK — битовое поле в этом же слове; cgo TinyGo битовых полей не понимает */
+} GdkEventScroll;
 /* GdkEventKey: драйвер читает keyval, state и hardware_keycode (OnKey); тесты — заполняют. */
 typedef struct _GdkEventKey {
 	int type;
@@ -205,6 +239,18 @@ NUI_CONST(GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, 2)
 NUI_CONST(G_BUS_TYPE_SESSION, 2)
 NUI_CONST(G_DBUS_CALL_FLAGS_NONE, 0)
 NUI_CONST(GDK_KEY_PRESS, 8)
+NUI_CONST(GDK_MOTION_NOTIFY, 3)
+NUI_CONST(GDK_BUTTON_PRESS, 4)
+NUI_CONST(GDK_BUTTON_RELEASE, 7)
+NUI_CONST(GDK_SCROLL, 31)
+NUI_CONST(GDK_SCROLL_UP, 0)
+NUI_CONST(GDK_SCROLL_DOWN, 1)
+NUI_CONST(GDK_SCROLL_LEFT, 2)
+NUI_CONST(GDK_SCROLL_RIGHT, 3)
+NUI_CONST(GDK_POINTER_MOTION_MASK, 4)
+NUI_CONST(GDK_BUTTON_PRESS_MASK, 256)
+NUI_CONST(GDK_BUTTON_RELEASE_MASK, 512)
+NUI_CONST(GDK_SCROLL_MASK, 2097152)
 NUI_CONST(GTK_DEST_DEFAULT_ALL, 7)
 NUI_CONST(GDK_ACTION_COPY, 2)
 NUI_CONST(GTK_TEXT_WINDOW_WIDGET, 1)
@@ -238,6 +284,9 @@ _Static_assert(__builtin_offsetof(GdkEventKey, keyval) == 28, "GdkEventKey.keyva
 _Static_assert(__builtin_offsetof(GdkEventKey, hardware_keycode) == 48, "GdkEventKey.hardware_keycode");
 _Static_assert(sizeof(GdkKeymapKey) == 12, "GdkKeymapKey");
 _Static_assert(sizeof(GtkTargetEntry) == 16, "GtkTargetEntry");
+_Static_assert(sizeof(GdkEventButton) == 80 && __builtin_offsetof(GdkEventButton, button) == 52, "GdkEventButton");
+_Static_assert(sizeof(GdkEventMotion) == 80 && __builtin_offsetof(GdkEventMotion, device) == 56, "GdkEventMotion");
+_Static_assert(sizeof(GdkEventScroll) == 96 && __builtin_offsetof(GdkEventScroll, direction) == 44, "GdkEventScroll");
 
 /* ---------- 4. Прототипы ---------- */
 /* GLib, GObject, цикл событий. (w) — только из обёрток. */
@@ -381,7 +430,30 @@ NUI_FN(void, gdk_event_free, (GdkEvent *event))                                 
 NUI_FN(void, gdk_event_set_device, (GdkEvent *event, GdkDevice *device))                      /* тесты */
 NUI_FN(GdkSeat *, gdk_display_get_default_seat, (GdkDisplay *display))                       /* тесты */
 NUI_FN(GdkDevice *, gdk_seat_get_keyboard, (GdkSeat *seat))                                  /* тесты */
+NUI_FN(GdkDevice *, gdk_seat_get_pointer, (GdkSeat *seat))                                   /* тесты */
+NUI_FN(GdkPixbuf *, gdk_pixbuf_get_from_window, (GdkWindow *window, gint src_x, gint src_y, gint width, gint height)) /* тесты */
+NUI_FN(guchar *, gdk_pixbuf_get_pixels, (const GdkPixbuf *pixbuf))                           /* тесты */
 NUI_FN(gboolean, gtk_widget_event, (GtkWidget *widget, GdkEvent *event))                     /* тесты */
+/* Canvas: GtkDrawingArea, cairo, события мыши */
+NUI_FN(GtkWidget *, gtk_drawing_area_new, (void))
+NUI_FN(void, gtk_widget_add_events, (GtkWidget *widget, gint events))
+NUI_FN(void, cairo_set_source_rgb, (cairo_t *cr, double red, double green, double blue))     /* (w) */
+NUI_FN(void, cairo_set_line_width, (cairo_t *cr, double width))                              /* (w) */
+NUI_FN(void, cairo_line_to, (cairo_t *cr, double x, double y))                               /* (w) */
+NUI_FN(void, cairo_stroke, (cairo_t *cr))                                                    /* (w) */
+NUI_FN(void, cairo_fill, (cairo_t *cr))                                                      /* (w) */
+NUI_FN(void, cairo_rectangle, (cairo_t *cr, double x, double y, double width, double height)) /* (w) */
+NUI_FN(void, cairo_new_path, (cairo_t *cr))                                                  /* (w) */
+NUI_FN(void, cairo_save, (cairo_t *cr))                                                      /* (w) */
+NUI_FN(void, cairo_restore, (cairo_t *cr))                                                   /* (w) */
+NUI_FN(void, cairo_translate, (cairo_t *cr, double tx, double ty))                           /* (w) */
+NUI_FN(void, cairo_scale, (cairo_t *cr, double sx, double sy))                              /* (w) */
+NUI_FN(void, cairo_arc, (cairo_t *cr, double xc, double yc, double radius, double angle1, double angle2)) /* (w) */
+NUI_FN(GdkEventType, gdk_event_get_event_type, (const GdkEvent *event))                     /* (w) */
+NUI_FN(gboolean, gdk_event_get_coords, (const GdkEvent *event, gdouble *x_win, gdouble *y_win)) /* (w) */
+NUI_FN(gboolean, gdk_event_get_button, (const GdkEvent *event, guint *button))              /* (w) */
+NUI_FN(gboolean, gdk_event_get_state, (const GdkEvent *event, GdkModifierType *state))      /* (w) */
+NUI_FN(gboolean, gdk_event_get_scroll_direction, (const GdkEvent *event, GdkScrollDirection *direction)) /* (w) */
 /* Меню окна (Window.SetMenu) */
 NUI_FN(GtkWidget *, gtk_menu_bar_new, (void))                                                 /* (w) */
 NUI_FN(GtkWidget *, gtk_event_box_new, (void))                                                /* (w) */
@@ -615,6 +687,17 @@ void   nui_css_background(GtkWidget *w, unsigned color, int panel);
 void   nui_set_padding(GtkWidget *w, unsigned px);
 GtkClipboard *nui_clipboard(void);
 void   nui_container_clear(GtkContainer *c);
+void   nui_paint_begin(cairo_t *cr, GtkWidget *w);
+void   nui_paint_theme_color(cairo_t *cr, GtkWidget *w);
+unsigned nui_pixel_at(GtkWidget *w, int x, int y); /* только с NUI_GUI_TEST */
+void   nui_paint_color(cairo_t *cr, unsigned rgb);
+void   nui_paint_line(cairo_t *cr, double x1, double y1, double x2, double y2);
+void   nui_paint_rect(cairo_t *cr, double x, double y, double w, double h, int fill);
+void   nui_paint_ellipse(cairo_t *cr, double x, double y, double w, double h, int fill);
+void   nui_paint_text(cairo_t *cr, GtkWidget *w, double x, double y, const gchar *s);
+void   nui_paint_text_size(GtkWidget *w, const gchar *s, int out[2]);
+int    nui_mouse_decode(GdkEvent *e, double xy[2], int info[3]); /* вид; info: кнопка, Mod*, шаг колеса */
+void   nui_sim_mouse(GtkWidget *w, int type, double x, double y, unsigned button, unsigned state); /* только с NUI_GUI_TEST */
 GtkWidget *nui_window_menubar(GtkWindow *w);
 GtkContainer *nui_window_content(GtkWindow *w);
 void   nui_window_menubar_resize(GtkWindow *w);

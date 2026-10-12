@@ -531,6 +531,21 @@ static struct {
 	nui_GdipCreateImageAttributes_fn newAttrs;
 	nui_GdipSetImageAttributesWrapMode_fn wrapMode;
 	nui_GdipDisposeImageAttributes_fn disposeAttrs;
+	nui_GdipCreateFromHDC_fn fromHDC;
+	nui_GdipSetSmoothingMode_fn smoothing;
+	nui_GdipScaleWorldTransform_fn scale;
+	nui_GdipCreatePen1_fn newPen;
+	nui_GdipDeletePen_fn deletePen;
+	nui_GdipSetPenColor_fn penColor;
+	nui_GdipSetPenWidth_fn penWidth;
+	nui_GdipCreateSolidFill_fn newBrush;
+	nui_GdipSetSolidFillColor_fn brushColor;
+	nui_GdipDeleteBrush_fn deleteBrush;
+	nui_GdipDrawLine_fn line;
+	nui_GdipDrawRectangle_fn rect;
+	nui_GdipFillRectangle_fn fillRect;
+	nui_GdipDrawEllipse_fn ellipse;
+	nui_GdipFillEllipse_fn fillEllipse;
 } gp;
 
 #define GP_LOAD(field, name) \
@@ -556,6 +571,21 @@ static int gp_load(void) {
 	GP_LOAD(newAttrs, GdipCreateImageAttributes)
 	GP_LOAD(wrapMode, GdipSetImageAttributesWrapMode)
 	GP_LOAD(disposeAttrs, GdipDisposeImageAttributes)
+	GP_LOAD(fromHDC, GdipCreateFromHDC)
+	GP_LOAD(smoothing, GdipSetSmoothingMode)
+	GP_LOAD(scale, GdipScaleWorldTransform)
+	GP_LOAD(newPen, GdipCreatePen1)
+	GP_LOAD(deletePen, GdipDeletePen)
+	GP_LOAD(penColor, GdipSetPenColor)
+	GP_LOAD(penWidth, GdipSetPenWidth)
+	GP_LOAD(newBrush, GdipCreateSolidFill)
+	GP_LOAD(brushColor, GdipSetSolidFillColor)
+	GP_LOAD(deleteBrush, GdipDeleteBrush)
+	GP_LOAD(line, GdipDrawLine)
+	GP_LOAD(rect, GdipDrawRectangle)
+	GP_LOAD(fillRect, GdipFillRectangle)
+	GP_LOAD(ellipse, GdipDrawEllipse)
+	GP_LOAD(fillEllipse, GdipFillEllipse)
 	GdiplusStartupInput in = {1, 0, 0, 0};
 	ULONG_PTR token;
 	return startup && startup(&token, &in, 0) == 0;
@@ -732,6 +762,122 @@ int nui_menu_set_text(HMENU m, UINT item, int byPos, LPCWSTR text) {
 	mi.fMask = NUI_MIIM_STRING;
 	mi.dwTypeData = (LPWSTR)text;
 	return SetMenuItemInfoW(m, item, byPos, &mi);
+}
+
+// --- Canvas (driver-win32.md, §5) ---
+// WM_PAINT холста: рисунок — в битмап в памяти, затем одним BitBlt на экран (без мерцания).
+// Фигуры — GDI+ со сглаживанием; мировое преобразование — масштаб dpi/96, поэтому
+// координаты и толщина линий — логические пиксели; центры точек — на половинах
+// (PixelOffsetModeHalf), как в cairo: рисунок совпадает с GTK. Текст — GDI шрифтом окна
+// (как у остальных контролов), его координаты масштабируются здесь.
+
+struct NuiPaint {
+	HDC dc;
+	GpGraphics *g; // 0 — нет GDI+: фигуры не рисуются, текст — да
+	GpPen *pen;
+	GpSolidFill *brush;
+	float scale;
+};
+
+static struct {
+	PAINTSTRUCT ps;
+	HDC win;
+	HBITMAP bmp;
+	HGDIOBJ oldBmp, oldFont;
+	NuiPaint p;
+} cv;
+
+NuiPaint *nui_canvas_begin(HWND h, HBRUSH bg, HFONT font, UINT dpi, COLORREF text) {
+	RECT r;
+	GetClientRect(h, &r);
+	int w = r.right > 0 ? r.right : 1, ht = r.bottom > 0 ? r.bottom : 1;
+	cv.win = BeginPaint(h, &cv.ps);
+	cv.p.dc = CreateCompatibleDC(cv.win);
+	cv.bmp = CreateCompatibleBitmap(cv.win, w, ht);
+	cv.oldBmp = SelectObject(cv.p.dc, cv.bmp);
+	cv.oldFont = SelectObject(cv.p.dc, font);
+	FillRect(cv.p.dc, &r, bg);
+	SetBkMode(cv.p.dc, NUI_TRANSPARENT);
+	cv.p.scale = (float)dpi / 96.0f;
+	cv.p.g = 0;
+	cv.p.pen = cv.p.brush = 0;
+	if (gp_ready() && gp.fromHDC(cv.p.dc, &cv.p.g) == 0) {
+		gp.smoothing(cv.p.g, NUI_SmoothingModeAntiAlias);
+		gp.pixelOffset(cv.p.g, NUI_PixelOffsetModeHalf);
+		gp.scale(cv.p.g, cv.p.scale, cv.p.scale, NUI_MatrixOrderPrepend);
+		gp.newPen(0xFF000000, 1, NUI_UnitWorld, &cv.p.pen);
+		gp.newBrush(0xFF000000, &cv.p.brush);
+	}
+	nui_paint_color(&cv.p, text);
+	return &cv.p;
+}
+
+void nui_canvas_end(HWND h) {
+	if (cv.p.g) {
+		gp.deletePen(cv.p.pen);
+		gp.deleteBrush(cv.p.brush);
+		gp.deleteGraphics(cv.p.g);
+	}
+	RECT r;
+	GetClientRect(h, &r);
+	BitBlt(cv.win, 0, 0, r.right, r.bottom, cv.p.dc, 0, 0, NUI_SRCCOPY);
+	SelectObject(cv.p.dc, cv.oldFont);
+	SelectObject(cv.p.dc, cv.oldBmp);
+	DeleteObject(cv.bmp);
+	DeleteDC(cv.p.dc);
+	EndPaint(h, &cv.ps);
+}
+
+// c — COLORREF (0x00BBGGRR); GDI+ ждёт ARGB.
+void nui_paint_color(NuiPaint *p, COLORREF c) {
+	ARGB argb = 0xFF000000u | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16 & 0xFF);
+	SetTextColor(p->dc, c);
+	if (p->g) {
+		gp.penColor(p->pen, argb);
+		gp.brushColor(p->brush, argb);
+	}
+}
+
+void nui_paint_width(NuiPaint *p, float w) {
+	if (p->g)
+		gp.penWidth(p->pen, w);
+}
+
+void nui_paint_line(NuiPaint *p, float x1, float y1, float x2, float y2) {
+	if (p->g)
+		gp.line(p->g, p->pen, x1, y1, x2, y2);
+}
+
+void nui_paint_rect(NuiPaint *p, float x, float y, float w, float h, int fill) {
+	if (!p->g)
+		return;
+	if (fill)
+		gp.fillRect(p->g, p->brush, x, y, w, h);
+	else
+		gp.rect(p->g, p->pen, x, y, w, h);
+}
+
+void nui_paint_ellipse(NuiPaint *p, float x, float y, float w, float h, int fill) {
+	if (!p->g)
+		return;
+	if (fill)
+		gp.fillEllipse(p->g, p->brush, x, y, w, h);
+	else
+		gp.ellipse(p->g, p->pen, x, y, w, h);
+}
+
+void nui_paint_text(NuiPaint *p, float x, float y, LPCWSTR s, int len) {
+	RECT r = {(LONG)(x * p->scale + 0.5f), (LONG)(y * p->scale + 0.5f), 0, 0};
+	r.right = r.left + 100000;
+	r.bottom = r.top + 100000;
+	DrawTextW(p->dc, s, len, &r, NUI_DT_NOPREFIX | NUI_DT_EXPANDTABS);
+}
+
+void nui_paint_text_size(NuiPaint *p, LPCWSTR s, int len, float out[2]) {
+	RECT r = {0, 0, 0, 0};
+	DrawTextW(p->dc, s, len, &r, NUI_DT_CALCRECT | NUI_DT_NOPREFIX | NUI_DT_EXPANDTABS);
+	out[0] = (float)r.right / p->scale;
+	out[1] = (float)r.bottom / p->scale;
 }
 
 // --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---

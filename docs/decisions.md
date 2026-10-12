@@ -317,7 +317,7 @@
   - `libc` пустая — своя musl не собирается;
   - триплет `<arch>-unknown-linux-gnu`;
   - заголовки glibc для C-файлов рантайма TinyGo — через `-isystem`;
-  - линковка встроенным `ld.lld`: `crt1.o`, `crti.o`, `crtn.o`, `-lc`, `-L/usr/lib/<multiarch>`, `--dynamic-linker`.
+  - линковка встроенным `ld.lld`: `crt1.o`, `crti.o`, `crtn.o`, `-lc`, `-L/usr/lib/<multiarch>`, `--dynamic-linker`; с 12.10.2026 и `-l:libm.so.6` — для `math.Sin` и других функций, которые TinyGo отдаёт libm (без неё — «linker could not find symbol sin»).
 - Файлы целей лежат в репозитории nui, по одному на архитектуру. Makefile передаёт `-target=targets/linux-glibc-$(ARCH).json`.
 - Когда PR #5838 вольют, переход на `-libc=glibc` — отдельный ADR. Он сократит target-файл, но кода nui не коснётся.
 

@@ -245,7 +245,17 @@ typedef struct IStreamVtbl {
 struct IStream { const IStreamVtbl *lpVtbl; };
 /* GDI+, плоский API (gdiplus.h в режиме C): объекты — void, перечисления — int. */
 typedef void GpImage, GpBitmap, GpGraphics, GpImageAttributes;
-typedef int GpStatus, PixelFormat, InterpolationMode, PixelOffsetMode, WrapMode, GpUnit, RotateFlipType;
+typedef int GpStatus, PixelFormat, InterpolationMode, PixelOffsetMode, WrapMode, GpUnit, RotateFlipType,
+            SmoothingMode, GpMatrixOrder;
+typedef void GpPen, GpBrush, GpSolidFill;
+typedef float REAL;
+typedef struct tagPAINTSTRUCT {
+	HDC hdc;
+	BOOL fErase;
+	RECT rcPaint;
+	BOOL fRestore, fIncUpdate;
+	BYTE rgbReserved[32];
+} PAINTSTRUCT;
 typedef DWORD ARGB;
 typedef void *DrawImageAbort;
 typedef struct GdiplusStartupInput {
@@ -275,6 +285,7 @@ _Static_assert(sizeof(BITMAPINFO) == 44, "BITMAPINFO");
 _Static_assert(sizeof(NMHDR) == 24, "NMHDR");
 _Static_assert(sizeof(DROPFILES) == 20, "DROPFILES");
 _Static_assert(sizeof(MENUITEMINFOW) == 80, "MENUITEMINFOW");
+_Static_assert(sizeof(PAINTSTRUCT) == 72, "PAINTSTRUCT");
 _Static_assert(sizeof(LVITEMW) == 88, "LVITEMW");
 _Static_assert(sizeof(LVCOLUMNW) == 56, "LVCOLUMNW");
 _Static_assert(sizeof(NMLVDISPINFOW) == 112, "NMLVDISPINFOW");
@@ -587,6 +598,21 @@ NUI_CONST(AC_SRC_ALPHA, 0x01)
 NUI_CONST(PixelFormat32bppPARGB, 0xE200B)
 NUI_CONST(InterpolationModeHighQualityBicubic, 7)
 NUI_CONST(PixelOffsetModeHighQuality, 2)
+NUI_CONST(PixelOffsetModeHalf, 4)
+NUI_CONST(SmoothingModeAntiAlias, 4)
+NUI_CONST(MatrixOrderPrepend, 0)
+NUI_CONST(UnitWorld, 0)
+NUI_CONST(SRCCOPY, 0x00CC0020)
+NUI_CONST(WM_MOUSEMOVE, 0x0200)
+NUI_CONST(WM_LBUTTONDOWN, 0x0201)
+NUI_CONST(WM_LBUTTONUP, 0x0202)
+NUI_CONST(WM_RBUTTONDOWN, 0x0204)
+NUI_CONST(WM_RBUTTONUP, 0x0205)
+NUI_CONST(WM_MBUTTONDOWN, 0x0207)
+NUI_CONST(WM_MBUTTONUP, 0x0208)
+NUI_CONST(WM_MOUSEHWHEEL, 0x020E)
+NUI_CONST(MK_SHIFT, 0x0004)
+NUI_CONST(MK_CONTROL, 0x0008)
 NUI_CONST(WrapModeTileFlipXY, 3)
 NUI_CONST(UnitPixel, 2)
 
@@ -660,6 +686,15 @@ NUI_FN(int, GetMenuItemCount, (HMENU hMenu))
 NUI_FN(BOOL, SetMenuItemInfoW, (HMENU hmenu, UINT item, BOOL fByPositon, const MENUITEMINFOW *lpmii))
 NUI_FN(int, GetMenuStringW, (HMENU hMenu, UINT uIDItem, LPWSTR lpString, int cchMax, UINT flags))
 NUI_FN(BOOL, GetClientRect, (HWND hWnd, RECT *lpRect))
+NUI_FN(HDC, BeginPaint, (HWND hWnd, PAINTSTRUCT *lpPaint))
+NUI_FN(BOOL, EndPaint, (HWND hWnd, const PAINTSTRUCT *lpPaint))
+NUI_FN(HBITMAP, CreateCompatibleBitmap, (HDC hdc, int cx, int cy))
+NUI_FN(BOOL, BitBlt, (HDC hdc, int x, int y, int cx, int cy, HDC hdcSrc, int x1, int y1, DWORD rop))
+NUI_FN(HWND, SetCapture, (HWND hWnd))
+NUI_FN(BOOL, ReleaseCapture, (void))
+NUI_FN(BOOL, ScreenToClient, (HWND hWnd, POINT *lpPoint))
+NUI_FN(BOOL, ClientToScreen, (HWND hWnd, POINT *lpPoint))                                   /* тесты */
+NUI_FN(COLORREF, GetPixel, (HDC hdc, int x, int y))                                         /* тесты */
 NUI_FN(BOOL, GetWindowRect, (HWND hWnd, RECT *lpRect))
 NUI_FN(HWND, SetFocus, (HWND hWnd))
 NUI_FN(BOOL, SetForegroundWindow, (HWND hWnd))
@@ -762,6 +797,22 @@ NUI_FNPTR(GpStatus, GdipCreateImageAttributes, (GpImageAttributes **imageattr))
 NUI_FNPTR(GpStatus, GdipSetImageAttributesWrapMode, (GpImageAttributes *imageAttr, WrapMode wrap, ARGB argb,
           BOOL clamp))
 NUI_FNPTR(GpStatus, GdipDisposeImageAttributes, (GpImageAttributes *imageattr))
+/* Canvas */
+NUI_FNPTR(GpStatus, GdipCreateFromHDC, (HDC hdc, GpGraphics **graphics))
+NUI_FNPTR(GpStatus, GdipSetSmoothingMode, (GpGraphics *graphics, SmoothingMode smoothingMode))
+NUI_FNPTR(GpStatus, GdipScaleWorldTransform, (GpGraphics *graphics, REAL sx, REAL sy, GpMatrixOrder order))
+NUI_FNPTR(GpStatus, GdipCreatePen1, (ARGB color, REAL width, GpUnit unit, GpPen **pen))
+NUI_FNPTR(GpStatus, GdipDeletePen, (GpPen *pen))
+NUI_FNPTR(GpStatus, GdipSetPenColor, (GpPen *pen, ARGB argb))
+NUI_FNPTR(GpStatus, GdipSetPenWidth, (GpPen *pen, REAL width))
+NUI_FNPTR(GpStatus, GdipCreateSolidFill, (ARGB color, GpSolidFill **brush))
+NUI_FNPTR(GpStatus, GdipSetSolidFillColor, (GpSolidFill *brush, ARGB color))
+NUI_FNPTR(GpStatus, GdipDeleteBrush, (GpBrush *brush))
+NUI_FNPTR(GpStatus, GdipDrawLine, (GpGraphics *graphics, GpPen *pen, REAL x1, REAL y1, REAL x2, REAL y2))
+NUI_FNPTR(GpStatus, GdipDrawRectangle, (GpGraphics *graphics, GpPen *pen, REAL x, REAL y, REAL width, REAL height))
+NUI_FNPTR(GpStatus, GdipFillRectangle, (GpGraphics *graphics, GpBrush *brush, REAL x, REAL y, REAL width, REAL height))
+NUI_FNPTR(GpStatus, GdipDrawEllipse, (GpGraphics *graphics, GpPen *pen, REAL x, REAL y, REAL width, REAL height))
+NUI_FNPTR(GpStatus, GdipFillEllipse, (GpGraphics *graphics, GpBrush *brush, REAL x, REAL y, REAL width, REAL height))
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
@@ -795,6 +846,17 @@ HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита,
 void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 void  nui_list_column(HWND lv, int index, LPCWSTR title);
+/* Canvas: рисование одного WM_PAINT (двойная буферизация); координаты — логические пиксели */
+typedef struct NuiPaint NuiPaint;
+NuiPaint *nui_canvas_begin(HWND h, HBRUSH bg, HFONT font, UINT dpi, COLORREF text);
+void  nui_canvas_end(HWND h);
+void  nui_paint_color(NuiPaint *p, COLORREF c);
+void  nui_paint_width(NuiPaint *p, float w);
+void  nui_paint_line(NuiPaint *p, float x1, float y1, float x2, float y2);
+void  nui_paint_rect(NuiPaint *p, float x, float y, float w, float h, int fill);
+void  nui_paint_ellipse(NuiPaint *p, float x, float y, float w, float h, int fill);
+void  nui_paint_text(NuiPaint *p, float x, float y, LPCWSTR s, int len);
+void  nui_paint_text_size(NuiPaint *p, LPCWSTR s, int len, float out[2]);
 int   nui_menu_set_text(HMENU m, UINT item, int byPos, LPCWSTR text);
 void  nui_edit_hint(HWND edit, LPCWSTR hint); /* подсказка в пустом многострочном поле; 0 — убрать */
 void  nui_list_select(HWND lv, int row);
