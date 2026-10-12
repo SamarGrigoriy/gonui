@@ -467,6 +467,12 @@ NUI_CONST(SM_CXHSCROLL, 21)
 NUI_CONST(VK_TAB, 0x09)
 NUI_CONST(VK_PRIOR, 0x21)
 NUI_CONST(VK_NEXT, 0x22)
+NUI_CONST(VK_LEFT, 0x25)
+NUI_CONST(VK_UP, 0x26)
+NUI_CONST(VK_DOWN, 0x28)
+NUI_CONST(BS_RADIOBUTTON, 0x0004)
+NUI_CONST(WM_GETDLGCODE, 0x0087)
+NUI_CONST(DLGC_RADIOBUTTON, 0x0040)
 NUI_CONST(LVM_INSERTCOLUMNW, 0x1061)
 NUI_CONST(LVM_SETCOLUMNWIDTH, 0x101E)
 NUI_CONST(LVM_GETCOLUMNWIDTH, 0x101D)
@@ -765,6 +771,7 @@ NUI_FN(BOOL, SetProcessDpiAwarenessContext, (DPI_AWARENESS_CONTEXT value))
 NUI_FN(UINT, GetDpiForWindow, (HWND hwnd))
 NUI_FN(UINT, GetDpiForSystem, (void))
 NUI_FN(int, GetSystemMetricsForDpi, (int nIndex, UINT dpi))
+NUI_FN(BOOL, IsZoomed, (HWND hWnd))
 NUI_FN(HRGN, CreateRectRgn, (int x1, int y1, int x2, int y2))
 NUI_FN(int, CombineRgn, (HRGN hrgnDst, HRGN hrgnSrc1, HRGN hrgnSrc2, int iMode))
 NUI_FN(int, SetWindowRgn, (HWND hWnd, HRGN hRgn, BOOL bRedraw))
@@ -859,7 +866,7 @@ NUI_FNPTR(GpStatus, GdipFillEllipse, (GpGraphics *graphics, GpBrush *brush, REAL
 
 /* ---------- 5. Обёртки (wrap_windows.c) ---------- */
 /* Свои сообщения: WM_APP + n. */
-enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL, NUI_WM_KEY, NUI_WM_TABSKEY };
+enum { NUI_WM_DO = 0x8000 + 1, NUI_WM_RELAYOUT, NUI_WM_ENTER, NUI_WM_LISTSEL, NUI_WM_KEY, NUI_WM_NAVKEY };
 
 int   nui_init(void);
 HWND  nui_msg_window(void);

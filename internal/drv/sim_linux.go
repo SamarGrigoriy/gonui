@@ -80,6 +80,11 @@ func SimToggle(h H) {
 // SimSelect — как выбор пункта в списке.
 func SimSelect(h H, i int) { C.gtk_combo_box_set_active((*C.GtkComboBox)(h), C.gint(i)) }
 
+// SimRadioSelect — щелчок по варианту i переключателя.
+func SimRadioSelect(h H, i int) {
+	C.gtk_button_clicked((*C.GtkButton)(C.nui_radio_nth(radioBox(h), C.int(i))))
+}
+
 // SimSlide — как перетаскивание ползунка.
 func SimSlide(h H, v float64) { C.gtk_range_set_value((*C.GtkRange)(h), C.gdouble(v)) }
 

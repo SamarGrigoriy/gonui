@@ -90,29 +90,31 @@ static int window_key(const MSG *m) {
 	return SendMessageW(msgWnd, NUI_WM_KEY, (m->wParam & 0xFFFF) | mods << 16, (LPARAM)root) != 0;
 }
 
-// Ctrl+Tab и Ctrl+PgDn — следующая вкладка Tabs, внутри которых фокус; Ctrl+Shift+Tab и
-// Ctrl+PgUp — предыдущая. Ответ 1 — фокус во вкладках, клавиша обработана.
-static int tabs_key(const MSG *m) {
-	if (m->message != NUI_WM_KEYDOWN || GetKeyState(NUI_VK_CONTROL) >= 0)
+// Клавиши переключения, которые nui разбирает сам до IsDialogMessage (ответ 1 — обработано):
+// Ctrl+Tab и Ctrl+PgDn — следующая вкладка Tabs, внутри которых фокус, Ctrl+Shift+Tab
+// и Ctrl+PgUp — предыдущая; стрелки на переключателе (Radio) — соседний вариант до края
+// группы, как в GTK: IsDialogMessage увёл бы фокус за край, к другим контролам.
+// wParam NUI_WM_NAVKEY: 1 — назад, 2 — переключатель (иначе вкладки).
+static int nav_key(const MSG *m) {
+	if (m->message != NUI_WM_KEYDOWN)
 		return 0;
-	WPARAM back;
-	switch (m->wParam) {
-	case NUI_VK_TAB:
-		back = GetKeyState(NUI_VK_SHIFT) < 0;
-		break;
-	case NUI_VK_NEXT:
-		back = 0;
-		break;
-	case NUI_VK_PRIOR:
-		back = 1;
-		break;
-	default:
+	WPARAM vk = m->wParam, how;
+	if (GetKeyState(NUI_VK_CONTROL) < 0) {
+		if (vk == NUI_VK_TAB)
+			how = GetKeyState(NUI_VK_SHIFT) < 0;
+		else if (vk == NUI_VK_NEXT || vk == NUI_VK_PRIOR)
+			how = vk == NUI_VK_PRIOR;
+		else
+			return 0;
+	} else if (vk >= NUI_VK_LEFT && vk <= NUI_VK_DOWN &&
+		(SendMessageW(m->hwnd, NUI_WM_GETDLGCODE, vk, (LPARAM)m) & NUI_DLGC_RADIOBUTTON))
+		how = 2 | (vk == NUI_VK_LEFT || vk == NUI_VK_UP);
+	else
 		return 0;
-	}
-	return SendMessageW(msgWnd, NUI_WM_TABSKEY, back, (LPARAM)m->hwnd) != 0;
+	return SendMessageW(msgWnd, NUI_WM_NAVKEY, how, (LPARAM)m->hwnd) != 0;
 }
 
-// Цикл (§3): сначала OnKey окна, затем переключение вкладок; Enter в поле с OnEnter — до IsDialogMessage; клавиатура —
+// Цикл (§3): сначала OnKey окна, затем переключение вкладок и вариантов (nav_key); Enter в поле с OnEnter — до IsDialogMessage; клавиатура —
 // IsDialogMessage окна верхнего уровня (Tab, Shift+Tab, Enter = кнопка по умолчанию);
 // остальное — как обычно.
 void nui_loop(void) {
@@ -121,7 +123,7 @@ void nui_loop(void) {
 		if (m.message >= NUI_WM_KEYFIRST && m.message <= NUI_WM_KEYLAST) {
 			if (window_key(&m))
 				continue;
-			if (tabs_key(&m))
+			if (nav_key(&m))
 				continue;
 			// nuiEnter: 1 — всегда (Entry с OnEnter), 2 — только без Shift (TextView с OnEnter:
 			// Shift+Enter — перевод строки).

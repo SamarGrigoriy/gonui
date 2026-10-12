@@ -124,7 +124,8 @@ struct _GList { gpointer data; GList *next; GList *prev; };
 /* Одним объявлением: cgo TinyGo не видит полей структуры, описанной после typedef. */
 typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
 typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned; typedef struct _GtkMenu GtkMenu;
-typedef struct _GtkNotebook GtkNotebook;
+typedef struct _GtkNotebook GtkNotebook; typedef struct _GtkRadioButton GtkRadioButton;
+typedef struct _GtkOrientable GtkOrientable;
 typedef void (*GtkMenuDetachFunc)(GtkWidget *attach_widget, GtkMenu *menu);
 typedef struct _GtkMenuShell GtkMenuShell; typedef struct _GtkMenuItem GtkMenuItem;
 typedef struct _GtkCheckMenuItem GtkCheckMenuItem; typedef struct _GtkAccelLabel GtkAccelLabel;
@@ -460,6 +461,11 @@ NUI_FN(void, gtk_notebook_set_current_page, (GtkNotebook *notebook, gint page_nu
 NUI_FN(gint, gtk_notebook_get_current_page, (GtkNotebook *notebook))
 NUI_FN(GtkWidget *, gtk_notebook_get_nth_page, (GtkNotebook *notebook, gint page_num))      /* (w) */
 NUI_FN(void, gtk_notebook_set_tab_label_text, (GtkNotebook *notebook, GtkWidget *child, const gchar *tab_text))
+/* Radio: GtkRadioButton в GtkBox */
+NUI_FN(GtkWidget *, gtk_radio_button_new_with_label_from_widget, (GtkRadioButton *radio_group_member,
+       const gchar *label))                                                                 /* (w) */
+NUI_FN(void, gtk_orientable_set_orientation, (GtkOrientable *orientable, GtkOrientation orientation))
+NUI_FN(GList *, g_list_nth, (GList *list, guint n))                                          /* (w) */
 /* Canvas: GtkDrawingArea, cairo, события мыши */
 NUI_FN(GtkWidget *, gtk_drawing_area_new, (void))
 NUI_FN(void, gtk_widget_add_events, (GtkWidget *widget, gint events))
@@ -730,6 +736,9 @@ void   nui_ctx_set(GtkWidget *w, GtkWidget *menu);
 GtkWidget *nui_ctx_owner_at(GtkWidget *top, int x, int y); /* только с NUI_GUI_TEST: чьё меню у точки окна */
 void   nui_window_menubar_resize(GtkWindow *w);
 GtkWidget *nui_tabs_new(uintptr_t ud);
+void   nui_radio_add(GtkBox *box, const gchar *text, uintptr_t ud);
+GtkWidget *nui_radio_nth(GtkBox *box, int i); /* кнопка i; 0 — нет такой */
+int    nui_radio_selected(GtkBox *box);       /* номер включённой; -1 — кнопок нет */
 GtkWidget *nui_image_new(void);
 GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud);
 void   nui_list_column(GtkTreeView *view, const gchar *title, int index);

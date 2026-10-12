@@ -20,3 +20,8 @@ RUN gcc -std=gnu11 -O2 /tmp/rootshot.c -o /usr/local/bin/rootshot -l:libX11.so.6
 RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends make \
  && rm -rf /var/lib/apt/lists/*
+# Загрузчик SVG для gdk-pixbuf: им Adwaita рисует точку переключателя и галочку флажка
+# (bullet-symbolic.svg, check-symbolic.svg). На настоящем рабочем столе он всегда есть.
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends librsvg2-common \
+ && rm -rf /var/lib/apt/lists/*

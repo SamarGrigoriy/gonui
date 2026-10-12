@@ -235,7 +235,7 @@ func SimListActivate(view H, row int) {
 }
 
 // SimKey — нажатие клавиши в окне win: тот же путь, что у цикла (NUI_WM_KEY, затем
-// NUI_WM_TABSKEY), только модификаторы — из mods, а не из GetKeyState. Не забрало окно — символ (WM_CHAR)
+// NUI_WM_NAVKEY), только модификаторы — из mods, а не из GetKeyState. Не забрало окно — символ (WM_CHAR)
 // получает виджет с фокусом.
 func SimKey(win H, key uint32, mods uint8) {
 	n := nodes[win]
@@ -250,11 +250,18 @@ func SimKey(win H, key uint32, mods uint8) {
 		send(msg(), C.NUI_WM_KEY, uintptr(vk)|uintptr(mods)<<16, uintptrOf(n.hwnd)) != 0 {
 		return
 	}
-	if mods&ModCtrl != 0 && (key == KeyTab || key == KeyPageUp || key == KeyPageDown) { // tabs_key
-		back := key == KeyPageUp || key == KeyTab && mods&ModShift != 0
-		if send(msg(), C.NUI_WM_TABSKEY, uintptr(b2i(back)), uintptrOf(C.GetFocus())) != 0 {
-			return
+	// nav_key: Ctrl+Tab, Ctrl+PgUp/PgDn — вкладки; стрелки на варианте переключателя.
+	nav, how := false, uintptr(0)
+	switch {
+	case mods&ModCtrl != 0 && (key == KeyTab || key == KeyPageUp || key == KeyPageDown):
+		nav, how = true, uintptr(b2i(key == KeyPageUp || key == KeyTab && mods&ModShift != 0))
+	case mods&ModCtrl == 0 && key >= KeyLeft && key <= KeyDown:
+		if _, f := nodeOf(C.GetFocus()); f != nil && f.kind == kRadioItem {
+			nav, how = true, 2|uintptr(b2i(key == KeyLeft || key == KeyUp))
 		}
+	}
+	if nav && send(msg(), C.NUI_WM_NAVKEY, how, uintptrOf(C.GetFocus())) != 0 {
+		return
 	}
 	ch := key
 	switch {
@@ -385,6 +392,9 @@ func ContextMenuOwner(win H, x, y int) H {
 	}
 	return Nil
 }
+
+// SimRadioSelect — щелчок по варианту i переключателя: BN_CLICKED, как от кнопки.
+func SimRadioSelect(h H, i int) { notifyParent(nodes[nodes[h].kids[i]], C.NUI_BN_CLICKED) }
 
 // SimTabsSelect — пользователь щёлкнул ярлык страницы i.
 func SimTabsSelect(h H, i int) {

@@ -100,8 +100,12 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			return core.Dispatch(core.UD(n.id, core.EvKey), wp), true
 		}
 		return 0, true
-	case C.NUI_WM_TABSKEY: // Ctrl+Tab, Ctrl+PgDn…: ответ 1 — фокус во вкладках, переключено
-		return uintptr(b2i(tabsHooks.key != nil && tabsHooks.key(hwndOf(lp), wp != 0))), true
+	case C.NUI_WM_NAVKEY: // nav_key: Ctrl+Tab… во вкладках, стрелки на переключателе; 1 — обработано
+		f, back := hwndOf(lp), wp&1 != 0
+		if wp&2 != 0 {
+			return uintptr(b2i(radioHooks.key != nil && radioHooks.key(f, back))), true
+		}
+		return uintptr(b2i(tabsHooks.key != nil && tabsHooks.key(f, back))), true
 	case C.NUI_WM_LISTSEL: // выделение в списке снято — сообщить, если новое не появилось
 		if _, n := nodeOf(hwndOf(lp)); n != nil {
 			emit(n, core.EvChange)
@@ -196,7 +200,7 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 
 // notify — WM_COMMAND от контрола (driver-win32.md, §4).
 func notify(ctl C.HWND, code uint32) {
-	_, c := nodeOf(ctl)
+	h, c := nodeOf(ctl)
 	if c == nil {
 		return
 	}
@@ -205,6 +209,8 @@ func notify(ctl C.HWND, code uint32) {
 		emit(c, core.EvClick)
 	case c.kind == kCheck && code == C.NUI_BN_CLICKED:
 		emit(c, core.EvChange)
+	case c.kind == kRadioItem && code == C.NUI_BN_CLICKED: // и щелчок, и фокус на невыбранном
+		radioHooks.clicked(h)
 	case (c.kind == kEntry || c.kind == kText) && code == C.NUI_EN_CHANGE:
 		emit(c, core.EvChange)
 	case c.kind == kCombo && (code == C.NUI_CBN_SELCHANGE || code == C.NUI_CBN_EDITCHANGE):

@@ -180,6 +180,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
 - `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- `Radio` — переключатель: `NewRadio`, `SetSelected`, `SetHorizontal`, `OnChange` ([api.md](api.md), §9), [отчёт](reports/radio.md);
 - `Tabs` — вкладки: `NewTabs`, `Add`, `Remove`, `SetCurrent`, `OnChange` ([api.md](api.md), §15), [отчёт](reports/tabs.md);
 - контекстное меню: `SetContextMenu` у виджетов, окна и чата ([api.md](api.md), §4, §5), [отчёт](reports/context.md);
 - `Split` — две панели с границей, которую двигают мышью: `HSplit`, `VSplit` ([api.md](api.md), §15), [отчёт](reports/split.md);

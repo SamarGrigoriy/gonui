@@ -73,6 +73,7 @@ nui/
 ├── canvas.go                Canvas, Painter, MouseEvent
 ├── split.go                 Split, HSplit, VSplit
 ├── tabs.go                  Tabs — вкладки
+├── radio.go                 Radio — переключатель
 ├── args.go                  Args — аргументы командной строки
 ├── nui_gui_test.go          интеграционные тесты            //go:build gui
 │
@@ -108,6 +109,7 @@ nui/
 │   ├── canvas_linux.go      CanvasNew, Paint*, MouseDecode (cairo)
 │   ├── split_linux.go       SplitNew, SplitSet, SplitSetPosition (GtkPaned)
 │   ├── tabs_linux.go        TabsNew, TabsAdd, TabsSetCurrent … (GtkNotebook)
+│   ├── radio_linux.go       RadioNew, RadioAdd, RadioSelected … (GtkRadioButton)
 │   ├── args_linux.go        Args (/proc/self/cmdline)
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)

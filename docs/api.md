@@ -354,7 +354,7 @@ func NewEntry() *Entry
 
 ---
 
-## 9. Check — флажок
+## 9. Check — флажок, Radio — переключатель
 
 ```go
 func NewCheck(text string) *Check
@@ -364,6 +364,29 @@ func NewCheck(text string) *Check
 | `SetChecked(on bool)`, `Checked() bool` | состояние |
 | `SetText(s)`, `Text() string` | подпись |
 | `OnChange(fn func())` | пользователь переключил флажок |
+
+```go
+func NewRadio(items ...string) *Radio // варианты в столбик; выбран первый
+```
+Несколько вариантов, выбран ровно один: «Быстро / Качественно», формат файла.
+
+| Метод | Семантика |
+|---|---|
+| `Add(text string)` | вариант в конец; первый добавленный становится выбранным |
+| `Len() int`, `Item(i int) string` | варианты (копия на стороне Go) |
+| `Selected() int`, `SetSelected(i int)` | номер выбранного; −1 — вариантов нет. Вне диапазона `SetSelected` ничего не делает: «ничего не выбрано» не бывает |
+| `SetHorizontal(on bool)` | варианты в ряд (промежуток 12) или в столбик (6, по умолчанию) |
+| `Focus()` | фокус на выбранный вариант |
+| `OnChange(fn func())` | пользователь выбрал другой вариант |
+
+- Выбирают щелчком или стрелками: стрелка выбирает соседний вариант, у края группы — ничего, как в GTK. Tab попадает на выбранный вариант.
+- `SetSelected` и `Add` не вызывают `OnChange` (ADR-8). Окно растёт, если ряд вариантов шире него.
+
+```go
+format := nui.NewRadio("PNG", "JPEG", "WebP")
+format.SetHorizontal(true)
+format.OnChange(func() { ext = format.Item(format.Selected()) })
+```
 
 ---
 

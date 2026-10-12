@@ -518,6 +518,45 @@ GtkWidget *nui_tabs_new(uintptr_t ud) {
 	return nb;
 }
 
+/* ---------- Переключатель (Radio): GtkRadioButton одной группы в GtkBox ----------
+   toggled приходит и кнопке, которая выключилась, и той, что включилась: EvChange — только
+   от включившейся. */
+
+static void radio_toggled(GtkToggleButton *b, gpointer ud) {
+	if (gtk_toggle_button_get_active(b))
+		nuiSignal(b, (uintptr_t)ud);
+}
+
+/* Первая кнопка ряда — член группы для следующих; первая сразу включена. */
+void nui_radio_add(GtkBox *box, const gchar *text, uintptr_t ud) {
+	GList *kids = gtk_container_get_children((GtkContainer *)box);
+	GtkWidget *b = gtk_radio_button_new_with_label_from_widget(kids ? (GtkRadioButton *)kids->data : 0, text);
+	g_list_free(kids);
+	gtk_widget_show(b);
+	gtk_box_pack_start(box, b, 0, 0, 0);
+	g_signal_connect_data(b, "toggled", (GCallback)radio_toggled, (gpointer)ud, 0, 0);
+}
+
+GtkWidget *nui_radio_nth(GtkBox *box, int i) {
+	GList *kids = gtk_container_get_children((GtkContainer *)box);
+	GList *l = i >= 0 ? g_list_nth(kids, (guint)i) : 0;
+	GtkWidget *b = l ? l->data : 0;
+	g_list_free(kids);
+	return b;
+}
+
+int nui_radio_selected(GtkBox *box) {
+	GList *kids = gtk_container_get_children((GtkContainer *)box);
+	int i = 0, found = -1;
+	for (GList *l = kids; l; l = l->next, i++)
+		if (gtk_toggle_button_get_active(l->data)) {
+			found = i;
+			break;
+		}
+	g_list_free(kids);
+	return found;
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная

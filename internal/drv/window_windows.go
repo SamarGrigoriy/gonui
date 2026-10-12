@@ -218,7 +218,7 @@ func windowProc(h H, n *node, m uint32, wp, lp uintptr) (uintptr, bool) {
 		C.nui_window_frame(n.hwnd, C.int(n.minClient[0]), C.int(n.minClient[1]), 0, &r[0])
 		mmi := minmaxOf(lp)
 		mmi.ptMinTrackSize.x, mmi.ptMinTrackSize.y = C.LONG(r[2]), C.LONG(r[3])
-		if n.fixed && n.sized && !n.fullscreen {
+		if n.fixed && n.sized && !n.fullscreen && !n.growing { // нерастягиваемое — но не меньше содержимого
 			var wr C.RECT
 			C.GetWindowRect(n.hwnd, &wr)
 			mmi.ptMaxTrackSize.x, mmi.ptMaxTrackSize.y = wr.right-wr.left, wr.bottom-wr.top

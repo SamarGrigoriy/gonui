@@ -37,10 +37,12 @@ const (
 	kImage
 	kList
 	kCanvas
-	kSplit    // две панели; HWND — полоса между ними (за неё тянут)
-	kTabs     // вкладки: SysTabControl32 над страницами
-	kMenu     // HMENU: строка меню или подменю
-	kMenuItem // пункт меню (в hmenu — меню, где он лежит)
+	kSplit     // две панели; HWND — полоса между ними (за неё тянут)
+	kTabs      // вкладки: SysTabControl32 над страницами
+	kRadio     // переключатель: ряд вариантов, как Box
+	kRadioItem // вариант переключателя: BUTTON BS_RADIOBUTTON
+	kMenu      // HMENU: строка меню или подменю
+	kMenuItem  // пункт меню (в hmenu — меню, где он лежит)
 )
 
 // Шрифты окна.
@@ -69,7 +71,7 @@ type node struct {
 	colGap     int // Grid
 	rowGap     int
 
-	text                 string   // исходный текст: Label, Button, Check, Frame
+	text                 string   // исходный текст: Label, Button, Check, Frame, вариант Radio
 	tooltip              string   // SetTooltip
 	fg, bg               uint32   // SetForeground, SetBackground: 0xRRGGBB; noColor — цвет темы (ADR-19)
 	font                 C.HFONT  // свой шрифт подписи (SetFontScale), удаляется вместе с узлом
@@ -146,6 +148,7 @@ type node struct {
 	reorder    bool // поменялась структура — восстановить Z-порядок (он же порядок Tab)
 	fixed      bool // нерастягиваемое окно
 	sized      bool // окно уже получило начальный размер
+	growing    bool // окно растёт под минимум содержимого (relayout)
 	reqW, reqH int  // последний SetSize, логические пиксели; 0 — не задан
 	defBtn     H
 	tip        C.HWND // окно подсказок (tooltips_class32), создаётся при первой подсказке
@@ -170,6 +173,12 @@ var tabsHooks struct {
 	visibility func(h, page H)
 	clicked    func(h H)
 	key        func(focus C.HWND, back bool) bool
+}
+
+// radioHooks — то же для переключателя; задаёт RadioNew.
+var radioHooks struct {
+	clicked func(item H)                       // BN_CLICKED варианта
+	key     func(focus C.HWND, back bool) bool // стрелка на варианте
 }
 
 var (
@@ -414,6 +423,18 @@ func relayout(wh H) {
 	w.minClient = [2]int{root.lay.Min.W + 2*p, root.lay.Min.H + 2*p}
 	var cs [2]C.int
 	C.nui_client_size(w.hwnd, &cs[0])
+	// Как в GTK: показанное окно не меньше содержимого — растёт вслед за его минимумом
+	// (новые виджеты, SetMinSize, Radio в ряд); место на экране прежнее. WM_SIZE от
+	// SetWindowPos раскладывает окно внутри (growing — без повторного роста).
+	if gw, gh := max(int(cs[0]), w.minClient[0]), max(int(cs[1]), w.minClient[1]); w.sized && !w.growing &&
+		!w.fullscreen && C.IsZoomed(w.hwnd) == 0 && (gw > int(cs[0]) || gh > int(cs[1])) {
+		var r [4]C.int
+		C.nui_window_frame(w.hwnd, C.int(gw), C.int(gh), 0, &r[0])
+		w.growing = true
+		C.SetWindowPos(w.hwnd, nil, r[0], r[1], r[2], r[3], C.NUI_SWP_NOZORDER|C.NUI_SWP_NOACTIVATE)
+		w.growing = false
+		C.nui_client_size(w.hwnd, &cs[0])
+	}
 	layout.Arrange(&root.lay, layout.Rect{X: p, Y: p, W: max(1, int(cs[0])-2*p), H: max(1, int(cs[1])-2*p)})
 	place(w, firstKid(w), 0, 0, false)
 	if w.panels || w.bg != noColor { // цветные зоны переехали — перерисовать фон
@@ -480,6 +501,8 @@ func prepare(w *node, h H) {
 		l.Min, l.Nat, l.Expand = layout.Size{}, layout.Size{}, true
 	case kSplit: // как ряд с промежутком-полосой; панели расставляет placeSplit
 		l.Spacing, l.Padding = w.px(splitGap), 0
+	case kRadio:
+		l.Spacing = w.px(n.spacing)
 	case kTabs:
 		tabsHooks.measure(w, n)
 		w.panels = true // область страниц рисует хост (eraseBackground)
@@ -662,14 +685,14 @@ func measureLeaf(w *node, n *node) {
 			l.Min.W += w.px(4)
 			l.Nat.W += w.px(4)
 		}
-	case kButton, kCheck:
+	case kButton, kCheck, kRadioItem:
 		var out [2]C.int
 		C.nui_ideal_size(n.hwnd, &out[0])
 		bw, bh := int(out[0]), int(out[1])
 		if bw <= 0 || bh <= 0 { // нет BCM_GETIDEALSIZE (comctl32 v5)
 			tw, th := textSize(n, amp(n.text), 0)
 			bw, bh = tw+w.px(16), max(th+w.px(10), field)
-			if n.kind == kCheck {
+			if n.kind != kButton {
 				bw, bh = tw+w.px(20), max(th, w.px(13))
 			}
 		}
