@@ -133,6 +133,10 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 				return r, true
 			}
 		}
+	case C.NUI_WM_CONTEXTMENU: // правый щелчок, клавиша «Меню», Shift+F10
+		if contextMenu(hwndOf(wp), lp) {
+			return 0, true
+		}
 	case C.NUI_WM_NOTIFY:
 		if _, c := nodeOf(nmhdrOf(lp).hwndFrom); c != nil && c.kind == kList {
 			return listNotify(c, lp), true

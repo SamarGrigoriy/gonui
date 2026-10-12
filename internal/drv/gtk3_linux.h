@@ -22,7 +22,7 @@ typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnect
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
             GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags,
             GtkStateFlags, GtkTextWindowType, PangoWrapMode, GtkDestDefaults, GdkDragAction,
-            GdkModifierType, GdkEventType, GdkScrollDirection, GdkEventMask;
+            GdkModifierType, GdkEventType, GdkScrollDirection, GdkEventMask, GdkGravity;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -123,7 +123,8 @@ typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
 /* Одним объявлением: cgo TinyGo не видит полей структуры, описанной после typedef. */
 typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
-typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned;
+typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned; typedef struct _GtkMenu GtkMenu;
+typedef void (*GtkMenuDetachFunc)(GtkWidget *attach_widget, GtkMenu *menu);
 typedef struct _GtkMenuShell GtkMenuShell; typedef struct _GtkMenuItem GtkMenuItem;
 typedef struct _GtkCheckMenuItem GtkCheckMenuItem; typedef struct _GtkAccelLabel GtkAccelLabel;
 typedef struct _GtkTreeView GtkTreeView;   typedef struct _GtkTreeSelection GtkTreeSelection;
@@ -337,10 +338,10 @@ NUI_FN(void, gtk_widget_get_allocation, (GtkWidget *widget, GtkAllocation *alloc
 NUI_FN(void, gtk_widget_get_preferred_width, (GtkWidget *widget, gint *minimum_width, gint *natural_width))     /* тесты */
 NUI_FN(void, gtk_widget_get_preferred_height, (GtkWidget *widget, gint *minimum_height, gint *natural_height))
 NUI_FN(gboolean, gtk_widget_translate_coordinates, (GtkWidget *src_widget, GtkWidget *dest_widget,
-       gint src_x, gint src_y, gint *dest_x, gint *dest_y))                                                     /* тесты */
-NUI_FN(GtkWidget *, gtk_widget_get_toplevel, (GtkWidget *widget))                                              /* тесты */
+       gint src_x, gint src_y, gint *dest_x, gint *dest_y))
+NUI_FN(GtkWidget *, gtk_widget_get_toplevel, (GtkWidget *widget))
 NUI_FN(GdkWindow *, gtk_widget_get_window, (GtkWidget *widget))                                                /* тесты */
-NUI_FN(gint, gdk_window_get_origin, (GdkWindow *window, gint *x, gint *y))                                     /* тесты */
+NUI_FN(gint, gdk_window_get_origin, (GdkWindow *window, gint *x, gint *y))
 NUI_FN(void, gtk_container_add, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_remove, (GtkContainer *container, GtkWidget *widget))
 NUI_FN(void, gtk_container_set_border_width, (GtkContainer *container, guint border_width))
@@ -434,6 +435,16 @@ NUI_FN(GdkDevice *, gdk_seat_get_pointer, (GdkSeat *seat))                      
 NUI_FN(GdkPixbuf *, gdk_pixbuf_get_from_window, (GdkWindow *window, gint src_x, gint src_y, gint width, gint height)) /* тесты */
 NUI_FN(guchar *, gdk_pixbuf_get_pixels, (const GdkPixbuf *pixbuf))                           /* тесты */
 NUI_FN(gboolean, gtk_widget_event, (GtkWidget *widget, GdkEvent *event))                     /* тесты */
+/* Контекстное меню */
+NUI_FN(void, gtk_menu_attach_to_widget, (GtkMenu *menu, GtkWidget *attach_widget, GtkMenuDetachFunc detacher)) /* (w) */
+NUI_FN_CONST(GType, gtk_scrolled_window_get_type)                                          /* (w) */
+NUI_FN(void, gtk_menu_popup_at_pointer, (GtkMenu *menu, const GdkEvent *trigger_event))            /* (w) */
+NUI_FN(void, gtk_menu_popup_at_widget, (GtkMenu *menu, GtkWidget *widget, GdkGravity widget_anchor,
+       GdkGravity menu_anchor, const GdkEvent *trigger_event))                                    /* (w) */
+NUI_FN(void, gtk_menu_popdown, (GtkMenu *menu))                                                    /* тесты */
+NUI_FN(gboolean, gtk_widget_is_toplevel, (GtkWidget *widget))                                       /* (w) */
+NUI_FN(gboolean, gtk_tree_view_get_path_at_pos, (GtkTreeView *tree_view, gint x, gint y, GtkTreePath **path,
+       GtkTreeViewColumn **column, gint *cell_x, gint *cell_y))                                   /* (w) */
 /* Split: GtkPaned */
 NUI_FN(GtkWidget *, gtk_paned_new, (GtkOrientation orientation))
 NUI_FN(void, gtk_paned_pack1, (GtkPaned *paned, GtkWidget *child, gboolean resize, gboolean shrink))
@@ -706,6 +717,8 @@ int    nui_mouse_decode(GdkEvent *e, double xy[2], int info[3]); /* вид; info
 void   nui_sim_mouse(GtkWidget *w, int type, double x, double y, unsigned button, unsigned state); /* только с NUI_GUI_TEST */
 GtkWidget *nui_window_menubar(GtkWindow *w);
 GtkContainer *nui_window_content(GtkWindow *w);
+void   nui_ctx_set(GtkWidget *w, GtkWidget *menu);
+GtkWidget *nui_ctx_owner_at(GtkWidget *top, int x, int y); /* только с NUI_GUI_TEST: чьё меню у точки окна */
 void   nui_window_menubar_resize(GtkWindow *w);
 GtkWidget *nui_image_new(void);
 GtkWidget *nui_list_new(GtkWidget **view, uintptr_t activate_ud);

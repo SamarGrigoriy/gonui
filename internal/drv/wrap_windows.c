@@ -882,6 +882,25 @@ void nui_paint_text_size(NuiPaint *p, LPCWSTR s, int len, float out[2]) {
 
 HCURSOR nui_cursor(int id) { return LoadCursorW(0, RES(id)); }
 
+// У EDIT своё контекстное меню («Отменить, Вырезать…»), и WM_CONTEXTMENU дальше он не
+// пускает. Если у поля есть меню nui — поле подклассируется и отдаёт сообщение родителю.
+static LRESULT ctx_proc(HWND h, UINT m, WPARAM wp, LPARAM lp) {
+	WNDPROC old = (WNDPROC)GetPropW(h, L"nuiCtxProc");
+	if (m == NUI_WM_CONTEXTMENU)
+		return SendMessageW(GetParent(h), m, (WPARAM)h, lp);
+	return CallWindowProcW(old, h, m, wp, lp);
+}
+
+void nui_ctx_forward(HWND h, int on) {
+	WNDPROC old = (WNDPROC)GetPropW(h, L"nuiCtxProc");
+	if (on && !old)
+		SetPropW(h, L"nuiCtxProc", (HANDLE)SetWindowLongPtrW(h, NUI_GWLP_WNDPROC, (LONG_PTR)ctx_proc));
+	else if (!on && old) {
+		SetWindowLongPtrW(h, NUI_GWLP_WNDPROC, (LONG_PTR)old);
+		RemovePropW(h, L"nuiCtxProc");
+	}
+}
+
 // --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---
 
 void nui_list_column(HWND lv, int index, LPCWSTR title) {

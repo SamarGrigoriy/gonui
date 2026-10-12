@@ -34,12 +34,17 @@ func allocCmd() uint16 {
 	return nextCmd - 1
 }
 
-// menuNode — новый узел меню окна win.
-func menuNode(win H, kind uint8, id uint32) (H, *node) {
+// menuNode — новый узел меню владельца owner: окна (строка меню) или виджета (ctx —
+// контекстное меню). Узлы уничтожаются вместе с ним.
+func menuNode(owner H, ctx bool, kind uint8, id uint32) (H, *node) {
 	h, n := newNode(kind, id)
-	n.win = win
-	w := nodes[win]
-	w.menuNodes = append(w.menuNodes, h)
+	n.win, n.ctx = owner, ctx
+	o := nodes[owner]
+	if ctx {
+		o.ctxNodes = append(o.ctxNodes, h)
+	} else {
+		o.menuNodes = append(o.menuNodes, h)
+	}
 	return h, n
 }
 
@@ -49,7 +54,7 @@ func MenuBar(win H) H {
 	w := nodes[win]
 	C.nui_client_size(w.hwnd, &w.menuKeep[0]) // до того, как прежняя строка снята с окна
 	removeBar(win)
-	h, n := menuNode(win, kMenu, 0)
+	h, n := menuNode(win, false, kMenu, 0)
 	n.hmenu = C.CreateMenu()
 	nodes[win].menuBar = h
 	return h
@@ -78,9 +83,23 @@ func removeBar(win H) {
 	C.DestroyMenu(old) // вместе с подменю
 }
 
-// dropMenuNodes — EvDestroy пунктам меню окна; команды и узлы — обратно (и в destroyTree окна).
+// dropMenuNodes — EvDestroy пунктам строки меню окна; команды и узлы — обратно.
 func dropMenuNodes(w *node) {
-	for _, h := range w.menuNodes {
+	dropNodes(w.menuNodes)
+	w.menuNodes, w.menuBar = nil, Nil
+}
+
+// dropContextMenu — контекстное меню узла: HMENU и узлы пунктов.
+func dropContextMenu(o *node) {
+	if m := get(o.ctxMenu); m != nil {
+		C.DestroyMenu(m.hmenu)
+	}
+	dropNodes(o.ctxNodes)
+	o.ctxNodes, o.ctxMenu = nil, Nil
+}
+
+func dropNodes(list []H) {
+	for _, h := range list {
 		n := get(h)
 		if n == nil {
 			continue
@@ -95,7 +114,6 @@ func dropMenuNodes(w *node) {
 		nodes[h] = nil
 		freeList = append(freeList, h)
 	}
-	w.menuNodes, w.menuBar = nil, Nil
 }
 
 // MenuSub — пункт с подменю в parent: item — пункт (по позиции), menu — подменю.
@@ -104,9 +122,9 @@ func MenuSub(parent H, id uint32, title string) (item, menu H) {
 	popup := C.CreatePopupMenu()
 	pos := int(C.GetMenuItemCount(p.hmenu))
 	C.AppendMenuW(p.hmenu, C.NUI_MF_POPUP, C.UINT_PTR(uintptr(unsafe.Pointer(popup))), wstr(amp(title)))
-	item, it := menuNode(p.win, kMenuItem, id)
+	item, it := menuNode(p.win, p.ctx, kMenuItem, id)
 	it.hmenu, it.pos = p.hmenu, pos
-	menu, m := menuNode(p.win, kMenu, 0)
+	menu, m := menuNode(p.win, p.ctx, kMenu, 0)
 	m.hmenu = popup
 	return item, menu
 }
@@ -114,7 +132,7 @@ func MenuSub(parent H, id uint32, title string) (item, menu H) {
 // MenuItemNew — пункт с командой; check — с флажком (его переключает menuCommand).
 func MenuItemNew(menu H, id uint32, check bool, text string, key uint32, mods uint8) H {
 	p := nodes[menu]
-	h, n := menuNode(p.win, kMenuItem, id)
+	h, n := menuNode(p.win, p.ctx, kMenuItem, id)
 	n.hmenu, n.cmd, n.editable = p.hmenu, allocCmd(), check
 	menuCmds[n.cmd] = h
 	C.AppendMenuW(p.hmenu, C.NUI_MF_STRING, C.UINT_PTR(n.cmd), wstr(menuText(text, key, mods)))
@@ -209,3 +227,95 @@ func MenuItemSetText(h H, text string, key uint32, mods uint8) {
 
 // WindowSetPadding — отступ окна: у Win32 меню вне клиентской области, ничего особого.
 func WindowSetPadding(h H, px int) { SetPadding(h, px) }
+
+// ContextMenu — новое пустое контекстное меню узла (прежнее уничтожается).
+func ContextMenu(owner H) H {
+	o := nodes[owner]
+	dropContextMenu(o)
+	h, n := menuNode(owner, true, kMenu, 0)
+	n.hmenu = C.CreatePopupMenu()
+	o.ctxMenu = h
+	ctxForward(o)
+	return h
+}
+
+func ContextMenuDone(owner H, menu H) {}
+
+func ContextMenuRemove(owner H) {
+	o := nodes[owner]
+	dropContextMenu(o)
+	ctxForward(o)
+}
+
+// ctxForward — у полей ввода (EDIT) своё меню: с меню nui поле отдаёт WM_CONTEXTMENU
+// родителю. Пересозданное поле (TextView.SetWrap) — заново.
+func ctxForward(o *node) {
+	if o.hwnd != nil && (o.kind == kEntry || o.kind == kText) {
+		C.nui_ctx_forward(o.hwnd, b2i(o.ctxMenu != Nil))
+	}
+}
+
+// contextMenu — WM_CONTEXTMENU: target — окно под указателем (контрол или хост: окно,
+// прокрутка), lp — точка на экране или −1 (клавиатура). Меню — у узла под указателем или
+// ближайшего выше; true — меню показано.
+func contextMenu(target C.HWND, lp uintptr) bool {
+	th, t := nodeOf(target)
+	if t == nil {
+		return false
+	}
+	keyboard := uint32(lp) == 0xFFFFFFFF
+	var pt C.POINT
+	if keyboard { // по клавише — у левого нижнего угла виджета
+		var r C.RECT
+		C.GetWindowRect(target, &r)
+		pt = C.POINT{r.left, r.bottom}
+	} else {
+		pt = C.POINT{C.LONG(int16(lp)), C.LONG(int16(lp >> 16))}
+	}
+	at := th
+	if !keyboard && (t.kind == kWindow || t.kind == kScroll) { // фон хоста: узел под точкой
+		cp := pt
+		C.ScreenToClient(target, &cp)
+		at = nodeAt(th, int(cp.x), int(cp.y))
+	}
+	for h := at; h != Nil; h = nodes[h].parent {
+		if m := get(nodes[h].ctxMenu); m != nil {
+			top := C.GetAncestor(target, C.NUI_GA_ROOT)
+			cmd := C.TrackPopupMenu(m.hmenu, C.NUI_TPM_RETURNCMD|C.NUI_TPM_RIGHTBUTTON|C.NUI_TPM_NONOTIFY,
+				C.int(pt.x), C.int(pt.y), 0, top, nil)
+			if cmd != 0 {
+				menuCommand(uint16(cmd))
+			}
+			return true
+		}
+		if nodes[h].kind == kWindow {
+			break
+		}
+	}
+	return false
+}
+
+// nodeAt — самый глубокий узел хоста host под точкой его клиентской области. У детей
+// прокрутки координаты — от начала содержимого (placeScroll).
+func nodeAt(host H, x, y int) H {
+	hn := nodes[host]
+	if hn.kind == kScroll {
+		x += hn.lay.Out.X + hn.scrollX
+		y += hn.lay.Out.Y + hn.scrollY
+	}
+	cur := host
+	for {
+		next := Nil
+		for _, k := range nodes[cur].kids {
+			kn := nodes[k]
+			o := kn.lay.Out
+			if !kn.hidden && kn.kind != kScroll && x >= o.X && x < o.X+o.W && y >= o.Y && y < o.Y+o.H {
+				next = k
+			}
+		}
+		if next == Nil {
+			return cur
+		}
+		cur = next
+	}
+}

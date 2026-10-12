@@ -69,7 +69,7 @@ nui/
 ├── shell.go                 OpenURI, ShowInFolder
 ├── clipboard.go             SetClipboard, Clipboard
 ├── key.go                   Key, Mod — для Window.OnKey
-├── menu.go                  Menu, MenuItem, Window.SetMenu
+├── menu.go                  Menu, MenuItem, Window.SetMenu, SetContextMenu
 ├── canvas.go                Canvas, Painter, MouseEvent
 ├── split.go                 Split, HSplit, VSplit
 ├── args.go                  Args — аргументы командной строки

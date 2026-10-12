@@ -363,6 +363,130 @@ int nui_mouse_decode(GdkEvent *e, double xy[2], int info[3]) {
 	return kind;
 }
 
+/* ---------- Контекстное меню ----------
+   Меню виджета — GtkMenu в его данных "nui-ctx", прикреплено к нему (уничтожится с ним).
+   Виджеты со своим окном событий (поля, список, холст) ловят правый щелчок сами — раньше
+   своего обычного меню. У подписей и рядов в GTK3 окна нет: щелчок доходит до окна
+   верхнего уровня, и оно ищет самый глубокий виджет под указателем. Меню берётся у него
+   или у ближайшего контейнера выше. */
+
+static GtkWidget *ctx_find(GtkWidget *w) {
+	for (; w; w = gtk_widget_get_parent(w))
+		if (g_object_get_data((GObject *)w, "nui-ctx"))
+			return w;
+	return 0;
+}
+
+static gboolean ctx_popup(GtkWidget *owner, GdkEvent *e) {
+	GtkMenu *m = owner ? g_object_get_data((GObject *)owner, "nui-ctx") : 0;
+	if (!m)
+		return 0;
+	if (e)
+		gtk_menu_popup_at_pointer(m, e);
+	else
+		gtk_menu_popup_at_widget(m, owner, 7 /* SOUTH_WEST */, 1 /* NORTH_WEST */, 0);
+	return 1;
+}
+
+typedef struct {
+	GtkWidget *top;
+	int x, y;
+	GtkWidget *hit;
+} CtxPick;
+
+static void ctx_pick(GtkWidget *w, gpointer data) {
+	CtxPick *p = data;
+	GtkAllocation a;
+	int x, y;
+	if (!gtk_widget_get_mapped(w) || !gtk_widget_translate_coordinates(p->top, w, p->x, p->y, &x, &y))
+		return;
+	gtk_widget_get_allocation(w, &a);
+	if (x < 0 || y < 0 || x >= a.width || y >= a.height)
+		return;
+	p->hit = w; /* глубже — точнее */
+	if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_container_get_type()))
+		gtk_container_forall((GtkContainer *)w, ctx_pick, data);
+}
+
+/* Владелец меню у точки (x, y) окна top: самый глубокий виджет под ней или контейнер выше. */
+GtkWidget *nui_ctx_owner_at(GtkWidget *top, int x, int y) {
+	CtxPick p = {top, x, y, 0};
+	gtk_container_forall((GtkContainer *)top, ctx_pick, &p);
+	return ctx_find(p.hit ? p.hit : top);
+}
+
+static gboolean ctx_window_press(GtkWidget *top, GdkEventButton *e, gpointer d) {
+	(void)d;
+	if ((int)e->type != NUI_GDK_BUTTON_PRESS || e->button != 3)
+		return 0;
+	int ox = 0, oy = 0;
+	gdk_window_get_origin(gtk_widget_get_window(top), &ox, &oy);
+	return ctx_popup(nui_ctx_owner_at(top, (int)e->x_root - ox, (int)e->y_root - oy), (GdkEvent *)e);
+}
+
+/* Правый щелчок по виджету со своим окном событий. В списке сначала выбирается строка
+   под указателем — как в файловых менеджерах. */
+static gboolean ctx_press(GtkWidget *w, GdkEventButton *e, gpointer d) {
+	(void)d;
+	if ((int)e->type != NUI_GDK_BUTTON_PRESS || e->button != 3)
+		return 0;
+	if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_tree_view_get_type())) {
+		GtkTreePath *p = 0;
+		if (gtk_tree_view_get_path_at_pos((GtkTreeView *)w, (int)e->x, (int)e->y, &p, 0, 0, 0) && p) {
+			gtk_tree_view_set_cursor((GtkTreeView *)w, p, 0, 0);
+			gtk_tree_path_free(p);
+		}
+	}
+	return ctx_popup(ctx_find(w), (GdkEvent *)e);
+}
+
+/* Клавиша «Меню» или Shift+F10 у виджета в фокусе. */
+static gboolean ctx_key(GtkWidget *w, gpointer d) {
+	(void)d;
+	return ctx_popup(ctx_find(w), 0);
+}
+
+static void ctx_anchor(GtkWidget *w, GtkWidget *prev, gpointer d) {
+	(void)prev;
+	(void)d;
+	GtkWidget *top = gtk_widget_get_toplevel(w);
+	if (!gtk_widget_is_toplevel(top) || g_object_get_data((GObject *)top, "nui-ctx-top"))
+		return;
+	g_object_set_data_full((GObject *)top, "nui-ctx-top", (gpointer)1, 0);
+	g_signal_connect_data(top, "button-press-event", (GCallback)ctx_window_press, 0, 0, 0);
+}
+
+static void ctx_hook(GtkWidget *w) {
+	g_signal_connect_data(w, "button-press-event", (GCallback)ctx_press, 0, 0, 0);
+	g_signal_connect_data(w, "popup-menu", (GCallback)ctx_key, 0, 0, 0);
+}
+
+/* menu == 0 — убрать меню. */
+void nui_ctx_set(GtkWidget *w, GtkWidget *menu) {
+	GtkWidget *old = g_object_get_data((GObject *)w, "nui-ctx");
+	g_object_set_data_full((GObject *)w, "nui-ctx", menu, 0);
+	if (old)
+		gtk_widget_destroy(old);
+	if (!menu)
+		return;
+	gtk_menu_attach_to_widget((GtkMenu *)menu, w, 0);
+	if (g_object_get_data((GObject *)w, "nui-ctx-hooked"))
+		return;
+	g_object_set_data_full((GObject *)w, "nui-ctx-hooked", (gpointer)1, 0);
+	if (gtk_widget_is_toplevel(w)) {
+		ctx_anchor(w, 0, 0);
+		return;
+	}
+	ctx_hook(w);
+	if (g_type_check_instance_is_a((GTypeInstance *)w, gtk_scrolled_window_get_type())) {
+		GtkWidget *inner = gtk_bin_get_child((GtkBin *)w); /* TextView, List: события — у них */
+		if (inner)
+			ctx_hook(inner);
+	}
+	g_signal_connect_data(w, "hierarchy-changed", (GCallback)ctx_anchor, 0, 0, 0);
+	ctx_anchor(w, 0, 0);
+}
+
 /* ---------- Картинка (Image) ----------
    Закодированные байты хранятся у виджета: при смене масштаба экрана (scale-factor)
    картинка перерисовывается из них и остаётся чёткой. src — только что декодированная

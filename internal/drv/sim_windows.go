@@ -285,9 +285,14 @@ func SimDropFiles(win H, id uint32, paths []string) {
 // DefaultButton — кнопка по умолчанию окна; Nil — нет.
 func DefaultButton(win H) H { return nodes[win].defBtn }
 
-// SimMenuActivate — пункт меню выбран мышью: WM_COMMAND окну.
+// SimMenuActivate — пункт меню выбран мышью: строки меню — WM_COMMAND окну, контекстного —
+// команда, как её возвращает TrackPopupMenu.
 func SimMenuActivate(item H) {
 	n := nodes[item]
+	if n.ctx {
+		menuCommand(n.cmd)
+		return
+	}
 	send(nodes[n.win].hwnd, C.NUI_WM_COMMAND, uintptr(n.cmd), 0)
 }
 
@@ -357,4 +362,20 @@ func SimSplitDrag(h H, delta int) {
 	}
 	send(n.hwnd, C.NUI_WM_MOUSEMOVE, 1, 0)
 	send(n.hwnd, C.NUI_WM_LBUTTONUP, 0, 0)
+}
+
+// ContextMenuOwner — чьё контекстное меню откроется правым щелчком в точке (x, y)
+// клиентской области окна win (логические пиксели); Nil — ничьё. Тот же поиск, что у
+// WM_CONTEXTMENU по фону окна.
+func ContextMenuOwner(win H, x, y int) H {
+	w := nodes[win]
+	for h := nodeAt(win, w.px(x), w.px(y)); h != Nil; h = nodes[h].parent {
+		if nodes[h].ctxMenu != Nil {
+			return h
+		}
+		if nodes[h].kind == kWindow {
+			break
+		}
+	}
+	return Nil
 }

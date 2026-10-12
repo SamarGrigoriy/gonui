@@ -116,6 +116,9 @@ type node struct {
 	pos       int      // позиция пункта с подменю в hmenu
 	menuBar   H        // окно: строка меню (kMenu)
 	menuNodes []H      // окно: все узлы меню — уничтожаются вместе с окном или строкой
+	ctxMenu   H        // контекстное меню узла (kMenu); Nil — нет
+	ctxNodes  []H      // его узлы — уничтожаются вместе с узлом
+	ctx       bool     // узел меню: часть контекстного меню (а не строки меню окна)
 	menuKeep  [2]C.int // окно: клиентская область до смены меню (её и сохраняем)
 
 	// Split
@@ -306,6 +309,9 @@ func destroyTree(h H, hwndToo bool) {
 	}
 	if n.kind == kImage {
 		freeImage(n)
+	}
+	if n.ctxMenu != Nil {
+		dropContextMenu(n)
 	}
 	if n.kind == kWindow {
 		dropMenuNodes(n)

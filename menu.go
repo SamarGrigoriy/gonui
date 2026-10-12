@@ -55,20 +55,28 @@ type MenuItem struct {
 }
 
 // Item — пункт: fn вызывается, когда его выбирают (мышью, с клавиатуры или сочетанием).
-func Item(text string, fn func()) *MenuItem { return &MenuItem{kind: itemPlain, text: text, fn: fn} }
+func Item(text string, fn func()) *MenuItem {
+	contextMenuHook = setContextMenu
+	return &MenuItem{kind: itemPlain, text: text, fn: fn}
+}
 
 // CheckItem — пункт с флажком: выбор переключает флажок и вызывает fn с новым состоянием.
 func CheckItem(text string, fn func(on bool)) *MenuItem {
+	contextMenuHook = setContextMenu
 	return &MenuItem{kind: itemCheck, text: text, onToggle: fn}
 }
 
 // SubMenu — пункт, открывающий вложенное меню.
 func SubMenu(title string, items ...*MenuItem) *MenuItem {
+	contextMenuHook = setContextMenu
 	return &MenuItem{kind: itemSub, text: title, sub: items}
 }
 
 // Sep — разделитель.
-func Sep() *MenuItem { return &MenuItem{kind: itemSep} }
+func Sep() *MenuItem {
+	contextMenuHook = setContextMenu
+	return &MenuItem{kind: itemSep}
+}
 
 // Shortcut — сочетание клавиш: показывается в меню справа от текста и выбирает пункт,
 // пока окно активно, — раньше OnKey окна и виджета с фокусом. Буквы — по положению
@@ -174,7 +182,7 @@ func (w *Window) SetMenu(menus ...*Menu) {
 		bar := drv.MenuBar(w.h)
 		for _, m := range menus {
 			_, menu := drv.MenuSub(bar, 0, m.title)
-			w.buildMenu(menu, m.items)
+			buildMenu(menu, m.items, w)
 		}
 		drv.MenuDone(w.h)
 	}
@@ -200,8 +208,9 @@ func markUsed(items []*MenuItem) {
 	}
 }
 
-// buildMenu создаёт пункты в меню драйвера и собирает сочетания клавиш окна.
-func (w *Window) buildMenu(menu drv.H, items []*MenuItem) {
+// buildMenu создаёт пункты в меню драйвера и собирает сочетания клавиш окна w (nil —
+// контекстное меню: сочетания в нём только подписываются).
+func buildMenu(menu drv.H, items []*MenuItem, w *Window) {
 	for _, it := range items {
 		if it.kind == itemSep {
 			drv.MenuSepNew(menu)
@@ -211,10 +220,10 @@ func (w *Window) buildMenu(menu drv.H, items []*MenuItem) {
 		if it.kind == itemSub {
 			var sub drv.H
 			it.h, sub = drv.MenuSub(menu, it.id, it.text)
-			w.buildMenu(sub, it.sub)
+			buildMenu(sub, it.sub, w)
 		} else {
 			it.h = drv.MenuItemNew(menu, it.id, it.kind == itemCheck, it.text, uint32(it.key), uint8(it.mod))
-			if it.key != 0 {
+			if it.key != 0 && w != nil {
 				shortcuts[w] = append(shortcuts[w], it)
 			}
 			if it.kind == itemCheck && it.checked {
@@ -243,4 +252,39 @@ func chooseShortcut(w *Window, k Key, m Mod) bool {
 		}
 	}
 	return false
+}
+
+// SetContextMenu — меню по правому щелчку по виджету, а также по клавише «Меню» или
+// Shift+F10, когда виджет в фокусе. Без аргументов — убрать. Если у виджета под указателем
+// своего меню нет, показывается меню ближайшего контейнера выше (Box, Grid…), а затем —
+// окна (Window.SetContextMenu). У полей ввода (Entry, TextView) оно заменяет их обычное
+// меню («Вырезать, Копировать, Вставить»); в списке правый щелчок сначала выбирает строку.
+// Пункты — те же, что в меню окна; сочетания клавиш в контекстном меню только подписываются.
+func (w *widget) SetContextMenu(items ...*MenuItem) {
+	if !w.dead() && contextMenuHook != nil { // без пунктов (Item …) меню не было и нет
+		contextMenuHook(w.h, items)
+	}
+}
+
+// contextMenuHook — setContextMenu; его задают конструкторы пунктов. Прямой вызов из
+// метода widget держал бы код и описания пунктов меню в каждой программе TinyGo: методы
+// общего widget остаются у всех виджетов.
+var contextMenuHook func(owner drv.H, items []*MenuItem)
+
+// SetContextMenu — меню по правому щелчку по окну там, где у виджетов своего меню нет.
+func (w *Window) SetContextMenu(items ...*MenuItem) {
+	if !w.dead() {
+		setContextMenu(w.h, items)
+	}
+}
+
+func setContextMenu(owner drv.H, items []*MenuItem) {
+	if len(items) == 0 {
+		drv.ContextMenuRemove(owner)
+		return
+	}
+	markUsed(items)
+	menu := drv.ContextMenu(owner)
+	buildMenu(menu, items, nil)
+	drv.ContextMenuDone(owner, menu)
 }

@@ -180,6 +180,7 @@ S1 ─► S2 ─┬─(успех)───────────────�
 - буфер обмена: `SetClipboard`, `Clipboard`, `Chat.LastMessage` ([api.md](api.md), §17);
 - `Image` — картинка ([api.md](api.md), §19; ADR-20) и `OpenFiles` — выбор нескольких файлов (§16), [отчёт](reports/image.md);
 - `List` — список и таблица со строками по требованию ([api.md](api.md), §20), [отчёт](reports/list.md);
+- контекстное меню: `SetContextMenu` у виджетов, окна и чата ([api.md](api.md), §4, §5), [отчёт](reports/context.md);
 - `Split` — две панели с границей, которую двигают мышью: `HSplit`, `VSplit` ([api.md](api.md), §15), [отчёт](reports/split.md);
 - `Canvas` — рисование: линии, прямоугольники, эллипсы, текст, мышь ([api.md](api.md), §21), [отчёт](reports/canvas.md);
 - меню окна: `Window.SetMenu`, `NewMenu`, `Item`, `CheckItem`, `SubMenu`, `Sep`, сочетания клавиш ([api.md](api.md), §5), [отчёт](reports/menu.md);

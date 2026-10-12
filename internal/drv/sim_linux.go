@@ -216,3 +216,9 @@ func PixelAt(h H, x, y int) uint32 { return uint32(C.nui_pixel_at(widget(h), C.i
 
 // SimSplitDrag — перетаскивание границы на delta: то, что делает GtkPaned, пока её тянут.
 func SimSplitDrag(h H, delta int) { SplitSetPosition(h, SplitPosition(h)+delta) }
+
+// ContextMenuOwner — чьё контекстное меню откроется правым щелчком в точке (x, y) окна
+// win (логические пиксели от левого верхнего угла содержимого окна); Nil — ничьё.
+func ContextMenuOwner(win H, x, y int) H {
+	return H(C.nui_ctx_owner_at(widget(win), C.int(x), C.int(y)))
+}

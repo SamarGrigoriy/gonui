@@ -605,6 +605,10 @@ NUI_CONST(UnitWorld, 0)
 NUI_CONST(SRCCOPY, 0x00CC0020)
 NUI_CONST(WM_MOUSEMOVE, 0x0200)
 NUI_CONST(WM_SETCURSOR, 0x0020)
+NUI_CONST(WM_CONTEXTMENU, 0x007B)
+NUI_CONST(TPM_RIGHTBUTTON, 0x0002)
+NUI_CONST(TPM_NONOTIFY, 0x0080)
+NUI_CONST(TPM_RETURNCMD, 0x0100)
 NUI_CONST(WM_LBUTTONDOWN, 0x0201)
 NUI_CONST(WM_LBUTTONUP, 0x0202)
 NUI_CONST(WM_RBUTTONDOWN, 0x0204)
@@ -675,6 +679,7 @@ NUI_FN(HWND, SetParent, (HWND hWndChild, HWND hWndNewParent))
 NUI_FN(BOOL, SetWindowPos, (HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, UINT uFlags))
 NUI_FN(HMENU, CreateMenu, (void))
 NUI_FN(HMENU, CreatePopupMenu, (void))
+NUI_FN(BOOL, TrackPopupMenu, (HMENU hMenu, UINT uFlags, int x, int y, int nReserved, HWND hWnd, const RECT *prcRect))
 NUI_FN(BOOL, AppendMenuW, (HMENU hMenu, UINT uFlags, UINT_PTR uIDNewItem, LPCWSTR lpNewItem))
 NUI_FN(BOOL, SetMenu, (HWND hWnd, HMENU hMenu))
 NUI_FN(HMENU, GetMenu, (HWND hWnd))
@@ -852,6 +857,7 @@ void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 void  nui_list_column(HWND lv, int index, LPCWSTR title);
 HCURSOR nui_cursor(int id); /* системный курсор по номеру (IDC_*) */
+void  nui_ctx_forward(HWND edit, int on); /* EDIT: WM_CONTEXTMENU — родителю, а не своё меню */
 /* Canvas: рисование одного WM_PAINT (двойная буферизация); координаты — логические пиксели */
 typedef struct NuiPaint NuiPaint;
 NuiPaint *nui_canvas_begin(HWND h, HBRUSH bg, HFONT font, UINT dpi, COLORREF text);

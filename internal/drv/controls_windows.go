@@ -384,8 +384,9 @@ func TextSetWrap(view H, on bool) {
 	recreate(view, "EDIT", text, textStyle(n), C.NUI_WS_EX_CLIENTEDGE)
 	send(n.hwnd, C.NUI_EM_SETLIMITTEXT, 0x7FFFFFFE, 0)
 	TextSetReadOnly(view, readOnly)
-	TextSetEnter(view, n.id, n.enterText) // новый контрол — метка и подсказка заново
+	TextSetEnter(view, n.id, n.enterText) // новый контрол — метка, подсказка и меню заново
 	TextSetPlaceholder(view, n.hint)
+	ctxForward(n)
 }
 
 // TextSetEnter: on — Enter без Shift даёт EvEnter вместо перевода строки (метку

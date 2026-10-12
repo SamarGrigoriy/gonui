@@ -80,3 +80,15 @@ func MenuItemChecked(h H) bool {
 func MenuItemSetText(h H, text string, key uint32, mods uint8) {
 	C.gtk_menu_item_set_label((*C.GtkMenuItem)(h), cstr(text))
 }
+
+// ContextMenu — новое пустое контекстное меню виджета (прежнее уничтожается); пункты —
+// MenuItemNew и др., затем ContextMenuDone.
+func ContextMenu(owner H) H {
+	m := C.gtk_menu_new()
+	C.nui_ctx_set(widget(owner), m)
+	return H(m)
+}
+
+func ContextMenuDone(owner H, menu H) { C.gtk_widget_show_all(widget(menu)) }
+
+func ContextMenuRemove(owner H) { C.nui_ctx_set(widget(owner), nil) }

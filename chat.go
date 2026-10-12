@@ -310,6 +310,14 @@ func (c *Chat) SetBackground(col Color) {
 	drv.SetBackground(c.h, uint32(col), true)
 }
 
+// SetContextMenu — меню по правому щелчку по ленте сообщений (Widget.SetContextMenu).
+// Например, «Скопировать ответ»: nui.Item("Скопировать ответ", func() { nui.SetClipboard(chat.LastMessage()) }).
+func (c *Chat) SetContextMenu(items ...*MenuItem) {
+	if !c.dead() {
+		c.log.SetContextMenu(items...)
+	}
+}
+
 // Focus передаёт фокус полю ввода.
 func (c *Chat) Focus() {
 	if !c.dead() {
