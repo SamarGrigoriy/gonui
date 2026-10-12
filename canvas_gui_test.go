@@ -14,7 +14,7 @@ func TestCanvas(t *testing.T) {
 	var w *Window
 	var c *Canvas
 	var kept *Painter
-	draws := 0
+	draws, n := 0, 0
 	var size [2]float64
 	var text [2]float64
 	var events []MouseEvent
@@ -64,10 +64,10 @@ func TestCanvas(t *testing.T) {
 		}
 		kept.FillRect(0, 0, 10, 10) // Painter вне draw — ничего
 		w.Show()                    // наверх: окно, закрытое другими (Wine без композитора), не перерисовывается
+		n = draws                   // здесь, в UI-потоке: draws меняет draw
 		c.Redraw()
 		c.Redraw() // несколько подряд — одна перерисовка
 	})
-	n := draws
 	waitUntil(t, 2000, func() bool { return draws > n })
 	ui(func() {
 		drv.SimMouse(c.h, drv.MouseDown, 30, 40, 1, drv.ModShift) // Win32 — в целых точках
