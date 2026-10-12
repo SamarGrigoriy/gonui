@@ -341,3 +341,20 @@ func PixelAt(h H, x, y int) uint32 {
 	C.ReleaseDC(n.hwnd, dc)
 	return c&0xFF<<16 | c&0xFF00 | c>>16&0xFF
 }
+
+// SimSplitDrag — перетаскивание полосы разделителя на delta логических пикселей: нажатие,
+// курсор сдвигается (SetCursorPos), движение, отпускание — тот же путь, что у мыши.
+func SimSplitDrag(h H, delta int) {
+	n := nodes[h]
+	var pt C.POINT
+	C.GetCursorPos(&pt)
+	send(n.hwnd, C.NUI_WM_LBUTTONDOWN, 1, 0)
+	x, y, d := C.int(pt.x), C.int(pt.y), C.int(dpiOf(n).px(delta))
+	if n.vertical {
+		C.SetCursorPos(x, y+d)
+	} else {
+		C.SetCursorPos(x+d, y)
+	}
+	send(n.hwnd, C.NUI_WM_MOUSEMOVE, 1, 0)
+	send(n.hwnd, C.NUI_WM_LBUTTONUP, 0, 0)
+}

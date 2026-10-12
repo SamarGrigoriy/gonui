@@ -37,6 +37,7 @@ const (
 	kImage
 	kList
 	kCanvas
+	kSplit    // две панели; HWND — полоса между ними (за неё тянут)
 	kMenu     // HMENU: строка меню или подменю
 	kMenuItem // пункт меню (в hmenu — меню, где он лежит)
 )
@@ -116,6 +117,11 @@ type node struct {
 	menuBar   H        // окно: строка меню (kMenu)
 	menuNodes []H      // окно: все узлы меню — уничтожаются вместе с окном или строкой
 	menuKeep  [2]C.int // окно: клиентская область до смены меню (её и сохраняем)
+
+	// Split
+	splitPos  int    // размер первой панели по SetPosition или перетаскиванию, логические пиксели; -1 — нет
+	splitCur  int    // размер первой панели после раскладки, физические пиксели
+	dragStart [2]int // начало перетаскивания: splitCur и координата курсора на экране
 
 	// List
 	columns   []string                  // заголовки колонок
@@ -439,6 +445,8 @@ func prepare(w *node, h H) {
 		l.Floor.W, l.Floor.H = max(l.Floor.W, w.px(46)), max(l.Floor.H, w.px(46))
 	case kSpacer:
 		l.Min, l.Nat, l.Expand = layout.Size{}, layout.Size{}, true
+	case kSplit: // как ряд с промежутком-полосой; панели расставляет placeSplit
+		l.Spacing, l.Padding = w.px(splitGap), 0
 	default:
 		if !n.measured {
 			measureLeaf(w, n)
@@ -460,6 +468,10 @@ func setFlag(f []bool, i int) []bool {
 func place(w *node, h H, ox, oy int, hide bool) {
 	n := nodes[h]
 	hide = hide || n.hidden
+	if n.kind == kSplit {
+		placeSplit(w, h, ox, oy, hide)
+		return
+	}
 	o := n.lay.Out
 	if n.hwnd != nil {
 		x, y, cw, ch := o.X-ox, o.Y-oy, o.W, o.H

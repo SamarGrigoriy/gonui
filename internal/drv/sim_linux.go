@@ -213,3 +213,6 @@ func SimMouse(h H, kind uint8, x, y float64, button int, mods uint8) {
 // PixelAt — цвет точки (x, y) виджета на экране, 0xRRGGBB (логические пиксели = точки
 // при масштабе 1).
 func PixelAt(h H, x, y int) uint32 { return uint32(C.nui_pixel_at(widget(h), C.int(x), C.int(y))) }
+
+// SimSplitDrag — перетаскивание границы на delta: то, что делает GtkPaned, пока её тянут.
+func SimSplitDrag(h H, delta int) { SplitSetPosition(h, SplitPosition(h)+delta) }

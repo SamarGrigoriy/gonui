@@ -176,6 +176,9 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 	if n.kind == kCanvas {
 		return canvasProc(n, m, wp, lp)
 	}
+	if n.kind == kSplit {
+		return splitProc(h, n, m, wp, lp)
+	}
 	return 0, false
 }
 

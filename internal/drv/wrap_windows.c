@@ -880,6 +880,8 @@ void nui_paint_text_size(NuiPaint *p, LPCWSTR s, int len, float out[2]) {
 	out[1] = (float)r.bottom / p->scale;
 }
 
+HCURSOR nui_cursor(int id) { return LoadCursorW(0, RES(id)); }
+
 // --- List (driver-win32.md, §5): ListView с LVS_OWNERDATA ---
 
 void nui_list_column(HWND lv, int index, LPCWSTR title) {

@@ -604,6 +604,7 @@ NUI_CONST(MatrixOrderPrepend, 0)
 NUI_CONST(UnitWorld, 0)
 NUI_CONST(SRCCOPY, 0x00CC0020)
 NUI_CONST(WM_MOUSEMOVE, 0x0200)
+NUI_CONST(WM_SETCURSOR, 0x0020)
 NUI_CONST(WM_LBUTTONDOWN, 0x0201)
 NUI_CONST(WM_LBUTTONUP, 0x0202)
 NUI_CONST(WM_RBUTTONDOWN, 0x0204)
@@ -702,6 +703,10 @@ NUI_FN(BOOL, InvalidateRect, (HWND hWnd, const RECT *lpRect, BOOL bErase))
 NUI_FN(UINT_PTR, SetTimer, (HWND hWnd, UINT_PTR nIDEvent, UINT uElapse, TIMERPROC lpTimerFunc))
 NUI_FN(BOOL, KillTimer, (HWND hWnd, UINT_PTR uIDEvent))
 NUI_FN(HCURSOR, LoadCursorW, (HINSTANCE hInstance, LPCWSTR lpCursorName))
+NUI_FN(HCURSOR, SetCursor, (HCURSOR hCursor))
+NUI_FN(HWND, GetCapture, (void))
+NUI_FN(BOOL, GetCursorPos, (POINT *lpPoint))
+NUI_FN(BOOL, SetCursorPos, (int X, int Y))                                                  /* тесты */
 NUI_FN(HICON, LoadIconW, (HINSTANCE hInstance, LPCWSTR lpIconName))
 NUI_FN(DWORD, GetSysColor, (int nIndex))
 NUI_FN(HBRUSH, GetSysColorBrush, (int nIndex))
@@ -846,6 +851,7 @@ HBITMAP nui_image_render(void *pic, int w, int h);           /* DIB 32 бита,
 void  nui_image_free(void *pic);
 void  nui_draw_image(const DRAWITEMSTRUCT *d, HBITMAP bmp, int w, int h, HBRUSH bg);
 void  nui_list_column(HWND lv, int index, LPCWSTR title);
+HCURSOR nui_cursor(int id); /* системный курсор по номеру (IDC_*) */
 /* Canvas: рисование одного WM_PAINT (двойная буферизация); координаты — логические пиксели */
 typedef struct NuiPaint NuiPaint;
 NuiPaint *nui_canvas_begin(HWND h, HBRUSH bg, HFONT font, UINT dpi, COLORREF text);

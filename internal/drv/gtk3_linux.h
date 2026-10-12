@@ -123,7 +123,7 @@ typedef struct _GList GList;
 struct _GList { gpointer data; GList *next; GList *prev; };
 /* Одним объявлением: cgo TinyGo не видит полей структуры, описанной после typedef. */
 typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
-typedef struct _GtkEventBox GtkEventBox;
+typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned;
 typedef struct _GtkMenuShell GtkMenuShell; typedef struct _GtkMenuItem GtkMenuItem;
 typedef struct _GtkCheckMenuItem GtkCheckMenuItem; typedef struct _GtkAccelLabel GtkAccelLabel;
 typedef struct _GtkTreeView GtkTreeView;   typedef struct _GtkTreeSelection GtkTreeSelection;
@@ -434,6 +434,12 @@ NUI_FN(GdkDevice *, gdk_seat_get_pointer, (GdkSeat *seat))                      
 NUI_FN(GdkPixbuf *, gdk_pixbuf_get_from_window, (GdkWindow *window, gint src_x, gint src_y, gint width, gint height)) /* тесты */
 NUI_FN(guchar *, gdk_pixbuf_get_pixels, (const GdkPixbuf *pixbuf))                           /* тесты */
 NUI_FN(gboolean, gtk_widget_event, (GtkWidget *widget, GdkEvent *event))                     /* тесты */
+/* Split: GtkPaned */
+NUI_FN(GtkWidget *, gtk_paned_new, (GtkOrientation orientation))
+NUI_FN(void, gtk_paned_pack1, (GtkPaned *paned, GtkWidget *child, gboolean resize, gboolean shrink))
+NUI_FN(void, gtk_paned_pack2, (GtkPaned *paned, GtkWidget *child, gboolean resize, gboolean shrink))
+NUI_FN(void, gtk_paned_set_position, (GtkPaned *paned, gint position))
+NUI_FN(gint, gtk_paned_get_position, (GtkPaned *paned))
 /* Canvas: GtkDrawingArea, cairo, события мыши */
 NUI_FN(GtkWidget *, gtk_drawing_area_new, (void))
 NUI_FN(void, gtk_widget_add_events, (GtkWidget *widget, gint events))
