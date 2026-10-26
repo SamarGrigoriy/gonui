@@ -528,6 +528,16 @@ NUI_CONST(ES_NOHIDESEL, 0x0100)
 NUI_CONST(ES_READONLY, 0x0800)
 NUI_CONST(ES_WANTRETURN, 0x1000)
 NUI_CONST(EN_CHANGE, 0x0300)
+NUI_CONST(EN_KILLFOCUS, 0x0200)
+NUI_CONST(ES_NUMBER, 0x2000)
+NUI_CONST(ICC_UPDOWN_CLASS, 0x00000010)
+NUI_CONST(UDS_SETBUDDYINT, 0x0002)
+NUI_CONST(UDS_ARROWKEYS, 0x0020)
+NUI_CONST(UDS_NOTHOUSANDS, 0x0080)
+NUI_CONST(UDM_SETBUDDY, 0x0469)
+NUI_CONST(UDM_SETRANGE32, 0x046F)
+NUI_CONST(UDM_SETPOS32, 0x0471)
+NUI_CONST(WM_KEYUP, 0x0101)
 NUI_CONST(EM_GETSEL, 0x00B0)
 NUI_CONST(EM_SETSEL, 0x00B1)
 NUI_CONST(EM_LINESCROLL, 0x00B6)
@@ -919,6 +929,7 @@ void  nui_tabs_hole(HWND tab, int w, int h, const int in[4]); /* окно кон
 int   nui_tabs_item_width(HWND tab, int i);
 COLORREF nui_tabs_pane(void); /* цвет области страниц у темы */
 void  nui_tabs_click(HWND tab, int i);      /* только с NUI_GUI_TEST: щелчок по ярлыку i */
+void  nui_sim_spin(HWND edit, int up);      /* только с NUI_GUI_TEST: ↑ или ↓ в поле Spin */
 HWND  nui_hwnd_at(HWND win, int x, int y);  /* только с NUI_GUI_TEST: окно под точкой клиентской области */
 int   nui_list_item_text(HWND lv, int row, int col, LPWSTR buf, int cap); /* только с NUI_GUI_TEST */
 void  nui_sim_drop(HWND w, LPCWSTR files, int len); /* только с NUI_GUI_TEST: files — «путь\0путь\0\0» */

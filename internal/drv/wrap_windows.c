@@ -43,7 +43,7 @@ static void comctl_init(void) {
 	if (init) {
 		INITCOMMONCONTROLSEX icc = {sizeof icc,
 			NUI_ICC_STANDARD_CLASSES | NUI_ICC_BAR_CLASSES | NUI_ICC_PROGRESS_CLASS | NUI_ICC_LISTVIEW_CLASSES |
-			NUI_ICC_TAB_CLASSES};
+			NUI_ICC_TAB_CLASSES | NUI_ICC_UPDOWN_CLASS};
 		init(&icc);
 	}
 	taskDialog = (nui_TaskDialogIndirect_fn)(void (*)(void))GetProcAddress(m, "TaskDialogIndirect");
@@ -126,12 +126,14 @@ void nui_loop(void) {
 			if (nav_key(&m))
 				continue;
 			// nuiEnter: 1 — всегда (Entry с OnEnter), 2 — только без Shift (TextView с OnEnter:
-			// Shift+Enter — перевод строки).
+			// Shift+Enter — перевод строки), 3 — Spin: значение принято, и Enter идёт дальше
+			// (кнопка по умолчанию — уже с новым значением, как в GTK).
 			HANDLE enter = GetPropW(m.hwnd, L"nuiEnter");
 			if (m.message == NUI_WM_KEYDOWN && m.wParam == NUI_VK_RETURN && enter &&
 				!((UINT_PTR)enter == 2 && GetKeyState(NUI_VK_SHIFT) < 0)) {
 				SendMessageW(msgWnd, NUI_WM_ENTER, 0, (LPARAM)m.hwnd);
-				continue;
+				if ((UINT_PTR)enter != 3)
+					continue;
 			}
 			HWND root = GetAncestor(m.hwnd, NUI_GA_ROOT);
 			if (root && IsDialogMessageW(root, &m))
@@ -1022,6 +1024,13 @@ void nui_tabs_click(HWND tab, int i) {
 	LPARAM at = (LPARAM)(((r.top + r.bottom) / 2) << 16 | ((r.left + r.right) / 2 & 0xFFFF));
 	SendMessageW(tab, NUI_WM_LBUTTONDOWN, 1 /* MK_LBUTTON */, at);
 	SendMessageW(tab, NUI_WM_LBUTTONUP, 0, at);
+}
+
+// ↑ или ↓ в поле Spin, как с клавиатуры: шаг делает подкласс поля от UDS_ARROWKEYS.
+void nui_sim_spin(HWND edit, int up) {
+	WPARAM vk = up ? NUI_VK_UP : NUI_VK_DOWN;
+	SendMessageW(edit, NUI_WM_KEYDOWN, vk, 1);
+	SendMessageW(edit, NUI_WM_KEYUP, vk, (LPARAM)0xC0000001u);
 }
 
 // Окно, которому достанется щелчок в точке (x, y) клиентской области win: с учётом

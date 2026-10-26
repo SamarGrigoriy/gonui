@@ -74,6 +74,7 @@ nui/
 ├── split.go                 Split, HSplit, VSplit
 ├── tabs.go                  Tabs — вкладки
 ├── radio.go                 Radio — переключатель
+├── spin.go                  Spin — числовое поле
 ├── args.go                  Args — аргументы командной строки
 ├── nui_gui_test.go          интеграционные тесты            //go:build gui
 │
@@ -110,6 +111,7 @@ nui/
 │   ├── split_linux.go       SplitNew, SplitSet, SplitSetPosition (GtkPaned)
 │   ├── tabs_linux.go        TabsNew, TabsAdd, TabsSetCurrent … (GtkNotebook)
 │   ├── radio_linux.go       RadioNew, RadioAdd, RadioSelected … (GtkRadioButton)
+│   ├── spin_linux.go        SpinNew, SpinSetValue, SpinValue (GtkSpinButton)
 │   ├── args_linux.go        Args (/proc/self/cmdline)
 │   ├── sim_linux.go         Sim* — имитация действий пользователя  //go:build gui
 │   ├── contract.go          общие константы контракта (MsgInfo, FileOpen, Filter)

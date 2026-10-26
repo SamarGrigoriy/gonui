@@ -238,6 +238,20 @@ func TestPostConcurrentOrder(t *testing.T) {
 	}
 }
 
+func TestAtoi(t *testing.T) {
+	for s, want := range map[string]int{"0": 0, "42": 42, " -17 ": -17, "+8080": 8080, "\t65535": 65535,
+		"2147483647": 2147483647, "-2147483648": -2147483648} {
+		if got, ok := Atoi(s); !ok || got != want {
+			t.Errorf("Atoi(%q) = %d, %v; ожидалось %d", s, got, ok, want)
+		}
+	}
+	for _, s := range []string{"", " ", "-", "+", "1a", "4 2", "--1", "2147483648", "-2147483649", "12345678901"} {
+		if got, ok := Atoi(s); ok {
+			t.Errorf("Atoi(%q) = %d — не число", s, got)
+		}
+	}
+}
+
 func TestItoa(t *testing.T) {
 	cases := map[int]string{0: "0", 7: "7", 42: "42", -5: "-5", 1234567890: "1234567890", -9223372036854775808: "-9223372036854775808"}
 	for n, want := range cases {

@@ -396,6 +396,9 @@ func ContextMenuOwner(win H, x, y int) H {
 // SimRadioSelect — щелчок по варианту i переключателя: BN_CLICKED, как от кнопки.
 func SimRadioSelect(h H, i int) { notifyParent(nodes[nodes[h].kids[i]], C.NUI_BN_CLICKED) }
 
+// SimSpinStep — ↑ (up) или ↓ в числовом поле.
+func SimSpinStep(h H, up bool) { C.nui_sim_spin(nodes[h].hwnd, C.int(b2i(up))) }
+
 // SimTabsSelect — пользователь щёлкнул ярлык страницы i.
 func SimTabsSelect(h H, i int) {
 	n := nodes[h]

@@ -8,6 +8,7 @@
 > - **Буфер обмена:** `nui.SetClipboard`, `nui.Clipboard`; `Chat.LastMessage` — для кнопки «Скопировать ответ» ([api.md, §17](docs/api.md), [отчёт](docs/reports/clipboard.md)).
 > - **Перетаскивание файлов** на окно `Window.OnDropFiles`; `nui.Args()` — аргументы командной строки без потерь русских букв в TinyGo на Windows. Пример `examples/viewer` — просмотрщик картинок: список, картинка, открытие нескольких файлов, перетаскивание, клавиши ([отчёт](docs/reports/drop.md)).
 > - **Контекстное меню** `chat.SetContextMenu(nui.Item("Скопировать ответ", …))` — по правому щелчку у любого виджета, окна и чата ([отчёт](docs/reports/context.md)).
+> - **Числовое поле** `nui.NewSpin(1, 65535)` — целое число со стрелками; набранное принимается по Enter или при уходе фокуса ([api.md, §11](docs/api.md), [отчёт](docs/reports/spin.md)).
 > - **Переключатель** `nui.NewRadio("PNG", "JPEG", "WebP")` — выбран ровно один вариант; в столбик или в ряд ([api.md, §9](docs/api.md), [отчёт](docs/reports/radio.md)).
 > - **Вкладки** `nui.NewTabs().Add("Общие", general).Add("Сеть", network)` — `OnChange`, `SetCurrent`, `Remove`; Ctrl+PgUp/PgDn ([api.md, §15](docs/api.md), [отчёт](docs/reports/tabs.md)).
 > - **Разделитель панелей** `nui.HSplit(menu, chat)` — границу двигают мышью ([отчёт](docs/reports/split.md)).

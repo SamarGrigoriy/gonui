@@ -22,7 +22,7 @@ typedef int GtkWindowType, GtkWindowPosition, GtkOrientation, GtkAlign, GConnect
             GtkDialogFlags, GtkMessageType, GtkButtonsType, GtkFileChooserAction, GBusType, GDBusCallFlags,
             GdkInterpType, GtkTreeModelFlags, GtkTreeViewColumnSizing, GtkSelectionMode, GTypeFlags,
             GtkStateFlags, GtkTextWindowType, PangoWrapMode, GtkDestDefaults, GdkDragAction,
-            GdkModifierType, GdkEventType, GdkScrollDirection, GdkEventMask, GdkGravity;
+            GdkModifierType, GdkEventType, GdkScrollDirection, GdkEventMask, GdkGravity, GtkSpinType;
 typedef unsigned int guint32;
 typedef unsigned long GType;
 typedef unsigned short guint16;
@@ -125,7 +125,7 @@ struct _GList { gpointer data; GList *next; GList *prev; };
 typedef struct _GSList { gpointer data; struct _GSList *next; } GSList;
 typedef struct _GtkEventBox GtkEventBox; typedef struct _GtkPaned GtkPaned; typedef struct _GtkMenu GtkMenu;
 typedef struct _GtkNotebook GtkNotebook; typedef struct _GtkRadioButton GtkRadioButton;
-typedef struct _GtkOrientable GtkOrientable;
+typedef struct _GtkOrientable GtkOrientable; typedef struct _GtkSpinButton GtkSpinButton;
 typedef void (*GtkMenuDetachFunc)(GtkWidget *attach_widget, GtkMenu *menu);
 typedef struct _GtkMenuShell GtkMenuShell; typedef struct _GtkMenuItem GtkMenuItem;
 typedef struct _GtkCheckMenuItem GtkCheckMenuItem; typedef struct _GtkAccelLabel GtkAccelLabel;
@@ -197,6 +197,8 @@ NUI_CONST(GTK_WINDOW_TOPLEVEL, 0)
 NUI_CONST(GTK_WIN_POS_CENTER, 1)
 NUI_CONST(GTK_ORIENTATION_HORIZONTAL, 0)
 NUI_CONST(GTK_ORIENTATION_VERTICAL, 1)
+NUI_CONST(GTK_SPIN_STEP_FORWARD, 0)
+NUI_CONST(GTK_SPIN_STEP_BACKWARD, 1)
 NUI_CONST(GTK_ALIGN_FILL, 0)
 NUI_CONST(GTK_ALIGN_START, 1)
 NUI_CONST(GTK_ALIGN_END, 2)
@@ -466,6 +468,12 @@ NUI_FN(GtkWidget *, gtk_radio_button_new_with_label_from_widget, (GtkRadioButton
        const gchar *label))                                                                 /* (w) */
 NUI_FN(void, gtk_orientable_set_orientation, (GtkOrientable *orientable, GtkOrientation orientation))
 NUI_FN(GList *, g_list_nth, (GList *list, guint n))                                          /* (w) */
+/* Spin: GtkSpinButton */
+NUI_FN(GtkWidget *, gtk_spin_button_new_with_range, (gdouble min, gdouble max, gdouble step))
+NUI_FN(void, gtk_spin_button_set_numeric, (GtkSpinButton *spin_button, gboolean numeric))
+NUI_FN(void, gtk_spin_button_set_value, (GtkSpinButton *spin_button, gdouble value))
+NUI_FN(gint, gtk_spin_button_get_value_as_int, (GtkSpinButton *spin_button))
+NUI_FN(void, gtk_spin_button_spin, (GtkSpinButton *spin_button, GtkSpinType direction, gdouble increment)) /* тесты */
 /* Canvas: GtkDrawingArea, cairo, события мыши */
 NUI_FN(GtkWidget *, gtk_drawing_area_new, (void))
 NUI_FN(void, gtk_widget_add_events, (GtkWidget *widget, gint events))

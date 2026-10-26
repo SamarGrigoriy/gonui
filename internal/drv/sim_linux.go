@@ -80,6 +80,15 @@ func SimToggle(h H) {
 // SimSelect — как выбор пункта в списке.
 func SimSelect(h H, i int) { C.gtk_combo_box_set_active((*C.GtkComboBox)(h), C.gint(i)) }
 
+// SimSpinStep — ↑ (up) или ↓ в числовом поле: шаг, как от стрелок.
+func SimSpinStep(h H, up bool) {
+	dir := C.GtkSpinType(C.NUI_GTK_SPIN_STEP_BACKWARD)
+	if up {
+		dir = C.NUI_GTK_SPIN_STEP_FORWARD
+	}
+	C.gtk_spin_button_spin((*C.GtkSpinButton)(h), dir, 1)
+}
+
 // SimRadioSelect — щелчок по варианту i переключателя.
 func SimRadioSelect(h H, i int) {
 	C.gtk_button_clicked((*C.GtkButton)(C.nui_radio_nth(radioBox(h), C.int(i))))

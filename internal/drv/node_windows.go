@@ -37,12 +37,14 @@ const (
 	kImage
 	kList
 	kCanvas
-	kSplit     // две панели; HWND — полоса между ними (за неё тянут)
-	kTabs      // вкладки: SysTabControl32 над страницами
-	kRadio     // переключатель: ряд вариантов, как Box
-	kRadioItem // вариант переключателя: BUTTON BS_RADIOBUTTON
-	kMenu      // HMENU: строка меню или подменю
-	kMenuItem  // пункт меню (в hmenu — меню, где он лежит)
+	kSplit      // две панели; HWND — полоса между ними (за неё тянут)
+	kTabs       // вкладки: SysTabControl32 над страницами
+	kRadio      // переключатель: ряд вариантов, как Box
+	kRadioItem  // вариант переключателя: BUTTON BS_RADIOBUTTON
+	kSpin       // числовое поле: EDIT; ребёнок — стрелки
+	kSpinArrows // стрелки поля: msctls_updown32
+	kMenu       // HMENU: строка меню или подменю
+	kMenuItem   // пункт меню (в hmenu — меню, где он лежит)
 )
 
 // Шрифты окна.
@@ -124,6 +126,9 @@ type node struct {
 	ctx       bool     // узел меню: часть контекстного меню (а не строки меню окна)
 	menuKeep  [2]C.int // окно: клиентская область до смены меню (её и сохраняем)
 
+	// Spin
+	spinMin, spinMax int
+
 	// Split
 	splitPos  int    // размер первой панели по SetPosition или перетаскиванию, логические пиксели; -1 — нет
 	splitCur  int    // размер первой панели после раскладки, физические пиксели
@@ -173,6 +178,13 @@ var tabsHooks struct {
 	visibility func(h, page H)
 	clicked    func(h H)
 	key        func(focus C.HWND, back bool) bool
+}
+
+// spinHooks — то же для числового поля; задаёт SpinNew.
+var spinHooks struct {
+	measure func(w, n *node)
+	place   func(w, n *node) int // стрелки — к правому краю; ответ — ширина поля
+	commit  func(h H)            // принять набранное: Enter, уход фокуса, стрелки
 }
 
 // radioHooks — то же для переключателя; задаёт RadioNew.
@@ -534,6 +546,9 @@ func place(w *node, h H, ox, oy int, hide bool) {
 	o := n.lay.Out
 	if n.hwnd != nil {
 		x, y, cw, ch := o.X-ox, o.Y-oy, o.W, o.H
+		if n.kind == kSpin {
+			cw = spinHooks.place(w, n)
+		}
 		if n.kind == kCombo {
 			// Высоту поля Windows задаёт сам; в ячейке — по центру, ниже — выпадающий список.
 			fh := n.lay.Nat.H
@@ -722,6 +737,8 @@ func measureLeaf(w *node, n *node) {
 		set(w.px(50), w.px(150), w.px(15))
 	case kText:
 		set(w.px(46), w.px(46), w.px(46)) // как TextView в GTK: размер задают SetMinSize или Expand
+	case kSpin:
+		spinHooks.measure(w, n)
 	case kCanvas:
 		set(0, 0, 0) // своего размера нет: SetMinSize или Expand
 	case kList:
@@ -947,7 +964,7 @@ func ctlColor(c *node, dc C.HDC, m uint32) (uintptr, bool) {
 	if c.kind == kLabel && c.color != noColor {
 		fg = c.color
 	}
-	field := c.kind == kEntry || c.kind == kText
+	field := c.kind == kEntry || c.kind == kText || c.kind == kSpin
 	if bg == noColor && !field {
 		bg = inheritedBg(c)
 	}

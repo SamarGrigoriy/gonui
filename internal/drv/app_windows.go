@@ -91,7 +91,9 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 			return 0, true
 		}
 	case C.NUI_WM_ENTER:
-		if _, n := nodeOf(hwndOf(lp)); n != nil {
+		if h, n := nodeOf(hwndOf(lp)); n != nil && n.kind == kSpin {
+			spinHooks.commit(h) // Enter идёт дальше: кнопка по умолчанию — с новым значением
+		} else if n != nil {
 			emit(n, core.EvEnter)
 		}
 		return 0, true
@@ -130,6 +132,8 @@ func wndProc(hwnd C.HWND, m uint32, wp, lp uintptr) (uintptr, bool) {
 					c.last = v
 					emit(c, core.EvChange)
 				}
+			} else if c != nil && c.kind == kSpinArrows { // шаг стрелками: текст поля уже новый
+				spinHooks.commit(c.parent)
 			}
 			return 0, true
 		}
@@ -213,6 +217,8 @@ func notify(ctl C.HWND, code uint32) {
 		radioHooks.clicked(h)
 	case (c.kind == kEntry || c.kind == kText) && code == C.NUI_EN_CHANGE:
 		emit(c, core.EvChange)
+	case c.kind == kSpin && code == C.NUI_EN_KILLFOCUS:
+		spinHooks.commit(h)
 	case c.kind == kCombo && (code == C.NUI_CBN_SELCHANGE || code == C.NUI_CBN_EDITCHANGE):
 		emit(c, core.EvChange)
 	}

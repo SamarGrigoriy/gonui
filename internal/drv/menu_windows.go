@@ -250,7 +250,7 @@ func ContextMenuRemove(owner H) {
 // ctxForward — у полей ввода (EDIT) своё меню: с меню nui поле отдаёт WM_CONTEXTMENU
 // родителю. Пересозданное поле (TextView.SetWrap) — заново.
 func ctxForward(o *node) {
-	if o.hwnd != nil && (o.kind == kEntry || o.kind == kText) {
+	if o.hwnd != nil && (o.kind == kEntry || o.kind == kText || o.kind == kSpin) {
 		C.nui_ctx_forward(o.hwnd, b2i(o.ctxMenu != Nil))
 	}
 }
