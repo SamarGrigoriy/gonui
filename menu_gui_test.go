@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Меню окна: выбор пунктов, сочетания раньше OnKey, выключенный пункт, флажок, подменю,

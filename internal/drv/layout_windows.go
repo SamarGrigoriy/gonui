@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/layout"
+import "github.com/SamarGrigoriy/gonui/internal/layout"
 
 // Контейнеры (driver-win32.md, §2, §5): Box, Grid, Stretch — виртуальные узлы без HWND;
 // Frame — рамка BS_GROUPBOX, её дети — соседи по окну внутри её прямоугольника;

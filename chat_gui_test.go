@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Отправка: Enter в поле — сообщение пользователя в ленте, поле пустое, OnSend получил

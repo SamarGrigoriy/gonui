@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"nui/internal/layout/golden"
+	"github.com/SamarGrigoriy/gonui/internal/layout/golden"
 )
 
 func TestGolden(t *testing.T) {

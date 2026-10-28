@@ -1,8 +1,8 @@
 package nui
 
 import (
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Spin — числовое поле (api.md, §11): целое число в диапазоне, со стрелками «больше» и

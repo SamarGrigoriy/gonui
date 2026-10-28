@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Win32: набранное в Spin принимается, когда фокус уходит из поля (EN_KILLFOCUS) — так

@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // List (driver-win32.md, §5): ListView с LVS_OWNERDATA — строки не хранятся, текст

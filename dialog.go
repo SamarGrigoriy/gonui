@@ -1,8 +1,8 @@
 package nui
 
 import (
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Все диалоги модальные и синхронные: функция возвращается, когда диалог закрыт.

@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // WindowNew создаёт окно: скрытое (ADR-14), по центру экрана, с отступом 12 (layout.md, §2).
 // delete-event → EvClose с ответом, destroy → EvDestroy.

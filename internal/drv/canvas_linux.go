@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // Canvas (api.md, §21): GtkDrawingArea; draw → EvDraw с cairo_t* в arg, нажатия,

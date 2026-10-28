@@ -16,7 +16,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // SimClick — как нажатие кнопки мышью.

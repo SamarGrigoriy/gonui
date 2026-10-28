@@ -2,7 +2,7 @@
 // строка состояния, кнопка по умолчанию (Enter в поле нажимает «Отправить»).
 package main
 
-import "nui"
+import "github.com/SamarGrigoriy/gonui"
 
 func main() {
 	err := nui.Run(func() {

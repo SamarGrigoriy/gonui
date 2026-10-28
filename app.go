@@ -10,8 +10,8 @@ import (
 	"errors"
 	"runtime"
 
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // init выполняется в главном потоке: главная горутина остаётся на нём (runtime.md, §1).

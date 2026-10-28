@@ -8,8 +8,8 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Spin (driver-win32.md, §5): узел kSpin — поле EDIT, ребёнок kSpinArrows — стрелки

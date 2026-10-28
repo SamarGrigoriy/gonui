@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // WindowNew — окно верхнего уровня: скрытое (ADR-14), отступ 12 (layout.md, §2), шрифты

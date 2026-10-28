@@ -1,6 +1,6 @@
 package drv
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // KeyLabel — подпись сочетания клавиш в меню Windows: «Ctrl+Shift+O», «F5», «Del».
 // Названия — английские, как в меню самой Windows на любом языке.

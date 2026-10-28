@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Строки, которые проходят через каждый текстовый Set/Get.

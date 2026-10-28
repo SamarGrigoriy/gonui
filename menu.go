@@ -1,8 +1,8 @@
 package nui
 
 import (
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Menu — меню в строке меню окна (Window.SetMenu, api.md, §5).

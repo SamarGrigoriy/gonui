@@ -24,9 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
-	"nui/internal/layout"
-	"nui/internal/layout/golden"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/layout/golden"
 )
 
 const (

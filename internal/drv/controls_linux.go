@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // LabelNew: у GtkLabel по умолчанию xalign = 0.5; nui выравнивает текст по началу.
 func LabelNew(id uint32, text string) H {

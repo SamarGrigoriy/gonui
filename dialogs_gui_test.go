@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // openDialog запускает диалог в UI-потоке и ждёт, пока он появится на экране.

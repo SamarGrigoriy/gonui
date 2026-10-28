@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // Canvas (driver-win32.md, §5): дочернее окно класса nuiWindow. WM_PAINT — двойная

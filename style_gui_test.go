@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Оформление (ADR-19): цвет и фон, отступ цветной панели, крупный шрифт подписи,

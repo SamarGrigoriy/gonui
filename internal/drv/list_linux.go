@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // List (driver-gtk3.md, §7): GtkTreeView в прокрутке со своей моделью — строки не
 // хранятся, текст ячейки модель спрашивает у Go (nuiListCell) при отрисовке.

@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Split: начальное положение — естественный размер первой панели; SetPosition; упор в

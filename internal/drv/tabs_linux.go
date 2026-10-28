@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // Tabs (api.md, §15): GtkNotebook. Ярлык — GtkLabel; спрятанная страница прячет и свой
 // ярлык. EvChange — только переключение пользователем (nui_tabs_new).

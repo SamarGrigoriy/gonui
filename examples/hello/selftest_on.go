@@ -2,7 +2,7 @@
 
 package main
 
-import "nui"
+import "github.com/SamarGrigoriy/gonui"
 
 // selftest: окно показано, цикл крутится, выход с кодом 0 (docs/testing.md, §4).
 func selftest() { nui.After(300, nui.Quit) }

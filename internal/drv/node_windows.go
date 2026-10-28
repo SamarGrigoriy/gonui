@@ -13,8 +13,8 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Виды узлов.

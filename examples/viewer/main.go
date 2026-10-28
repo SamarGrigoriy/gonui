@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"nui"
+	"github.com/SamarGrigoriy/gonui"
 )
 
 func main() {

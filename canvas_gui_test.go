@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Canvas: рисунок на экране (цвета точек), размер, TextSize, Redraw, мышь, Painter вне draw.

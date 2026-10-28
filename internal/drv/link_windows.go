@@ -17,7 +17,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // H — хендл ОС: на Windows индекс узла в таблице драйвера, а не HWND (driver-win32.md, §2).

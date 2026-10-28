@@ -5,8 +5,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Chat — готовый чат (api.md, §18): лента сообщений, поле ввода, кнопки «Отправить»
