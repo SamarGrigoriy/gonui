@@ -1,8 +1,8 @@
 package nui
 
 import (
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Split — две панели с границей, которую пользователь двигает мышью (api.md, §15):

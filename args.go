@@ -1,6 +1,6 @@
 package nui
 
-import "nui/internal/drv"
+import "github.com/SamarGrigoriy/gonui/internal/drv"
 
 // Args — аргументы командной строки, как os.Args: Args()[0] — программа. На Windows
 // они берутся из GetCommandLineW: в сборке TinyGo os.Args там приходят в кодировке ANSI,

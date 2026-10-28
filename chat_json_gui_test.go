@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // LoadJSON: свой формат и формат API моделей; ошибки не трогают ленту; JSON() — туда и

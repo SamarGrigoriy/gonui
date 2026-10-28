@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // Spin (api.md, §11): GtkSpinButton с шагом 1, только цифры и знак (numeric). Значение
 // принимается стрелками, кнопками, Enter и уходом фокуса — тогда value-changed → EvChange.

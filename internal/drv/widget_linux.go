@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // adopt — нормализация каждого созданного виджета (docs/driver-gtk3.md, §6):
 //  1. hexpand/vexpand явно FALSE — флаг expand не всплывает к родителям (layout.md, §6);

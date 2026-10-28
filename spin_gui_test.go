@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Spin: значение min; SetValue в диапазон без OnChange; стрелки — шаг, у края — ничего;

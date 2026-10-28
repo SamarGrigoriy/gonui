@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // OnDropFiles: пути бросенных файлов — как есть (кириллица, пробелы); nil — приём выключен.

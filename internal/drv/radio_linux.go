@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // Radio (api.md, §9): GtkBox с GtkRadioButton одной группы (nui_radio_add). EvChange —
 // только от кнопки, которая включилась.

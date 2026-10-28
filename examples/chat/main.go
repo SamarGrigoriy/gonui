@@ -7,7 +7,7 @@
 // Здесь горутин нет: буквы подаёт таймер — так пример собирается и малой сборкой TinyGo.
 package main
 
-import "nui"
+import "github.com/SamarGrigoriy/gonui"
 
 func main() {
 	err := nui.Run(func() {

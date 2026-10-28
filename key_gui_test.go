@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // OnKey: окно видит клавишу раньше поля с фокусом; обработанная (true) до поля не

@@ -38,7 +38,7 @@ import (
 	"strconv"
 	"strings"
 
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Item — узел случая.

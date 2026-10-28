@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // Init задаёт имя программы (WM_CLASS, app_id на Wayland) и инициализирует GTK.
 // false — нет дисплея или GTK не инициализировался.

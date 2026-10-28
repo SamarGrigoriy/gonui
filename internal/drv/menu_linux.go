@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // Меню окна (api.md, §5): GtkMenuBar над содержимым (nui_window_menubar), меню —
 // GtkMenu под пунктом строки меню, пункты — GtkMenuItem, GtkCheckMenuItem и

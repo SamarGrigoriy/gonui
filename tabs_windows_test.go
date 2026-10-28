@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Win32: область страниц вырезана из SysTabControl32 (он лежит над страницами) —

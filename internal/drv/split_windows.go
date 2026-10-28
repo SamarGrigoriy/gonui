@@ -6,7 +6,7 @@ package drv
 import "C"
 
 import (
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Split (driver-win32.md, §5): у Windows нет готового разделителя. Узел — ряд из двух

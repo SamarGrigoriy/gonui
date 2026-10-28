@@ -6,8 +6,8 @@ package drv
 import "C"
 
 import (
-	"nui/internal/core"
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Tabs (driver-win32.md, §5): SysTabControl32 — ярлыки и рамка. Как у Frame, HWND лежит

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Box.Remove и Clear: удалённые уничтожены, соседи занимают место, чужой виджет — паника.

@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // Картинка (driver-win32.md, §5): STATIC с SS_OWNERDRAW, рисует WM_DRAWITEM окна.

@@ -5,7 +5,7 @@ package drv
 */
 import "C"
 
-import "nui/internal/core"
+import "github.com/SamarGrigoriy/gonui/internal/core"
 
 // MessageBox показывает модальное сообщение. true — нажата OK или «Да»; Esc — false.
 func MessageBox(parent H, kind uint8, title, text string) bool {

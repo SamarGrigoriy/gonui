@@ -1,6 +1,6 @@
 package nui
 
-import "nui/internal/drv"
+import "github.com/SamarGrigoriy/gonui/internal/drv"
 
 // Key — клавиша (Window.OnKey). Буквы — 'A'…'Z', цифры — '0'…'9' (и на цифровом блоке),
 // пробел — ' ': по положению клавиши, независимо от раскладки и Shift. В русской

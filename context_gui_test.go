@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Контекстное меню: чьё меню у точки (виджет, контейнер выше, окно), выбор пунктов,

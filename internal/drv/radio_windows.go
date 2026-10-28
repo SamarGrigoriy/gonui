@@ -6,8 +6,8 @@ package drv
 import "C"
 
 import (
-	"nui/internal/core"
-	"nui/internal/layout"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/layout"
 )
 
 // Radio (driver-win32.md, §5): узел-ряд, как Box; варианты — узлы kRadioItem с BUTTON

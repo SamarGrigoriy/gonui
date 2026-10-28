@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Tabs: первая страница — текущая; размер — по самой большой странице, все страницы

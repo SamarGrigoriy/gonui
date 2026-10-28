@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 func TestMain(m *testing.M) {

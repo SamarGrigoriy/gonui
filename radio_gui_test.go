@@ -5,7 +5,7 @@ package nui
 import (
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Radio: выбран первый; SetSelected без OnChange, вне диапазона — ничего; щелчок по

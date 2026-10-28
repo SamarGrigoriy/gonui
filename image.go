@@ -3,8 +3,8 @@ package nui
 import (
 	"errors"
 
-	"nui/internal/core"
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Image — картинка (api.md, §19): PNG, JPEG, GIF (первый кадр) и BMP на всех ОС.

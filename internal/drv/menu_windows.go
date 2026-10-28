@@ -8,7 +8,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // Меню окна (driver-win32.md, §5): HMENU строки меню в неклиентской области окна,

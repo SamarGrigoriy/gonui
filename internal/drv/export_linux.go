@@ -10,7 +10,7 @@ import "C"
 import (
 	"unsafe"
 
-	"nui/internal/core"
+	"github.com/SamarGrigoriy/gonui/internal/core"
 )
 
 // Четыре трамплина — по одному на сигнатуру колбэка (ADR-6). Все ведут в core.Dispatch.

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"nui/internal/drv"
+	"github.com/SamarGrigoriy/gonui/internal/drv"
 )
 
 // Список: данные по требованию, выбор пользователем и программой, активация, Update,
